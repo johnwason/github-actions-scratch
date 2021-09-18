@@ -18,6 +18,8 @@ jobs:
       matrix:
         arch: [x64]
     steps:
+    - name: print env
+      run: env
     - uses: haya14busa/action-cond@v1
       id: cmake_arch
       with:

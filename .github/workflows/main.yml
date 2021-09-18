@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  release:
+    types:
+      - created
+
+env:
+  version_suffix:
+
+jobs:
+  
+  build-win:
+    runs-on: windows-2016
+    strategy:
+      matrix:
+        arch: [x64]
+    steps:
+    
+    - name: configure
+      run: >
+        md -Force build2 && cd build2 &&
+        echo cmake -G "Visual Studio 15 2017" -A ${{ steps.cmake_arch.outputs.value }} -DBUILD_GEN=ON -DBUILD_TEST=ON 
+        -DBUILD_NET=ON -DBoost_USE_STATIC_LIBS=ON -DBUILD_PYTHON=ON 
+        -DBUILD_PYTHON_WHEEL=ON -DBUILD_PYTHON3=ON -DBUILD_PYTHON3_WHEEL=ON -DBUILD_JAVA=ON 
+        -DBOOST_ROOT="${env:BOOST_ROOT_1_72_0}" -DPYTHON_EXECUTABLE="${{ env.PYTHON2_EXE }}"
+        -DPYTHON3_EXECUTABLE="${{ env.PYTHON3_EXE }}" -DROBOTRACONTEUR_VERSION_SUFFIX="${{ env.version_suffix }}"
+        -DCMAKE_TOOLCHAIN_FILE=($env:VCPKG_INSTALLATION_ROOT + "/scripts/buildsystems/vcpkg.cmake")
+        ../robotraconteur
+    
+
+  

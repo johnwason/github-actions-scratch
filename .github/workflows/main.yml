@@ -19,7 +19,7 @@ jobs:
         arch: [x64]
     steps:
     - name: print env
-      run: echo "${{ env.VCPKG_INSTALLATION_ROOT }}"
+      run: echo "$env:VCPKG_INSTALLATION_ROOT"
     - uses: haya14busa/action-cond@v1
       id: cmake_arch
       with:

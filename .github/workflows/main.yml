@@ -32,7 +32,7 @@ jobs:
         cmake -G "Visual Studio 15 2017" -A ${{ steps.cmake_arch.outputs.value }} -DBUILD_GEN=ON -DBUILD_TEST=ON 
         -DBUILD_NET=ON -DBoost_USE_STATIC_LIBS=ON -DBUILD_PYTHON=ON 
         -DBUILD_PYTHON_WHEEL=ON -DBUILD_PYTHON3=ON -DBUILD_PYTHON3_WHEEL=ON -DBUILD_JAVA=ON        
-        -DCMAKE_TOOLCHAIN_FILE=%VCPKG_INSTALLATION_ROOT%\scripts\buildsystems\vcpkg.cmake"
+        -DCMAKE_TOOLCHAIN_FILE=%VCPKG_INSTALLATION_ROOT%\scripts\buildsystems\vcpkg.cmake
         ../robotraconteur
     
 

@@ -37,7 +37,7 @@ jobs:
       shell: bash
     - name: echo key data
       run: >-
-        ls ${{ env.VCPKG_INSTALLATION_ROOT }}
+        ls ${{ (format('{0}/ports', env.VCPKG_INSTALLATION_ROOT)) }}
     - name: echo key data
       run: >-
         ls ${{ (format('{0}/ports/openssl/*', env.VCPKG_INSTALLATION_ROOT)) }}

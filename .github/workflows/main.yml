@@ -35,6 +35,10 @@ jobs:
         ${{ env.VCPKG_INSTALLATION_ROOT }}
         -${{ hashFiles(format('{0}/ports/openssl/*', env.VCPKG_INSTALLATION_ROOT)) }}-main
       shell: bash
+    - name: echo key data
+      run: >-
+        ls ${{ (format('{0}/ports/openssl/*', env.VCPKG_INSTALLATION_ROOT)) }}
+      shell: bash
     - name: cache-vcpkg-archives
       if: startsWith(github.ref, 'refs/tags/v') != true
       id: cache-vcpkg-archives

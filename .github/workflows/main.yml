@@ -27,10 +27,12 @@ jobs:
     
     - name: List of the GitHub Actions environment variables on Windows
       run: env
+    - name: env vcpkg
+      run: echo  $env:VCPKG_INSTALLATION_ROOT | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
     - name: echo key data
       run: >-
         echo ${{ runner.os }}-${{matrix.config.arch}}-vcpkg-
-        ${{ matrix.env.VCPKG_INSTALLATION_ROOT }}
+        ${{ env.VCPKG_INSTALLATION_ROOT }}
         -${{ (format('{0}/ports/openssl/*', env.VCPKG_INSTALLATION_ROOT)) }}-main
       shell: bash
     - name: cache-vcpkg-archives

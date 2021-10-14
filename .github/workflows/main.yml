@@ -30,7 +30,7 @@ jobs:
       uses: actions/cache@v2
       with:
         path: C:\Users\runneradmin\AppData\Local\vcpkg\archives
-        key: ${{ runner.os }}-${{matrix.config.arch}}-vcpkg-${{ hashFiles(format("{0}/ports/boost-config/*", env.VCPKG_INSTALLATION_ROOT)) }}-${{ hashFiles(format("{0}/ports/openssl/*", env.VCPKG_INSTALLATION_ROOT)) }}-main
+        key: ${{ runner.os }}-${{matrix.config.arch}}-vcpkg-${{ hashFiles(format('{0}/ports/boost-config/*'', env.VCPKG_INSTALLATION_ROOT)) }}-${{ hashFiles(format('{0}/ports/openssl/*'', env.VCPKG_INSTALLATION_ROOT)) }}-main
     - name: vcpkg
       working-directory: ${{ env.VCPKG_INSTALLATION_ROOT }}
       run: >

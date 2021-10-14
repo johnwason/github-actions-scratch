@@ -30,7 +30,7 @@ jobs:
     - name: echo key data
       run: >-
         echo ${{ runner.os }}-${{matrix.config.arch}}-vcpkg-
-        ${{ (env) }}
+        ${{ matrix.env.VCPKG_INSTALLATION_ROOT }}
         -${{ (format('{0}/ports/openssl/*', env.VCPKG_INSTALLATION_ROOT)) }}-main
       shell: bash
     - name: cache-vcpkg-archives

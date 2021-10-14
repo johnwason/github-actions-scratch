@@ -24,13 +24,22 @@ jobs:
     - uses: actions/checkout@v2
       with:
         path: robotraconteur
+    - name: echo key data
+      run: >
+        echo ${{ runner.os }}-${{matrix.config.arch}}-vcpkg-
+        ${{ (format('{0}/ports/boost-config/*', env.VCPKG_INSTALLATION_ROOT)) }}
+        -${{ (format('{0}/ports/openssl/*', env.VCPKG_INSTALLATION_ROOT)) }}-main
+      shell: bash
     - name: cache-vcpkg-archives
       if: startsWith(github.ref, 'refs/tags/v') != true
       id: cache-vcpkg-archives
       uses: actions/cache@v2
       with:
         path: C:\Users\runneradmin\AppData\Local\vcpkg\archives
-        key: ${{ runner.os }}-${{matrix.config.arch}}-vcpkg-${{ hashFiles(format('{0}/ports/boost-config/*', env.VCPKG_INSTALLATION_ROOT)) }}-${{ hashFiles(format('{0}/ports/openssl/*', env.VCPKG_INSTALLATION_ROOT)) }}-main
+        key: > 
+           ${{ runner.os }}-${{matrix.config.arch}}-vcpkg-
+           ${{ hashFiles(format('{0}/ports/boost-config/*', env.VCPKG_INSTALLATION_ROOT)) }}
+           -${{ hashFiles(format('{0}/ports/openssl/*', env.VCPKG_INSTALLATION_ROOT)) }}-main
     - name: vcpkg
       working-directory: ${{ env.VCPKG_INSTALLATION_ROOT }}
       run: >

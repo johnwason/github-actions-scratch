@@ -24,6 +24,9 @@ jobs:
     - uses: actions/checkout@v2
       with:
         path: robotraconteur
+    
+    - name: List of the GitHub Actions environment variables on Windows
+      run: env
     - name: echo key data
       run: >-
         echo ${{ runner.os }}-${{matrix.config.arch}}-vcpkg-

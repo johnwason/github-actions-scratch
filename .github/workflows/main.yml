@@ -33,7 +33,7 @@ jobs:
       run: >-
         echo ${{ runner.os }}-${{matrix.config.arch}}-vcpkg-
         ${{ env.VCPKG_INSTALLATION_ROOT }}
-        -${{ (format('{0}/ports/openssl/*', env.VCPKG_INSTALLATION_ROOT)) }}-main
+        -${{ hashFiles(format('{0}/ports/openssl/*', env.VCPKG_INSTALLATION_ROOT)) }}-main
       shell: bash
     - name: cache-vcpkg-archives
       if: startsWith(github.ref, 'refs/tags/v') != true

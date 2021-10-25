@@ -20,9 +20,13 @@ jobs:
     steps:
     - uses: actions/checkout@v2
       with:
+        path: test
+    - uses: actions/checkout@v2
+      with:
         path: robotraconteur
+        repository: johnwason/robotraconteur
     - name: semver
       run: >
-        python robotraconteur/packaging/scripts/actions_semver.py --github-env
+        python test/packaging/scripts/actions_semver.py --github-env
     - name: List of the GitHub Actions environment variables on Windows
       run: env

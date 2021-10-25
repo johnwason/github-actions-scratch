@@ -23,6 +23,6 @@ jobs:
         path: robotraconteur
     - name: semver
       run: >
-        robotraconteur/packaging/scripts/actions_semver.py --github-env
+        python robotraconteur/packaging/scripts/actions_semver.py --github-env
     - name: List of the GitHub Actions environment variables on Windows
       run: env

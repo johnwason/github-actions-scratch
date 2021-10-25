@@ -1,7 +1,6 @@
 import argparse
 import os
 import re
-from packaging import version
 
 def main():
     parser = argparse.ArgumentParser(description="Compute semver for Robot Raconteur build")
@@ -15,15 +14,15 @@ def main():
     config_h_ver_str_m = re.search("ROBOTRACONTEUR_VERSION_TEXT \"(\\d+\\.\\d+\\.\\d+)\"", config_h)
     config_h_ver_str = config_h_ver_str_m.group(1)
 
-    config_h_ver_regex = r"^refs\/tags\/v((?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*))?"
+    config_h_ver_regex = r"^((?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*))?"
     assert re.match(config_h_ver_regex, config_h_ver_str), f"Invalid config header file version {config_h_ver_str}"
 
     ref = os.environ["GITHUB_REF"]
     if ref.startswith("refs/tags"):
-        semver_tag_regex = r"^refs\/tags\/v((?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*))(-(?:alpha|beta|rc)\d+)?"
+        semver_tag_regex = r"^refs\/tags\/v(((?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*))(-(?:alpha|beta|rc)\d+)?)"
         m = re.match(semver_tag_regex,ref)
         assert m, f"Invalid tag {ref}"
-        assert version.parse(m.group(2)) == version(config_h_ver_str)
+        assert m.group(2) == config_h_ver_str
         semver = m.group(1)
         print(semver)        
     else:

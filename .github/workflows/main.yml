@@ -10,7 +10,7 @@ on:
 jobs:
   
   build-win:
-    runs-on: windows-2016
+    runs-on: windows-latest
     strategy:
       matrix:
         config:
@@ -21,12 +21,9 @@ jobs:
     - uses: actions/checkout@v2
       with:
         path: test
-    - uses: actions/checkout@v2
-      with:
-        path: robotraconteur
-        repository: johnwason/robotraconteur
-    - name: semver
+    - name: vsdevcmd
       run: >
-        python test/packaging/scripts/actions_semver.py --github-env
+        dir "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
+        
     - name: List of the GitHub Actions environment variables on Windows
       run: env

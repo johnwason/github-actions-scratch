@@ -10,7 +10,7 @@ on:
 jobs:
   
   build-win:
-    runs-on: windows-latest
+    runs-on: windows-2019
     strategy:
       matrix:
         config:
@@ -23,7 +23,7 @@ jobs:
         path: test
     - name: vsdevcmd
       run: >
-        dir "C:\Program Files\Microsoft Visual Studio\"
+        dir "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
         
     - name: List of the GitHub Actions environment variables on Windows
       run: env

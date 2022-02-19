@@ -23,7 +23,7 @@ jobs:
         path: test
     - name: vsdevcmd
       run: >
-        dir "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools"
+        dir "C:\Program Files (x86)\Microsoft Visual Studio\"
         
     - name: List of the GitHub Actions environment variables on Windows
       run: env

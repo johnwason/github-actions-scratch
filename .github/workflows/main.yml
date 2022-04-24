@@ -45,7 +45,7 @@ jobs:
         cd openssl
         export PATH=$ANDROID_NDK_LATEST_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH 
         echo PATH=$PATH
-        ./Configure ${{ matrix.config.openssl_arch }} --prefix=$GITHUB_WORKSPACE/openssl_install_${{ matrix.config.android_abi }}
+        echo ./Configure ${{ matrix.config.openssl_arch }} --prefix=$GITHUB_WORKSPACE/openssl_install_${{ matrix.config.android_abi }}
         make -j4
         make install
     - name: List of the GitHub Actions environment variables on Windows

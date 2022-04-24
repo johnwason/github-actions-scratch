@@ -9,21 +9,43 @@ on:
 
 jobs:
   
-  build-win:
-    runs-on: windows-2019
+  build:
+    runs-on: ubuntu-20.04
     strategy:
+      fail-fast: false
       matrix:
         config:
-          - arch: x64
-            vcpkg_triplet: x64-windows-static-md
-            cmake_arch: x64
+        - android_abi: x86_64
+          swig_args: -DSWIGWORDSIZE64
+          openssl_arch: android-x86_64
+        - android_abi: x86
+          openssl_arch: android-x86
+        - android_abi: arm64-v8a
+          openssl_arch: android-arm64
+          swig_args: -DSWIGWORDSIZE64
+        - android_abi: armeabi-v7a
+          openssl_arch: android-arm
+    env:
+      DEBIAN_FRONTEND: noninteractive
     steps:
     - uses: actions/checkout@v2
       with:
         path: test
-    - name: vsdevcmd
-      run: >
-        dir "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
-        
+    - name: ls
+      run: |
+        echo $ANDROID_NDK_LATEST_HOME
+        ls $ANDROID_NDK_LATEST_HOME
+        ls $ANDROID_NDK_LATEST_HOME/toolchains
+        ls $ANDROID_NDK_LATEST_HOME/toolchains/llvm
+        ls $ANDROID_NDK_LATEST_HOME/toolchains/llvm/prebuilt
+        ls $ANDROID_NDK_LATEST_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin
+    - name: build_openssl
+      run: |
+        git clone --branch OpenSSL_1_1_1n https://github.com/openssl/openssl.git
+        cd openssl
+        export PATH=$ANDROID_NDK_LATEST_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH 
+        ./Configure ${{ matrix.config.openssl_arch }} --prefix=$GITHUB_WORKSPACE/openssl_install_${{ matrix.config.android_abi }}
+        make -j4
+        make install
     - name: List of the GitHub Actions environment variables on Windows
-      run: env
+      run: printenv

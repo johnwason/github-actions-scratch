@@ -27,6 +27,10 @@ jobs:
     - name: vsdevcmd
       run: >
         dir "C:\Program Files (x86)\Microsoft Visual Studio\"
-        
+    - name: vcvars
+      uses: TheMrMilchmann/setup-msvc-dev@v1
+      with:
+        arch: x64
+        vs-path: "C:\\Program Files (x86)\\Microsoft Visual Studio\\2017"
     - name: List of the GitHub Actions environment variables on Windows
       run: env

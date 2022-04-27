@@ -10,7 +10,7 @@ on:
 jobs:
   
   build-win:
-    runs-on: windows-2019
+    runs-on: windows-2022
     strategy:
       matrix:
         config:
@@ -21,9 +21,6 @@ jobs:
     - uses: actions/checkout@v2
       with:
         path: test
-    - name: choco
-      run: >
-        choco install -y visualstudio2017buildtools
     - name: vsdevcmd
       run: >
         dir "C:\Program Files (x86)\Microsoft Visual Studio\"

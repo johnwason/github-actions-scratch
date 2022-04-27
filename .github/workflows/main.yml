@@ -26,7 +26,7 @@ jobs:
         choco install -y visualstudio2017buildtools
     - name: vsdevcmd
       run: >
-        dir "C:\Program Files (x86)\Microsoft Visual Studio\"
+        tree "C:\Program Files (x86)\Microsoft Visual Studio\2017"
     - name: vcvars
       uses: TheMrMilchmann/setup-msvc-dev@v1
       with:

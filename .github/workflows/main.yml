@@ -21,16 +21,13 @@ jobs:
     - uses: actions/checkout@v2
       with:
         path: test
-    - name: choco
+    - name: install_vc2017
       run: >
-        choco install -y visualstudio2017buildtools
-    - name: vsdevcmd
-      run: >
-        tree "C:\Program Files (x86)\Microsoft Visual Studio\2017"
-    - name: vcvars
-      uses: TheMrMilchmann/setup-msvc-dev@v1
-      with:
-        arch: x64
-        vs-path: "C:\\Program Files (x86)\\Microsoft Visual Studio\\2017"
+        vs_enterprise.exe modify --add "Microsoft.VisualStudio.Component.VC.v141.x86.x64"
+    # - name: vcvars
+    #   uses: TheMrMilchmann/setup-msvc-dev@v1
+    #   with:
+    #     arch: x64
+    #     vs-path: "C:\\Program Files (x86)\\Microsoft Visual Studio\\2017"
     - name: List of the GitHub Actions environment variables on Windows
       run: env

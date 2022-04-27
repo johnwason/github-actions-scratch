@@ -22,6 +22,7 @@ jobs:
       with:
         path: test
     - name: install_vc2017
+      shell: cmd
       run: >
         "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe" modify --add "Microsoft.VisualStudio.Component.VC.v141.x86.x64"
     # - name: vcvars

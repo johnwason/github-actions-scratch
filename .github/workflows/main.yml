@@ -22,10 +22,12 @@ jobs:
       with:
         path: vcpkg
         repository: microsoft/vcpkg
+        fetch-depth: 1
     - name: bootstrap vcpkg
       working-directory: vcpkg
       run: ./bootstrap-vcpkg.sh
     - name: vcpkg
+      working-directory: vcpkg
       run: >
         ./vcpkg install --triplet arm64-ios openssl
         boost-algorithm boost-array boost-asio

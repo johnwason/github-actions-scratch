@@ -10,20 +10,26 @@ on:
 jobs:
   
   build-win:
-    runs-on: windows-2019
-    strategy:
-      matrix:
-        config:
-          - arch: x64
-            vcpkg_triplet: x64-windows-static-md
-            cmake_arch: x64
+    runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v2
       with:
         path: test
-    - name: vsdevcmd
-      run: >
-        dir "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
-        
-    - name: List of the GitHub Actions environment variables on Windows
-      run: env
+    - uses: actions/checkout@v2
+      with:
+        repository: johnwason/robotraconteur
+        ref: formatting
+        path: robotraconteur
+    - name: pip
+      run: sudo python3 -m pip install autopep8 cmakelang
+    - name: clang-format-14
+      run: |
+        wget https://apt.llvm.org/llvm.sh
+        chmod +x llvm.sh
+        sudo ./llvm.sh 14 all
+    - name: run formatting
+      run: ./tools/formatting/run-all-formatting
+      working-directory: robotraconteur
+    - name: git diff for changes
+      run: git diff --name-only --exit-code
+      working-directory: robotraconteur

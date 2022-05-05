@@ -9,7 +9,7 @@ on:
 
 jobs:
   
-  build-win:
+  check-formatting:
     runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v2
@@ -18,7 +18,7 @@ jobs:
     - uses: actions/checkout@v2
       with:
         repository: johnwason/robotraconteur
-        ref: formatting
+        ref: formatting_bad
         path: robotraconteur
     - name: pip
       run: sudo python3 -m pip install autopep8 cmakelang

@@ -26,7 +26,7 @@ jobs:
       run: |
         wget https://apt.llvm.org/llvm.sh
         chmod +x llvm.sh
-        sudo ./llvm.sh 14 all
+        sudo ./llvm.sh 14 tools
     - name: run formatting
       run: ./tools/formatting/run-all-formatting
       working-directory: robotraconteur

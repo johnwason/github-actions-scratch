@@ -47,6 +47,6 @@ jobs:
       run: printenv
     - name: print python path
       run: echo "${{ steps.setup-python.outputs.python-path }}"
-    - name: ls python
-      run: ls $Python3_ROOT_DIR
+    - name: ls python bin
+      run: ls $Python3_ROOT_DIR/bin
     

@@ -35,7 +35,7 @@ jobs:
           runs_on: ubuntu-latest
           container: ubuntu:20.04
           py_platform: manylinux_2_31_x86_64
-          python_version: 3.10        
+          python_version: "3.10"
     env:
       DEBIAN_FRONTEND: noninteractive
     steps:
@@ -47,4 +47,6 @@ jobs:
       run: printenv
     - name: print python path
       run: echo "${{ steps.setup-python.outputs.python-path }}"
+    - name: ls python
+      run: ls $Python3_ROOT_DIR
     

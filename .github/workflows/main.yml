@@ -49,8 +49,8 @@ jobs:
       run: echo "${{ steps.setup-python.outputs.python-path }}"
     - name: ls python bin
       run: ls $Python3_ROOT_DIR/bin
-    - name: where python
-      run: where python
+    - name: whereis python
+      run: whereis python
     - name: python ver
       run: python --version
     

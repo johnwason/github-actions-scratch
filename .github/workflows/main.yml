@@ -7,64 +7,44 @@ on:
     types:
       - created
 
-env:
-  version_suffix:
-
 jobs:
   
-  build-win:
-    runs-on: windows-2016
+  build-ubuntu:
+    runs-on: ${{ matrix.config.runs_on }}
+    container: ${{ matrix.config.container }}
     strategy:
+      fail-fast: false
       matrix:
         config:
-          - arch: x64
-            vcpkg_triplet: x64-windows-static-md
-            cmake_arch: x64
+        - os: ubuntu-20.04
+          runs_on: ubuntu-latest
+          container: ubuntu:20.04
+          py_platform: manylinux_2_31_x86_64
+          python_version: 3.7
+        - os: ubuntu-20.04
+          runs_on: ubuntu-latest
+          container: ubuntu:20.04
+          py_platform: manylinux_2_31_x86_64
+          python_version: 3.8
+        - os: ubuntu-20.04
+          runs_on: ubuntu-latest
+          container: ubuntu:20.04
+          py_platform: manylinux_2_31_x86_64
+          python_version: 3.9
+        - os: ubuntu-20.04
+          runs_on: ubuntu-latest
+          container: ubuntu:20.04
+          py_platform: manylinux_2_31_x86_64
+          python_version: 3.10        
+    env:
+      DEBIAN_FRONTEND: noninteractive
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/setup-python@v4
+      id: setup-python
       with:
-        path: robotraconteur
-    
-    - name: List of the GitHub Actions environment variables on Windows
-      run: env
-    - name: checkout vcpkg
-      uses: actions/checkout@v2
-      with:
-        path: vcpkg
-        repository: microsoft/vcpkg
-    - name: bootstrap vcpkg
-      working-directory: vcpkg
-      run: bootstrap-vcpkg.bat
-    - name: echo key data
-      run: >-
-        echo ${{ runner.os }}-${{matrix.config.arch}}-vcpkg-
-        ${{ hashFiles('vcpkg/ports/boost-config/*') }}
-        -${{ hashFiles('vcpkg/ports/openssl/*') }}-main
-      shell: bash
-    - name: echo key data
-      run: >-
-        echo ${{ hashFiles('c:\\vcpkg\\*') }}
-    - name: echo key data
-      run: >-
-        ls ${{ (format('{0}/ports/openssl/*', env.VCPKG_INSTALLATION_ROOT)) }}
-      shell: bash
-    - name: cache-vcpkg-archives
-      if: startsWith(github.ref, 'refs/tags/v') != true
-      id: cache-vcpkg-archives
-      uses: actions/cache@v2
-      with:
-        path: C:\Users\runneradmin\AppData\Local\vcpkg\archives
-        key: >-
-           ${{ runner.os }}-${{matrix.config.arch}}-vcpkg-
-           ${{ hashFiles(format('{0}/ports/boost-config/*', env.VCPKG_INSTALLATION_ROOT)) }}
-           -${{ hashFiles(format('{0}/ports/openssl/*', env.VCPKG_INSTALLATION_ROOT)) }}-main
-    - name: vcpkg
-      working-directory: ${{ env.VCPKG_INSTALLATION_ROOT }}
-      run: >
-        vcpkg install --triplet ${{ matrix.config.vcpkg_triplet }} boost-algorithm boost-array boost-asio 
-        boost-assign boost-atomic boost-bind boost-config boost-container boost-date-time 
-        boost-smart-ptr boost-filesystem boost-foreach boost-format boost-function boost-interprocess
-        boost-intrusive boost-lexical-cast boost-locale boost-random boost-range boost-regex
-        boost-scope-exit boost-signals2 boost-thread boost-tuple boost-unordered 
-        boost-utility boost-uuid boost-program-options --dry-run
+        python-version: '${{ matrix.config.python_version }}'
+    - name: print env
+      run: printenv
+    - name: print python path
+      run: echo "${{ steps.setup-python.outputs.python-path }}"
     

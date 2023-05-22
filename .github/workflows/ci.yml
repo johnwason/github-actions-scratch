@@ -10,6 +10,7 @@ jobs:
     runs-on: ${{ matrix.config.os }}
     name: test-vcpkg-action
     strategy:
+      fail-fast: false
       matrix:
         config:
         - os: ubuntu-20.04
@@ -41,6 +42,7 @@ jobs:
     runs-on: ${{ matrix.config.os }}
     name: test-vcpkg-action-latest-vcpkg-release
     strategy:
+      fail-fast: false
       matrix:
         config:
         - os: ubuntu-20.04
@@ -71,6 +73,7 @@ jobs:
     runs-on: ${{ matrix.config.os }}
     name: test-manifest
     strategy:
+      fail-fast: false
       matrix:
         config:
         - os: ubuntu-20.04

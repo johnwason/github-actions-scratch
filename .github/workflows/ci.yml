@@ -25,7 +25,7 @@ jobs:
         id: vcpkg
         uses: johnwason/vcpkg-action@dry_run_tee
         with:
-          pkgs: boost-date-time boost-system baaaaddd
+          pkgs: boost-date-time boost-system
           triplet: ${{ matrix.config.vcpkg_triplet }}
           cache-key: ${{ matrix.config.os }}
           revision: master
@@ -57,7 +57,7 @@ jobs:
         id: vcpkg
         uses: johnwason/vcpkg-action@dry_run_tee
         with:
-          pkgs: boost-date-time boost-system baaaadddd
+          pkgs: boost-date-time boost-system
           triplet: ${{ matrix.config.vcpkg_triplet }}
           cache-key: ${{ matrix.config.os }}
           token: ${{ github.token }}

@@ -3,6 +3,6 @@
     "name": "test-vcpkg-manifest-mode",
     "version": "0.1.0",
     "dependencies": [
-      "boost-date-time", "boost-system", "baaaadddd"
+      "boost-date-time", "boost-system"
     ]
   }

@@ -10,7 +10,12 @@ on:
     
 jobs:
   windows_test:
-    runs-on: windows-2019
+    runs-on: ${{ matrix.windows-versions }}
+    strategy:
+      matrix:
+        windows-versions:
+          - windows-2019
+          - windows-2022
     steps:
     - uses: actions/checkout@v3
     # - name: pip

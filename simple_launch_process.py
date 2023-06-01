@@ -1,7 +1,10 @@
 import sys
 import atexit
+import time
 import traceback
 import threading
+
+hwnd_ = 0
 
 def wait_exit():
 
@@ -123,6 +126,8 @@ if sys.platform == "win32":
         return hWnd
 
     def _win32_wait_message_hwnd(hWnd):
+        global hwnd_
+        hwnd_ = hWnd
 
 
         # Install a ctrl-c handler to send WM_QUIT
@@ -149,4 +154,14 @@ if sys.platform == "win32":
 __all__ = ["wait_exit","wait_exit_callback","wait_exit_stop_loop"]
 
 if __name__ == "__main__":
+    def stop_thread():
+        time.sleep(15)
+        print("Sending stop signal")
+        _win32_post_hwnd_close(hwnd_)
+        print("Send stop signal")
+
+    t = threading.Thread(target=stop_thread)
+    t.start()
+    print("Start wait_exit")
     wait_exit()
+    print("Exiting program")

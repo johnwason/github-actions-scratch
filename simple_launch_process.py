@@ -62,7 +62,7 @@ if sys.platform == "win32":
     import ctypes
     import ctypes.wintypes
 
-    WNDPROCTYPE = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.wintypes.HWND, ctypes.c_uint, ctypes.wintypes.WPARAM, ctypes.wintypes.LPARAM)
+    WNDPROCTYPE = ctypes.WINFUNCTYPE(ctypes.wintypes.LPARAM, ctypes.wintypes.HWND, ctypes.wintypes.UINT, ctypes.wintypes.WPARAM, ctypes.wintypes.LPARAM)
     CtrlCHandlerRoutine = ctypes.WINFUNCTYPE(ctypes.wintypes.BOOL, ctypes.wintypes.DWORD)
     WM_DESTROY = 2
     WM_CLOSE = 16
@@ -83,17 +83,23 @@ if sys.platform == "win32":
                     ("hIconSm", ctypes.wintypes.HANDLE)]
 
     def _PyWndProcedure(hWnd, Msg, wParam, lParam):
-        if Msg == WM_DESTROY:
-            ctypes.windll.user32.PostQuitMessage(0)
-        elif Msg == WM_CLOSE:
-            ctypes.windll.user32.DestroyWindow(hWnd)
-        else:
-            try:
-                # TODO: Why is this raising on error?
-                return ctypes.windll.user32.DefWindowProcW(hWnd, Msg, wParam, 0)
-            except ctypes.ArgumentError:
-                pass
-        return 0
+        try:
+            print("Got message: ", hWnd, Msg, wParam, lParam)
+            if Msg == WM_DESTROY:
+                ctypes.windll.user32.PostQuitMessage(0)
+            elif Msg == WM_CLOSE:
+                ctypes.windll.user32.DestroyWindow(hWnd)
+            else:
+                try:
+                    # TODO: Why is this raising on error?
+                    return ctypes.windll.user32.DefWindowProcW(hWnd, Msg, ctypes.wintypes.WPARAM(wParam),
+                                                                      ctypes.wintypes.LPARAM(lParam))
+                except ctypes.ArgumentError:
+                    traceback.print_exc()
+                    pass
+        except Exception:
+            traceback.print_exc()
+        return 1
 
     WndProc = WNDPROCTYPE(_PyWndProcedure)
 
@@ -122,6 +128,10 @@ if sys.platform == "win32":
         assert regRes, "Could not create win32 message wnd class"
 
         hWnd = ctypes.windll.user32.CreateWindowExW( 0, wclassName, wname, 0, 0, 0, 0, 0, HWND_MESSAGE, None, None, None )
+        # GetLastError and print
+        err = ctypes.windll.kernel32.GetLastError()
+        print("Create Windows Error: ", err)
+        print(hWnd)
         assert hWnd, "Could not create win32 message hwnd"
         return hWnd
 
@@ -161,6 +171,7 @@ if __name__ == "__main__":
         print("Send stop signal")
 
     t = threading.Thread(target=stop_thread)
+    t.setDaemon(True)
     t.start()
     print("Start wait_exit")
     wait_exit()

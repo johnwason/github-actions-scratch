@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  release:
+    types:
+      - created
+  workflow_dispatch:
+    
+jobs:
+  windows_test:
+    runs-on: ${{ matrix.windows-versions }}
+    strategy:
+      fail-fast: false
+      matrix:
+        windows-versions:
+          - windows-2019
+          - windows-2022
+    steps:
+    - uses: actions/checkout@v3
+    - name: choco miniconda
+      run: |
+        choco install miniconda3 -r
+    - name: activate miniconda and install robostack
+      run: |
+        C:\tools\miniconda3\Scripts\activate.bat
+        conda install mamba -c conda-forge
+        mamba create -n ros_env
+        mamba activate ros_env
+        conda config --env --add channels conda-forge
+        conda config --env --add channels robostack-staging
+        conda config --env --remove channels defaults
+        mamba install ros-humble-ros-base
+
+    

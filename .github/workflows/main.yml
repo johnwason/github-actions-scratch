@@ -23,6 +23,7 @@ jobs:
       run: |
         choco install miniconda3 -r
     - name: activate miniconda and install robostack
+      shell: cmd
       run: |
         C:\tools\miniconda3\Scripts\activate.bat
         conda install mamba -c conda-forge

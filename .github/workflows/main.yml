@@ -12,6 +12,7 @@ jobs:
   windows_test:
     runs-on: ${{ matrix.windows-versions }}
     strategy:
+      fail-fast: false
       matrix:
         windows-versions:
           - windows-2019
@@ -26,7 +27,8 @@ jobs:
         choco install python2 ${{ matrix.arch == 'x86' && '-x86' }} -r
     - name: path
       run: |
-        echo %PATH%
+        echo $env:PATH
     - name: pip
       run: |
+        C:\python27\python -m pip install --upgrade pip
         C:\python27\python -m pip install numpy setuptools wheel pytest

@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  release:
+    types:
+      - created
+  workflow_dispatch:
+    
+jobs:
+  windows_test:
+    runs-on: ${{ matrix.windows-versions }}
+    strategy:
+      matrix:
+        windows-versions:
+          - windows-2019
+          - windows-2022
+        arch:
+          - x86
+          - x64
+    steps:
+    - uses: actions/checkout@v3
+    - name: choco python2.7
+      run: |
+        choco install python2 ${{ matrix.arch == 'x86' && '-x86' }} -r
+    - name: path
+      run: |
+        echo %PATH%
+    - name: pip
+      run: |
+        C:\python27\python -m pip install numpy setuptools wheel pytest

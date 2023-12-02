@@ -21,6 +21,10 @@ jobs:
     - uses: actions/checkout@v4
       with:
         path: target_ws/src
+    - name: configure-msvc
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: x64
     - name: Build and Tests
       uses: tesseract-robotics/colcon-action@v1
       with:

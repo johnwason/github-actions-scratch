@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  release:
+    types:
+      - created
+  workflow_dispatch:
+    
+jobs:
+  windows_test:
+    runs-on: ${{ matrix.windows-versions }}
+    strategy:
+      fail-fast: false
+      matrix:
+        windows-versions:
+          - windows-2019
+          - windows-2022
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        path: target_ws/src
+    - name: Build and Tests
+      uses: tesseract-robotics/colcon-action@v1
+      with:
+        upstream-args: --cmake-args -G "Ninja" -DVCPKG_TARGET_TRIPLET=x64-windows-release -DCMAKE_BUILD_TYPE=Release
+        target-path: target_ws/src
+        target-args: --cmake-args -G "Ninja" -DVCPKG_TARGET_TRIPLET=x64-windows-release -DCMAKE_BUILD_TYPE=Release -DTESSERACT_ENABLE_TESTING=ON
+    
+    
+
+    

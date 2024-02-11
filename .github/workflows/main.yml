@@ -22,7 +22,7 @@ jobs:
         echo "FEATURES=\"${FEATURES} binpkg-request-signature getbinpkg\"" >> /etc/portage/make.conf
     - name: sync-portage
       run: |
-        emerge --sync
+        emerge --sync --quiet
     - name: install-deps
       run: >-
         emerge --getbinpkg --usepkg  

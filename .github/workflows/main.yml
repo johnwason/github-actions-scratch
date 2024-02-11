@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  release:
+    types:
+      - created
+  workflow_dispatch:
+    
+jobs:
+  build-archlinux:
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        path: robotraconteur
+        repository: robotraconteur/robotraconteur
+    - name: install-pkgs
+      run: >-
+        pacman -Syu --noconfirm boost cmake ninja
+        gcc  make openssl dbus
+        libusb bluez-libs gtest
+        python python-pip python-numpy
+        python-pytest zlib swig
+    - name: config
+      run: >-
+        cmake -GNinja -S robotraconteur -B build -DBUILD_TESTING=ON -DBUILD_GEN=ON 
+        -DBUILD_PYTHON3=ON -DCMAKE_BUILD_CONFIG=Release 
+        -DPYTHON3_EXECUTABLE=/usr/bin/python3
+    - name: build
+      run: >-
+        cmake --build build --config Release
+    - name: test
+      run: >-
+        ctest --test-dir build -C Release
+        -E "robotraconteur_test_discovery_loopback|RobotRaconteurService.DiscoveryLoopback" 
+        --output-on-failure 
+        
+
+
+    
+    

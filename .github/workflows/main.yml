@@ -16,11 +16,11 @@ jobs:
       EMCC_CORES: 3
       PYODIDE_JOBS: 3
       #CCACHE_DIR: /tmp/dep-ccache
-      HOME: /root
     steps:
     - uses: actions/checkout@v4
       with:
         path: rr_src
+        repository: robotraconteur/robotraconteur
     # - name: ccache deps
     #   uses: actions/cache@v3
     #   with:

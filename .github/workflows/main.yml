@@ -40,12 +40,6 @@ jobs:
     - uses: mymindstorm/setup-emsdk@v14
       with:
         version: ${{ env.EMSCRIPTEN_VERSION }}
-    - name: remove apt swig
-      run: sudo apt remove '^swig.*' -y -qq || true
-    - name: build-swig
-      uses: johnwason/swig-build-action@v1.1
-      with:
-        cache-key: pyodide-swig
     - name: build pregenerated_src
       run: |
         cmake -S $GITHUB_WORKSPACE/rr_src -B gen_src -DPACKAGE_SWIG_SOURCE_ALL=ON -DBUILD_PYTHON3=ON -DBUILD_TESTING=OFF

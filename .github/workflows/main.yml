@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  release:
+    types:
+      - created
+  workflow_dispatch:
+    
+jobs:
+  build-pyodide:
+    runs-on: ubuntu-22.04
+    env:
+      EMSDK_NUM_CORES: 3
+      EMCC_CORES: 3
+      PYODIDE_JOBS: 3
+      #CCACHE_DIR: /tmp/dep-ccache
+      HOME: /root
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        path: rr_src
+    # - name: ccache deps
+    #   uses: actions/cache@v3
+    #   with:
+    #     path: |
+    #       /tmp/dep-ccache
+    #     key: pyodide-deps-${{ hashFiles('Makefile.envs') }}
+    - name: apt
+      run: |
+        sudo apt update
+        sudo apt install -y build-essential libboost-all-dev zlib1g-dev libssl-dev libdbus-1-dev libbluetooth-dev libusb-1.0-0-dev
+    - uses: actions/setup-python@v5
+      with:
+        python-version: 3.11
+    - run: |
+        pip install pyodide-build>=0.23.0
+        echo EMSCRIPTEN_VERSION=$(pyodide config get emscripten_version) >> $GITHUB_ENV
+    - uses: mymindstorm/setup-emsdk@v14
+      with:
+        version: ${{ env.EMSCRIPTEN_VERSION }}
+    - name: pip-install
+      working-directory: src
+      run: |
+        pip install pyodide-build
+        pip install -r requirements.txt
+        pip install numpy
+    - name: remove apt swig
+      run: sudo apt remove '^swig.*' -y -qq || true
+    - name: build-swig
+      uses: johnwason/swig-build-action@v1.1
+      with:
+        cache-key: pyodide-swig
+    - name: build pregenerated_src
+      run: |
+        cmake -S $GITHUB_WORKSPACE/rr_src -B gen_src -DPACKAGE_SWIG_SOURCE_ALL=ON -DBUILD_PYTHON3=ON -DBUILD_TESTING=OFF -DPYTHON3_EXECUTABLE=/usr/local/bin/python3
+        cmake --build gen_src --config Release --target package_source_swig
+        cp -r $GITHUB_WORKSPACE/gen_src/generated_src $GITHUB_WORKSPACE/rr_src/
+        cmake --build gen_src --config Release --target install -j4
+        python -m pip install $GITHUB_WORKSPACE/gen_src/out/Python3
+    - run: pyodide build
+      working-directory: rr_src/tools/build_files/pyodide
+ 
+        
+
+
+    
+    

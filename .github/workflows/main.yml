@@ -35,17 +35,11 @@ jobs:
       with:
         python-version: 3.11
     - run: |
-        pip install pyodide-build>=0.23.0
+        pip install pyodide-build>=0.23.0 numpy<2.0
         echo EMSCRIPTEN_VERSION=$(pyodide config get emscripten_version) >> $GITHUB_ENV
     - uses: mymindstorm/setup-emsdk@v14
       with:
         version: ${{ env.EMSCRIPTEN_VERSION }}
-    - name: pip-install
-      working-directory: src
-      run: |
-        pip install pyodide-build
-        pip install -r requirements.txt
-        pip install numpy
     - name: remove apt swig
       run: sudo apt remove '^swig.*' -y -qq || true
     - name: build-swig

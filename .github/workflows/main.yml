@@ -52,7 +52,7 @@ jobs:
         cp -v $GITHUB_WORKSPACE/rr_src/tools/build_files/pyodide/* $GITHUB_WORKSPACE/p/recipes/RobotRaconteur
         tree $GITHUB_WORKSPACE/p
         tree $GITHUB_WORKSPACE/rr_src/tools/build_files
-
+    - run: pyodide build-recipes numpy boost-cpp
     - run: pyodide build-recipes --recipe-dir $GITHUB_WORKSPACE/p/recipes RobotRaconteur
  
         

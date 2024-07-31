@@ -47,8 +47,11 @@ jobs:
         cp -r $GITHUB_WORKSPACE/gen_src/generated_src $GITHUB_WORKSPACE/rr_src/
         sudo cmake --build gen_src --config Release --target install -j4
         sudo python -m pip install $GITHUB_WORKSPACE/gen_src/out/Python3
-    - run: pyodide build-recipes .
-      working-directory: rr_src/tools/build_files/pyodide
+    - run: |
+        mkdir -p p/recipes/robotraconteur
+        cp $GITHUB_WORKSPACE/rr_src/tools/build_files/pyodide/* p/recipes/robotraconteur
+
+    - run: pyodide build-recipes --recipe-dir $GITHUB_WORKSPACE/p/recipes robotraconteur
  
         
 

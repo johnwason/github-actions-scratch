@@ -33,7 +33,7 @@ jobs:
         sudo apt install -y build-essential libboost-all-dev zlib1g-dev libssl-dev libdbus-1-dev libbluetooth-dev libusb-1.0-0-dev
     - uses: actions/setup-python@v5
       with:
-        python-version: 3.11
+        python-version: 3.12
     - run: |
         pip install "pyodide-build>=0.23.0" "numpy<2.0"
         echo EMSCRIPTEN_VERSION=$(pyodide config get emscripten_version) >> $GITHUB_ENV

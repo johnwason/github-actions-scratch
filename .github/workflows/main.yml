@@ -21,6 +21,10 @@ jobs:
       with:
         path: rr_src
         repository: robotraconteur/robotraconteur
+    - uses: actions/checkout@v4
+      with:
+        repository: pyodide/pyodide
+        path: src
     # - name: ccache deps
     #   uses: actions/cache@v3
     #   with:
@@ -52,7 +56,7 @@ jobs:
         cp -v $GITHUB_WORKSPACE/rr_src/tools/build_files/pyodide/* $GITHUB_WORKSPACE/p/recipes/RobotRaconteur
         tree $GITHUB_WORKSPACE/p
         tree $GITHUB_WORKSPACE/rr_src/tools/build_files
-    - run: pyodide build-recipes numpy boost-cpp
+    - run: pyodide build-recipes --recipe-dir $GITHUB_WORKSPACE/src/packages numpy boost-cpp
     - run: pyodide build-recipes --recipe-dir $GITHUB_WORKSPACE/p/recipes RobotRaconteur
  
         

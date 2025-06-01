@@ -20,7 +20,7 @@ runs:
       # Split the input version to get the major and minor parts
       py_major_part=$(echo "${{ inputs.python_version }}" | cut -d '.' -f 1)
       py_minor_part=$(echo "${{ inputs.python_version }}" | cut -d '.' -f 2)
-      latest=$(pyenv install --list | grep -E '^\s*$py_major_part\.$py_minor_part\.[0-9]+$' | tr -d ' ' | sort -V | tail -1)
+      latest=$(pyenv install --list | grep -E "^\s*$py_major_part\.$py_minor_part\.[0-9]+$" | tr -d ' ' | sort -V | tail -1)
       echo "latest_py=$latest" >> $GITHUB_OUTPUT
 
   - uses: "gabrielfalcao/pyenv-action@v18"

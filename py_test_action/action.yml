@@ -27,8 +27,8 @@ runs:
     name: python install
     if: always()
     with:
-      default: "${{ steps.full_py_ver.outputs.latest_py }}"
-      versions: "${{ steps.full_py_ver.outputs.latest_py }}"
+      default: "${{ steps.py_full_ver.outputs.latest_py }}"
+      versions: "${{ steps.py_full_ver.outputs.latest_py }}"
       command: "python --version"
       
   - name: test python version

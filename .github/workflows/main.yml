@@ -56,10 +56,18 @@ jobs:
         #   container: ""
         #   arch: x64
     steps:
+    - name: Switch to Azure Ubuntu mirror
+      if: ${{ matrix.config.container != '' && startsWith(matrix.config.container, 'ubuntu:') }}
+      run: |
+        sed -i 's|http://archive.ubuntu.com/ubuntu|http://azure.archive.ubuntu.com/ubuntu|g' /etc/apt/sources.list
+        sed -i 's|http://security.ubuntu.com/ubuntu|http://azure.archive.ubuntu.com/ubuntu|g' /etc/apt/sources.list
     - name: install sudo for containers
       if: ${{ matrix.config.container != '' }}
       run: |
         apt-get update
+        apt install sudo tzdata -y
+        ln -fs /usr/share/zoneinfo/Etc/UTC /etc/localtime
+        dpkg-reconfigure --frontend noninteractive tzdata
         apt-get install -y sudo
     - name: apt
       if: always()

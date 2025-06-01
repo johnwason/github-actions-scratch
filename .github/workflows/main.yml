@@ -56,6 +56,16 @@ jobs:
         #   container: ""
         #   arch: x64
     steps:
+    - name: apt
+      if: always()
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          unzip \
+          zip \
+          curl
+          wget
     - uses: "gabrielfalcao/pyenv-action@v18"
       name: python 3.8
       if: always()

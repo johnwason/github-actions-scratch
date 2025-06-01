@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  release:
+    types:
+      - created
+  workflow_dispatch:
+    
+jobs:
+  test-setup-python:
+    runs-on: ${{ matrix.config.runs_on }}
+    container: ${{ matrix.config.container }}
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+        - os: ubuntu-20.04
+          runs_on: ubuntu-latest
+          container: "ubuntu:focal"
+          arch: x64
+          wheel_platform: manylinux_2_31_x86_64
+        - os: ubuntu-22.04
+          runs_on: ubuntu-22.04
+          container: ""
+          arch: x64
+          wheel_platform: manylinux_2_31_x86_64
+        - os: ubuntu-24.04
+          runs_on: ubuntu-22.04
+          container: ""
+          arch: x64
+          wheel_platform: manylinux_2_31_x86_64
+        - os: debian-10
+          runs_on: ubuntu-latest
+          container: debian:buster-slim
+          arch: x64
+          wheel_platform: manylinux_2_31_x86_64
+        - os: debian-11
+          runs_on: ubuntu-latest
+          container: debian:bullseye-slim
+          arch: x64
+          wheel_platform: manylinux_2_31_x86_64
+        - os: ubuntu-20.04-arm
+          runs_on: ubuntu-24.04-arm
+          container: "ubuntu:focal"
+          arch: arm64
+          wheel_platform: manylinux_2_31_aarch64
+        - os: ubuntu-22.04-arm
+          runs_on: ubuntu-22.04-arm
+          container: ""
+          arch: arm64
+          wheel_platform: manylinux_2_31_aarch64
+        - os: windows-latest
+          run_ons: windows-latest
+          container: ""
+          arch: x64
+    steps:
+    - uses: actions/setup-python@v5
+      name: python 3.8
+      if: always()
+      with:
+        python-version: 3.8
+        architecture: ${{ matrix.config.runs_on }}
+    - uses: actions/setup-python@v5
+      name: python 3.9
+      if: always()
+      with:
+        python-version: 3.9
+        architecture: ${{ matrix.config.runs_on }}
+    - uses: actions/setup-python@v5
+      name: python 3.10
+      if: always()
+      with:
+        python-version: 3.10
+        architecture: ${{ matrix.config.runs_on }}
+    - uses: actions/setup-python@v5
+      name: python 3.11
+      if: always()
+      with:
+        python-version: 3.11
+        architecture: ${{ matrix.config.runs_on }}
+    - uses: actions/setup-python@v5
+      name: python 3.12
+      if: always()
+      with:
+        python-version: 3.12
+        architecture: ${{ matrix.config.runs_on }}
+    - uses: actions/setup-python@v5
+      name: python 3.13
+      if: always()
+      with:
+        python-version: 3.13
+        architecture: ${{ matrix.config.runs_on }}
+
+    
+    

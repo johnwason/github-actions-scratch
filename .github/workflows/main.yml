@@ -56,11 +56,16 @@ jobs:
         #   container: ""
         #   arch: x64
     steps:
+    - name: install sudo for containers
+      if: ${{ matrix.config.container != '' }}
+      run: |
+        apt-get update
+        apt-get install -y sudo
     - name: apt
       if: always()
       run: |
-        apt-get update
-        apt-get install -y \
+        sudo apt-get update
+        sudo apt-get install -y \
           build-essential \
           unzip \
           zip \
@@ -77,9 +82,10 @@ jobs:
     - name: test python version
       if: always()
       run: |
-        python --version
-        python -c "import sys; print(sys.executable)"
-        python -c "import sys; print(sys.version_info)"
+        export PY=$(pyenv which python)
+        $PY --version
+        $PY -c "import sys; print(sys.executable)"
+        $PY -c "import sys; print(sys.version_info)"
     - uses: "gabrielfalcao/pyenv-action@v18"
       name: python 3.9
       if: always()
@@ -90,9 +96,10 @@ jobs:
     - name: test python version
       if: always()
       run: |
-        python --version
-        python -c "import sys; print(sys.executable)"
-        python -c "import sys; print(sys.version_info)"
+        export PY=$(pyenv which python)
+        $PY --version
+        $PY -c "import sys; print(sys.executable)"
+        $PY -c "import sys; print(sys.version_info)"
     - uses: "gabrielfalcao/pyenv-action@v18"
       name: python 3.10
       if: always()
@@ -103,9 +110,10 @@ jobs:
     - name: test python version
       if: always()
       run: |
-        python --version
-        python -c "import sys; print(sys.executable)"
-        python -c "import sys; print(sys.version_info)"
+        export PY=$(pyenv which python)
+        $PY --version
+        $PY -c "import sys; print(sys.executable)"
+        $PY -c "import sys; print(sys.version_info)"
     - uses: "gabrielfalcao/pyenv-action@v18"
       name: python 3.11
       if: always()
@@ -115,9 +123,10 @@ jobs:
     - name: test python version
       if: always()
       run: |
-        python --version
-        python -c "import sys; print(sys.executable)"
-        python -c "import sys; print(sys.version_info)"
+        export PY=$(pyenv which python)
+        $PY --version
+        $PY -c "import sys; print(sys.executable)"
+        $PY -c "import sys; print(sys.version_info)"
     - uses: "gabrielfalcao/pyenv-action@v18"
       name: python 3.12
       if: always()
@@ -128,9 +137,10 @@ jobs:
     - name: test python version
       if: always()
       run: |
-        python --version
-        python -c "import sys; print(sys.executable)"
-        python -c "import sys; print(sys.version_info)"
+        export PY=$(pyenv which python)
+        $PY --version
+        $PY -c "import sys; print(sys.executable)"
+        $PY -c "import sys; print(sys.version_info)"
     - uses: "gabrielfalcao/pyenv-action@v18"
       name: python 3.13
       if: always()
@@ -141,9 +151,10 @@ jobs:
     - name: test python version
       if: always()
       run: |
-        python --version
-        python -c "import sys; print(sys.executable)"
-        python -c "import sys; print(sys.version_info)"
+        export PY=$(pyenv which python)
+        $PY --version
+        $PY -c "import sys; print(sys.executable)"
+        $PY -c "import sys; print(sys.version_info)"
 
     
     

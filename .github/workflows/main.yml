@@ -83,7 +83,7 @@ jobs:
       if: always()
       with:
         default: "3.8"
-        versions: "3.8.10"
+        versions: "3.8.x"
         # print version
         command: "python --version"
         

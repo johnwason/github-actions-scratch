@@ -89,10 +89,11 @@ jobs:
     - name: test python version
       if: always()
       run: |
-        $PY=$(pyenv root)/versions/$(pyenv version-name)/bin/python
-        $PY --version
-        $PY -c "import sys; print(sys.executable)"
-        $PY -c "import sys; print(sys.version_info)"
+        eval "$(pyenv init -)"
+        python global 3.8
+        python --version
+        python -c "import sys; print(sys.executable)"
+        python -c "import sys; print(sys.version_info)"
     - uses: "gabrielfalcao/pyenv-action@v18"
       name: python 3.9
       if: always()

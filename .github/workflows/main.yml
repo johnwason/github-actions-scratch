@@ -69,7 +69,7 @@ jobs:
           build-essential \
           unzip \
           zip \
-          curl
+          curl \
           wget
     - uses: "gabrielfalcao/pyenv-action@v18"
       name: python 3.8

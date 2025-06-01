@@ -23,20 +23,15 @@ runs:
       latest=$(pyenv install --list | grep -E "^\s*$py_major_part\.$py_minor_part\.[0-9]+$" | tr -d ' ' | sort -V | tail -1)
       echo "latest_py=$latest" >> $GITHUB_OUTPUT
 
-  - uses: "gabrielfalcao/pyenv-action@v18"
-    name: python install
-    if: always()
+  - uses: deadsnakes/action@v3.2.0
+    name: Install Python ${{ inputs.python_version }}
     with:
-      default: "${{ steps.py_full_ver.outputs.latest_py }}"
-      versions: "${{ steps.py_full_ver.outputs.latest_py }}"
-      command: "python --version"
+      python-version: ${{ inputs.python_version }}
       
   - name: test python version
     shell: bash
     if: always()
     run: |
-      eval "$(pyenv init -)"
-      pyenv global "${{ steps.py_full_ver.outputs.latest_py }}"
       python --version
       python -c "import sys; print(sys.executable)"
       python -c "import sys; print(sys.version_info)"

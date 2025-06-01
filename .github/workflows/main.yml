@@ -51,10 +51,10 @@ jobs:
           container: ""
           arch: arm64
           wheel_platform: manylinux_2_31_aarch64
-        - os: windows-latest
-          run_ons: windows-latest
-          container: ""
-          arch: x64
+        # - os: windows-latest
+        #   run_ons: windows-latest
+        #   container: ""
+        #   arch: x64
     steps:
     - uses: actions/setup-python@v5
       name: python 3.8

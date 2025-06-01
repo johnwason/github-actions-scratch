@@ -78,105 +78,34 @@ jobs:
           libusb-1.0-0-dev libdbus-1-3 libdbus-1-dev libbluetooth3 libbluetooth-dev zlib1g zlib1g-dev \
           git cmake g++ make libboost-all-dev autoconf ninja-build libsqlite3-dev libreadline-dev \
           automake libtool bison libpcre3-dev curl libgtest-dev python3-minimal libffi-dev liblzma-dev unzip
-    - uses: "gabrielfalcao/pyenv-action@v18"
-      name: install pyenv
+    - name: test 3.8
       if: always()
+      uses: ./py_test_action
       with:
-        default: "3.8"
-        command: "python --version"
-    - name: Get latest Python 3.8 patch version
-      id: py38
-      run: |
-        latest=$(pyenv install --list | grep -E '^\s*3\.8\.[0-9]+$' | tr -d ' ' | sort -V | tail -1)
-        echo "latest_py38=$latest" >> $GITHUB_OUTPUT
-
-    - uses: "gabrielfalcao/pyenv-action@v18"
-      name: python 3.8
-      if: always()
-      with:
-        default: "${{ steps.py38.outputs.latest_py38 }}"
-        versions: "${{ steps.py38.outputs.latest_py38 }}"
-        command: "python --version"
-        
-    - name: test python version
-      if: always()
-      run: |
-        eval "$(pyenv init -)"
-        pyenv global 3.8
-        python --version
-        python -c "import sys; print(sys.executable)"
-        python -c "import sys; print(sys.version_info)"
-    - uses: "gabrielfalcao/pyenv-action@v18"
-      name: python 3.9
-      if: always()
-      with:
-        default: "3.9"
-        command: "python --version"
-        
-    - name: test python version
-      if: always()
-      run: |
-        eval "$(pyenv init -)"
-        python --version
-        python -c "import sys; print(sys.executable)"
-        python -c "import sys; print(sys.version_info)"
-    - uses: "gabrielfalcao/pyenv-action@v18"
-      name: python 3.10
-      if: always()
-      with:
-        default: "3.10"
-        command: "python --version"
-        
-    - name: test python version
-      if: always()
-      run: |
-        eval "$(pyenv init -)"
-        python --version
-        python -c "import sys; print(sys.executable)"
-        python -c "import sys; print(sys.version_info)"
-    - uses: "gabrielfalcao/pyenv-action@v18"
-      name: python 3.11
-      if: always()
-      with:
-        default: "3.11"
-        command: "python --version"
-    - name: test python version
-      if: always()
-      run: |
-        eval "$(pyenv init -)"
-        python --version
-        python -c "import sys; print(sys.executable)"
-        python -c "import sys; print(sys.version_info)"
-    - uses: "gabrielfalcao/pyenv-action@v18"
-      name: python 3.12
-      if: always()
-      with:
-        default: "3.12"
-        command: "python --version"
-        
-    - name: test python version
-      if: always()
-      run: |
-        eval "$(pyenv init -)"
-        python --version
-        python -c "import sys; print(sys.executable)"
-        python -c "import sys; print(sys.version_info)"
-    - uses: "gabrielfalcao/pyenv-action@v18"
-      name: python 3.13
-      if: always()
-      with:
-        default: "3.13"
-        versions: "3.13.3"
-        command: "python --version"
-        
-    - name: test python version
-      if: always()
-      run: |
-        eval "$(pyenv init -)"
-        pyenv global 3.13.3
-        python --version
-        python -c "import sys; print(sys.executable)"
-        python -c "import sys; print(sys.version_info)"
-
+        python_version: "3.8"
     
-    
+    - name: test 3.9
+      if: always()
+      uses: ./py_test_action
+      with:
+        python_version: "3.9"
+    - name: test 3.10
+      if: always()
+      uses: ./py_test_action
+      with:
+        python_version: "3.10"
+    - name: test 3.11
+      if: always()
+      uses: ./py_test_action
+      with:
+        python_version: "3.11"
+    - name: test 3.12
+      if: always()
+      uses: ./py_test_action
+      with:
+        python_version: "3.12"
+    - name: test 3.13
+      if: always()
+      uses: ./py_test_action
+      with:
+        python_version: "3.13"    

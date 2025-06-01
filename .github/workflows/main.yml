@@ -67,10 +67,22 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y \
           build-essential \
-          unzip \
-          zip \
+          libssl-dev \
+          zlib1g-dev \
+          libbz2-dev \
+          libreadline-dev \
+          libsqlite3-dev \
           curl \
-          wget
+          wget \
+          llvm \
+          libncurses5-dev \
+          libncursesw5-dev \
+          xz-utils \
+          tk-dev \
+          libffi-dev \
+          liblzma-dev \
+          unzip \
+          zip
     - uses: "gabrielfalcao/pyenv-action@v18"
       name: python 3.8
       if: always()

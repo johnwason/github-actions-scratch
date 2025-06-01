@@ -89,10 +89,10 @@ jobs:
     - name: test python version
       if: always()
       run: |
-        export PY=$(pyenv which python)
-        $PY --version
-        $PY -c "import sys; print(sys.executable)"
-        $PY -c "import sys; print(sys.version_info)"
+        eval "$(pyenv init -)"
+        python --version
+        python -c "import sys; print(sys.executable)"
+        python -c "import sys; print(sys.version_info)"
     - uses: "gabrielfalcao/pyenv-action@v18"
       name: python 3.9
       if: always()
@@ -103,10 +103,10 @@ jobs:
     - name: test python version
       if: always()
       run: |
-        export PY=$(pyenv which python)
-        $PY --version
-        $PY -c "import sys; print(sys.executable)"
-        $PY -c "import sys; print(sys.version_info)"
+        eval "$(pyenv init -)"
+        python --version
+        python -c "import sys; print(sys.executable)"
+        python -c "import sys; print(sys.version_info)"
     - uses: "gabrielfalcao/pyenv-action@v18"
       name: python 3.10
       if: always()
@@ -117,10 +117,10 @@ jobs:
     - name: test python version
       if: always()
       run: |
-        export PY=$(pyenv which python)
-        $PY --version
-        $PY -c "import sys; print(sys.executable)"
-        $PY -c "import sys; print(sys.version_info)"
+        eval "$(pyenv init -)"
+        python --version
+        python -c "import sys; print(sys.executable)"
+        python -c "import sys; print(sys.version_info)"
     - uses: "gabrielfalcao/pyenv-action@v18"
       name: python 3.11
       if: always()
@@ -130,10 +130,10 @@ jobs:
     - name: test python version
       if: always()
       run: |
-        export PY=$(pyenv which python)
-        $PY --version
-        $PY -c "import sys; print(sys.executable)"
-        $PY -c "import sys; print(sys.version_info)"
+        eval "$(pyenv init -)"
+        python --version
+        python -c "import sys; print(sys.executable)"
+        python -c "import sys; print(sys.version_info)"
     - uses: "gabrielfalcao/pyenv-action@v18"
       name: python 3.12
       if: always()
@@ -144,10 +144,10 @@ jobs:
     - name: test python version
       if: always()
       run: |
-        export PY=$(pyenv which python)
-        $PY --version
-        $PY -c "import sys; print(sys.executable)"
-        $PY -c "import sys; print(sys.version_info)"
+        eval "$(pyenv init -)"
+        python --version
+        python -c "import sys; print(sys.executable)"
+        python -c "import sys; print(sys.version_info)"
     - uses: "gabrielfalcao/pyenv-action@v18"
       name: python 3.13
       if: always()
@@ -158,10 +158,10 @@ jobs:
     - name: test python version
       if: always()
       run: |
-        export PY=$(pyenv which python)
-        $PY --version
-        $PY -c "import sys; print(sys.executable)"
-        $PY -c "import sys; print(sys.version_info)"
+        eval "$(pyenv init -)"
+        python --version
+        python -c "import sys; print(sys.executable)"
+        python -c "import sys; print(sys.version_info)"
 
     
     

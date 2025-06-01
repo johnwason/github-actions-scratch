@@ -8,6 +8,11 @@ inputs:
 runs:
   using: "composite"
   steps:
+  - uses: "gabrielfalcao/pyenv-action@v18"
+    name: pyenv install
+    with:
+      default: "3.8"
+      command: "python --version"
   - name: Get latest Python patch version
     shell: bash
     id: py_full_ver
@@ -31,7 +36,7 @@ runs:
     if: always()
     run: |
       eval "$(pyenv init -)"
-      pyenv global 3.8
+      pyenv global "${{ steps.py_full_ver.outputs.latest_py }}"
       python --version
       python -c "import sys; print(sys.executable)"
       python -c "import sys; print(sys.version_info)"

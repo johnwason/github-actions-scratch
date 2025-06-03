@@ -9,12 +9,13 @@ on:
   workflow_dispatch:
     
 jobs:
-  test-setup-python:
+  test-msvc-install:
     runs-on: windows-latest
     steps:    
     - name: Checkout repository
       uses: actions/checkout@v4
     - name: Install MSVC 2019 Build Tools
+      shell: cmd
       run: |
         "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe" modify `
           --installPath "C:\Program Files\Microsoft Visual Studio\2022\Enterprise" `

@@ -12,10 +12,6 @@ jobs:
   build-matlab-toolbox:
     runs-on: ubuntu-22.04
     steps: 
-    - name: apt
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y tree
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
@@ -51,16 +47,8 @@ jobs:
     - name: upload matlab toolbox
       uses: actions/upload-artifact@v4
       with:
-        name: matlab-toolbox
+        name: out-matlab-toolbox
         path: "*.mltbx"
-    - name: tree
-      if: always()
-      run: |
-        tree
-    - name: upload all files
-      uses: actions/upload-artifact@v4
-      with:
-        name: debug-files
-        path: "**/*"
+
        
     

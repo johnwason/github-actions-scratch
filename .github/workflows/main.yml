@@ -19,12 +19,12 @@ jobs:
         repository: johnwason/robotraconteur
         run-id: 15436745068
         path: artifacts/main
-        pattern: "out-matlab*"
-    - uses: actions/download-artifact@v4
-      with:
-        repository: johnwason/robotraconteur
-        run-id: 15436745068
-        path: artifacts/main
-        pattern: out-win-64
+        # pattern: "out-matlab*"
+    # - uses: actions/download-artifact@v4
+    #   with:
+    #     repository: johnwason/robotraconteur
+    #     run-id: 15436745068
+    #     path: artifacts/main
+    #     pattern: out-win-64
        
     

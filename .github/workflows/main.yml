@@ -41,6 +41,8 @@ jobs:
       uses: matlab-actions/run-command@v2
       with:
         command: cd('${{github.workspace}}/build-matlab-toolbox/build'); matlab.addons.toolbox.packageToolbox('RobotRaconteurMatlab.prj','RobotRaconteurMatlab');
+    - name: finish matlab toolbox
+      run: python3 robotraconteur/packaging/scripts/build_matlab_toolbox3.py
     - name: move matlab toolbox
       run: |
         mv build-matlab-toolbox/build/*.mltbx ${{github.workspace}}

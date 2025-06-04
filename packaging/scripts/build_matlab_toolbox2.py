@@ -19,18 +19,28 @@ def main():
 
     print(f"tag_name: {tag_name}")
 
+    Path("distfiles").mkdir(exist_ok=True)
+
+    for asset_dir in asset_dirs:
+        for fname in list(Path(asset_dir).glob('**/RobotRaconteur-*-MATLAB*')):
+            if fname.is_dir():
+                continue
+            print(fname)
+            dest = Path(fname)
+            shutil.copy(str(fname), "distfiles/" + dest.name)
+
     build_dir = Path("build-matlab-toolbox/build")
     matlab_dir = build_dir.joinpath("matlab")
     matlab_dir.mkdir(exist_ok=True, parents=True)
 
     subprocess.check_call(
-        "tar xf ../../RobotRaconteur-*-MATLAB-glnxa64.tar.gz --strip-components 1", shell=True, cwd=matlab_dir)
+        "tar xf ../../../distfiles/RobotRaconteur-*-MATLAB-glnxa64.tar.gz --strip-components 1", shell=True, cwd=matlab_dir)
     subprocess.check_call(
-        "tar xf ../../RobotRaconteur-*-MATLAB-maci64.tar.gz --strip-components 1 --wildcards RobotRaconteur-*-MATLAB-maci64/RobotRaconteurMex.*", shell=True, cwd=matlab_dir)
+        "tar xf ../../../distfiles/RobotRaconteur-*-MATLAB-maci64.tar.gz --strip-components 1 --wildcards RobotRaconteur-*-MATLAB-maci64/RobotRaconteurMex.*", shell=True, cwd=matlab_dir)
     subprocess.check_call(
-        "tar xf ../../RobotRaconteur-*-MATLAB-maca64.tar.gz --strip-components 1 --wildcards RobotRaconteur-*-MATLAB-maca64/RobotRaconteurMex.*", shell=True, cwd=matlab_dir)
+        "tar xf ../../../distfiles/RobotRaconteur-*-MATLAB-maca64.tar.gz --strip-components 1 --wildcards RobotRaconteur-*-MATLAB-maca64/RobotRaconteurMex.*", shell=True, cwd=matlab_dir)
     subprocess.check_call(
-        "unzip -j ../../RobotRaconteur-*-MATLAB-win64.zip RobotRaconteur-*-MATLAB-win64/RobotRaconteurMex.mexw64", shell=True, cwd=matlab_dir)
+        "unzip -j ../../../distfiles/RobotRaconteur-*-MATLAB-win64.zip RobotRaconteur-*-MATLAB-win64/RobotRaconteurMex.mexw64", shell=True, cwd=matlab_dir)
 
     semver_regex = r"^v((?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*))(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$"
 

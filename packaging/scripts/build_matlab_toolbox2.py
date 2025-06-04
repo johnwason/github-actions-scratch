@@ -6,6 +6,7 @@ import urllib
 import subprocess
 import re
 
+asset_dirs = ["artifacts/main", "artifacts/build_python_version"]
 
 def main():
 

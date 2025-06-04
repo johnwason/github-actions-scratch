@@ -10,10 +10,16 @@ on:
     
 jobs:
   build-matlab-toolbox:
-    runs-on: windows-latest
-    steps:    
+    runs-on: ubuntu-22.04
+    steps: 
+    - name: apt
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y tree
     - name: Checkout repository
       uses: actions/checkout@v4
+      with:
+        path: robotraconteur
     - uses: actions/download-artifact@v4
       with:
         repository: johnwason/robotraconteur
@@ -28,5 +34,16 @@ jobs:
         path: artifacts/main
         github-token: ${{ secrets.TOKEN }}
         pattern: out-win-x64
+    - name: prepare matlab toolbox
+      run: python3 robotraconteur/packaging/scripts/build_matlab_toolbox2.py
+    - name: tree
+      if: always()
+      run: |
+        tree
+    - name: upload all files
+      uses: actions/upload-artifact@v4
+      with:
+        name: debug-files
+        path: "**/*"
        
     

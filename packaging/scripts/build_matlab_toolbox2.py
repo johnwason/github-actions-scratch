@@ -14,7 +14,7 @@ def main():
 
     workdir.mkdir()
 
-    with open("artifacts/main/out-matlab/rrversion.txt", r) as f:
+    with open("artifacts/main/out-matlab/rrversion.txt", "r") as f:
         tag_name = f.read().strip()
 
     print(f"tag_name: {tag_name}")

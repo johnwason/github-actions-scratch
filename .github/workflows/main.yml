@@ -27,6 +27,6 @@ jobs:
         run-id: 15436745068
         path: artifacts/main
         github-token: ${{ secrets.TOKEN }}
-        pattern: out-win64
+        pattern: out-win-x64
        
     

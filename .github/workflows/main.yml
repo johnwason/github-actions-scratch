@@ -19,7 +19,7 @@ jobs:
         repository: johnwason/robotraconteur
         run-id: 2068
         path: artifacts/main
-        artifact-ids: |
+        name: |
           out-matlab
           out-matlab-osx-arm64
           out-matlab-osx-x64

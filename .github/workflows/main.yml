@@ -34,8 +34,25 @@ jobs:
         path: artifacts/main
         github-token: ${{ secrets.TOKEN }}
         pattern: out-win-x64
+    - name: install matlab
+      id: setup-matlab
+      uses: matlab-actions/setup-matlab@v2
+      with:
+        release: R2022b
     - name: prepare matlab toolbox
       run: python3 robotraconteur/packaging/scripts/build_matlab_toolbox2.py
+    - name: build matlab toolbox
+      uses: matlab-actions/run-command@v2
+      with:
+        command: cd('${{github.workspace}}/build-matlab-toolbox/build'); matlab.addons.toolbox.packageToolbox('RobotRaconteurMatlab.prj','RobotRaconteurMatlab');
+    - name: move matlab toolbox
+      run: |
+        mv build-matlab-toolbox/build/*.mltbx ${{github.workspace}}
+    - name: upload matlab toolbox
+      uses: actions/upload-artifact@v4
+      with:
+        name: matlab-toolbox
+        path: "*.mltbx"
     - name: tree
       if: always()
       run: |

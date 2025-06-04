@@ -24,3 +24,6 @@ def main():
 
     shutil.move(f"{build_dir}/RobotRaconteurMatlab.mltbx",
                 f"{build_dir}/RobotRaconteurMatlab-{toolbox_ver}.mltbx")
+
+if __name__ == "__main__":
+    main()

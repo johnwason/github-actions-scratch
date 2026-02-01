@@ -12,4 +12,4 @@ set(CMAKE_CXX_STANDARD 11)
 #     find_package(Eigen3 3.3..5 REQUIRED NO_MODULE)
 # endif()
 
-find_package(Eigen3 REQUIRED NO_MODULE)
+find_package(Eigen3 3.3...5 REQUIRED NO_MODULE)

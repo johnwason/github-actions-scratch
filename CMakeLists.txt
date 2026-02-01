@@ -7,9 +7,8 @@ project(test_eigen3_find_package VERSION 0.4.2 LANGUAGES CXX C)
 
 set(CMAKE_CXX_STANDARD 11)
 
-# find_package(Eigen3 3.3 REQUIRED NO_MODULE)
-# if(NOT Eigen3_FOUND)
-#     find_package(Eigen3 3.3..5 REQUIRED NO_MODULE)
-# endif()
+find_package(Eigen3 3.3 REQUIRED NO_MODULE)
+if(NOT Eigen3_FOUND)
+    find_package(Eigen3 3.3...5 REQUIRED NO_MODULE)
+endif()
 
-find_package(Eigen3 3.3...5 REQUIRED NO_MODULE)

@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  release:
+    types:
+    - created
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-2022
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        path: src
+        submodules: recursive
+    - name: vcpkg build
+      uses: johnwason/vcpkg-action@v7
+      id: vcpkg
+      with:
+        pkgs: eigen3 
+        triplet: x64-windows-release
+        token: ${{ github.token }}
+    - uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: x64
+    - name: cmake
+      run: >
+        cmake -G Ninja -S src -B build
+        ${{ steps.vcpkg.outputs.vcpkg-cmake-config }}
+        -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON
+        -DBULID_TESTING=ON
+
+    

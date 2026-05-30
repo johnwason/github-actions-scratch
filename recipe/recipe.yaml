@@ -5,8 +5,8 @@ package:
   version: "0.35.0a1"
 
 source:
-  - url: https://github.com/johnwason/tesseract_python/archive/2b115c31d490fdef4c7780c8c924d546da51be53.tar.gz
-    sha256: b4a0f9acd34a165d9a00bd3d9ed08829c0a684544d78cc87d2bd6e932b762227
+  - url: https://github.com/johnwason/tesseract_python-1/archive/2627c4a1c36c3ee636b2248098bbeb5520fee7ca.tar.gz
+    sha256: d3062e8aab4b27a61f468851c77435e4b654390209f12fb49ec3233c7e927d81
     file_name: source.tar.gz
 
 build:

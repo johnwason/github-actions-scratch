@@ -12,7 +12,7 @@ cmake -GNinja ^
   -DTESSERACT_ENABLE_TESTING=OFF ^
   -DTESSERACT_ENABLE_EXAMPLES=OFF ^
   -DCMAKE_VERBOSE_MAKEFILE=ON ^
-  -DPYTHON_EXECUTABLE=%PYTHON% ^
+  -DPython3_EXECUTABLE=%PYTHON% ^
   -S src/tesseract_python ^
   -B build_dir
 if %errorlevel% neq 0 exit %errorlevel%

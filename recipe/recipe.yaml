@@ -5,7 +5,7 @@ package:
   version: "0.35.0a1"
 
 source:
-  - url: https://github.com/tesseract-robotics/tesseract_python/archive/8012d4e9366681358e827fbedfbc1fb7321220c1.tar.gz
+  - url: https://github.com/johnwason/tesseract_python/archive/2b115c31d490fdef4c7780c8c924d546da51be53.tar.gz
     sha256: b4a0f9acd34a165d9a00bd3d9ed08829c0a684544d78cc87d2bd6e932b762227
     file_name: source.tar.gz
 

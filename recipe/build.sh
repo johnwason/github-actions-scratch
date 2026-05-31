@@ -5,12 +5,6 @@ set -e
 mkdir -p src
 tar xf source.tar.gz --strip-components=1 -C src
 
-if [[ "$(uname)" == "Darwin" ]]; then
-  # 1. Prevent hard-linking to a specific libpython binary
-  # 2. Allow missing symbols to resolve dynamically when Python imports it
-  export LDFLAGS="${LDFLAGS} -Wl,-undefined,dynamic_lookup -Wl,-flat_namespace"
-fi
-
 cmake -GNinja \
   ${CMAKE_ARGS} \
   -DBUILD_SHARED_LIBS=ON \

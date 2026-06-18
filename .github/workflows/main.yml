@@ -74,7 +74,11 @@ jobs:
     - name: deps build
       working-directory: pyodide_recipes_src
       run: |
-        ./tools/prepare_pyodide_build.sh
+        where python
+        python --version
+        python -m pip install ./pyodide-build/
+        pyodide --version
+        pyodide xbuildenv install
         ./tools/copy_pyodide_runtime.sh
     - name: build pregenerated_src
       run: |

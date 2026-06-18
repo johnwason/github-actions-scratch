@@ -59,10 +59,10 @@ jobs:
     #     path: |
     #       /tmp/dep-ccache
     #     key: pyodide-deps-${{ hashFiles('Makefile.envs') }}
-    # - name: apt
-    #   run: |
-    #     sudo apt update
-    #     sudo apt install -y build-essential libboost-all-dev zlib1g-dev libssl-dev libdbus-1-dev libbluetooth-dev libusb-1.0-0-dev j2cli
+    - name: apt
+      run: |
+        sudo apt update
+        sudo apt install -y build-essential libboost-all-dev zlib1g-dev libssl-dev libdbus-1-dev libbluetooth-dev libusb-1.0-0-dev j2cli
     - uses: conda-incubator/setup-miniconda@v4
       with:
         activate-environment: pyodide-env

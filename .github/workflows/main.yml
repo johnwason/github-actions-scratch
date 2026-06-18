@@ -1,0 +1,122 @@
+name: CI
+
+on:
+  push:
+    branches-ignore:
+    - ros-**
+    - ros2-**
+    - ros
+    tags:
+    - v*
+    - '!*ros*'
+  pull_request:
+    branches-ignore:
+    - ros-**
+    - ros2-**
+    - ros
+  release:
+    types:
+    - created
+  workflow_dispatch:
+
+env:
+  VCPKG_PKGS: >-
+    boost-algorithm boost-array boost-asio
+    boost-assign boost-atomic boost-bind boost-config boost-container boost-date-time
+    boost-smart-ptr boost-filesystem boost-foreach boost-format boost-function boost-interprocess
+    boost-intrusive boost-lexical-cast boost-locale boost-random boost-range boost-regex
+    boost-scope-exit boost-signals2 boost-thread boost-tuple boost-unordered
+    boost-utility boost-uuid boost-program-options gtest openssl
+  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+
+
+
+jobs:
+  
+  build-pyodide:
+    runs-on: ubuntu-latest
+    env:
+      EMSDK_NUM_CORES: 3
+      EMCC_CORES: 3
+      PYODIDE_JOBS: 3
+    defaults:
+      run:
+        shell: bash -el {0}
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        path: robotraconteur
+        repository: robotraconteur/robotraconteur
+    - uses: actions/checkout@v6
+      with:
+        repository: pyodide/pyodide-recipes
+        path: pyodide_recipes_src
+        submodules: true
+    # - name: ccache deps
+    #   uses: actions/cache@v3
+    #   with:
+    #     path: |
+    #       /tmp/dep-ccache
+    #     key: pyodide-deps-${{ hashFiles('Makefile.envs') }}
+    - name: apt
+      run: |
+        sudo apt update
+        sudo apt install -y build-essential libboost-all-dev zlib1g-dev libssl-dev libdbus-1-dev libbluetooth-dev libusb-1.0-0-dev j2cli
+    - uses: conda-incubator/setup-miniconda@v4
+      with:
+        activate-environment: pyodide-env
+        environment-file: pyodide_recipes_src/environment.yml
+        channels: conda-forge
+    - name: pip-install
+      working-directory: pyodide_recipes_src
+      run: |
+        pip install numpy
+    - name: deps build
+      working-directory: pyodide_recipes_src
+      run: |
+        ./tools/prepare_pyodide_build.py
+        ./tools/copy_pyodide_runtime.sh
+    - name: build pregenerated_src
+      run: |
+        cmake -S $GITHUB_WORKSPACE/robotraconteur -B gen_src -DPACKAGE_SWIG_SOURCE_ALL=ON -DBUILD_PYTHON3=ON -DBUILD_TESTING=OFF
+        cmake --build gen_src --config Release --target package_source_swig
+        cp -r $GITHUB_WORKSPACE/gen_src/generated_src $GITHUB_WORKSPACE/robotraconteur/
+        cmake --build gen_src --config Release -j4
+        python -m pip install $GITHUB_WORKSPACE/gen_src/out/Python3
+    - name: build
+      working-directory: pyodide_recipes_src
+      # env:
+      #   CCACHE_DIR: /tmp/ccache
+      run: |
+        # mkdir -p /tmp/ccache
+        export version=$(sed -n 's/^#define[ \t]*ROBOTRACONTEUR_VERSION_TEXT[ \t]*"\([^"]*\)".*/\1/p' $GITHUB_WORKSPACE/robotraconteur/RobotRaconteurCore/include/RobotRaconteur/RobotRaconteurConfig.h)
+        export rr_src_path=$GITHUB_WORKSPACE/robotraconteur
+        export PYODIDE_PACKAGES="tag:core,micropip,pyparsing,packaging,Jinja2,regex,pytz,numpy,libboost,pytest,pyyaml,RobotRaconteur"
+        cp -r $GITHUB_WORKSPACE/robotraconteur/tools/build_files/pyodide-recipes/* $GITHUB_WORKSPACE/pyodide_recipes_src/packages/
+        j2 $GITHUB_WORKSPACE/robotraconteur/tools/build_files/pyodide-recipes/RobotRaconteur/meta.yaml.j2 > $GITHUB_WORKSPACE/pyodide_recipes_src/packages/RobotRaconteur/meta.yaml
+        pyodide build-recipes --recipe-dir=$GITHUB_WORKSPACE/pyodide_recipes_src/packages --install $PYODIDE_PACKAGES
+    - name: test
+      working-directory: pyodide_recipes_src
+      run: pytest $GITHUB_WORKSPACE/robotraconteur/test/pyodide --runtime=chrome --runner=selenium -s --dist-dir=$GITHUB_WORKSPACE/pyodide_recipes_src/dist
+    - name: archive dist
+      uses: actions/upload-artifact@v7
+      if: always()
+      with:
+        name: 'pyodide-dist'
+        path: pyodide_recipes_src/dist/*
+    - name: prepare archive wheel
+      run: |
+        mkdir -p out/wheels
+        cp pyodide_recipes_src/dist/robotraconteur* out/wheels/
+    - name: archive wheel
+      uses: actions/upload-artifact@v7
+      with:
+        name: 'out-pyodide'
+        path: out/
+    - name: archive package logs
+      if: failure()
+      uses: actions/upload-artifact@v7
+      with:
+        name: 'pyodide-package-logs'
+        path: pyodide_recipes_src/packages/build-logs/*
+  

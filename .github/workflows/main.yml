@@ -72,7 +72,7 @@ jobs:
     - name: pip-install
       working-directory: pyodide_recipes_src
       run: |
-        pip install numpy
+        pip install numpy pytest pytest-xdist pytest-pyodide pytest-httpserver pytest-benchmark pytest-asyncio
     - name: deps build
       working-directory: pyodide_recipes_src
       run: |

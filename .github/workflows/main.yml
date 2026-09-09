@@ -91,13 +91,13 @@ jobs:
         pyodide --version
         pyodide xbuildenv install
         ./tools/copy_pyodide_runtime.sh
-    # - name: build pregenerated_src
-    #   run: |
-    #     cmake -S $GITHUB_WORKSPACE/robotraconteur -B gen_src -DPACKAGE_SWIG_SOURCE_ALL=ON -DBUILD_PYTHON3=ON -DBUILD_TESTING=OFF
-    #     cmake --build gen_src --config Release --target package_source_swig
-    #     cp -r $GITHUB_WORKSPACE/gen_src/generated_src $GITHUB_WORKSPACE/robotraconteur/
-    #     cmake --build gen_src --config Release -j4
-    #     python -m pip install $GITHUB_WORKSPACE/gen_src/out/Python3
+    - name: build pregenerated_src
+      run: |
+        cmake -S $GITHUB_WORKSPACE/robotraconteur -B gen_src -DPACKAGE_SWIG_SOURCE_ALL=ON -DBUILD_PYTHON3=ON -DBUILD_TESTING=OFF
+        cmake --build gen_src --config Release --target package_source_swig
+        cp -r $GITHUB_WORKSPACE/gen_src/generated_src $GITHUB_WORKSPACE/robotraconteur/
+        cmake --build gen_src --config Release -j4
+        python -m pip install $GITHUB_WORKSPACE/gen_src/out/Python3
     - name: build
       working-directory: pyodide_recipes_src
       # env:

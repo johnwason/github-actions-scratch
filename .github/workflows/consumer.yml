@@ -4,6 +4,12 @@ name: consumer
 # missing from it builds locally and is not uploaded.
 on:
   workflow_dispatch:
+  # workflow_dispatch needs the file on the default branch; on this experiment branch a push
+  # that changes test/consumer-trigger.txt runs it instead
+  push:
+    branches: [vcpkg-artifact-cache]
+    paths:
+      - test/consumer-trigger.txt
 
 permissions:
   actions: read

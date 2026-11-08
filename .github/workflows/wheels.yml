@@ -21,20 +21,17 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  actions: read   # the vcpkg binary cache artifacts of vcpkg-cache.yml
+  contents: read
+
 env:
-  VCPKG_PKGS: >-
-    boost-dll boost-program-options
-    boost-serialization boost-filesystem
-    boost-stacktrace boost-algorithm
-    boost-format cereal
-    tinyxml2 spdlog assimp
-    urdfdom octomap orocos-kdl pcl
-    gtest benchmark flann jsoncpp
-    yaml-cpp eigen3
-    openblas
-    fcl ompl taskflow
-    bullet3[multithreading,double-precision,rtti]
-    ccd[double-precision] gperftools
+  # The vcpkg revision of the build jobs and of vcpkg-cache.yml, which builds the binary cache they
+  # read: both must check out the same one, or the package ABI hashes differ and nothing restores.
+  VCPKG_REVISION: '2026.10.16'
+  # Branch whose vcpkg-cache.yml artifacts the build jobs trust; empty is the default branch.
+  # (Experiment on johnwason/github-actions-scratch, whose default branch has no such workflow.)
+  VCPKG_CACHE_BRANCH: dev/vcpkg-artifact-cache
   # Tag builds must yield exactly the tag version (a dirty tree otherwise makes setuptools-scm
   # guess the next dev version); other builds take the version setuptools-scm derives
   SETUPTOOLS_SCM_PRETEND_VERSION_FOR_TESSERACT_ROBOTICS_NANOBIND: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
@@ -88,10 +85,12 @@ jobs:
         mkdir -p ws/src
         vcs import --input tesseract_nanobind/dependencies.rosinstall ws/src
     - name: vcpkg build
-      uses: johnwason/vcpkg-action@v8
+      uses: johnwason/github-actions-scratch/vcpkg-action@vcpkg-artifact-cache
       with:
-        pkgs: >-
-          ${{ env.VCPKG_PKGS }}
+        pkgs-file: tesseract_nanobind/.github/vcpkg/packages.txt
+        revision: ${{ env.VCPKG_REVISION }}
+        artifact-cache-workflow: vcpkg-cache.yml
+        artifact-cache-branch: ${{ env.VCPKG_CACHE_BRANCH }}
         triplet: ${{ matrix.config.vcpkg_triplet }}
         extra-args: >-
           --clean-after-build
@@ -250,10 +249,12 @@ jobs:
         mkdir ws\src
         vcs import --input tesseract_nanobind\dependencies.rosinstall ws\src
     - name: vcpkg build
-      uses: johnwason/vcpkg-action@v8
+      uses: johnwason/github-actions-scratch/vcpkg-action@vcpkg-artifact-cache
       with:
-        pkgs: >-
-          ${{ env.VCPKG_PKGS }}
+        pkgs-file: tesseract_nanobind/.github/vcpkg/packages.txt
+        revision: ${{ env.VCPKG_REVISION }}
+        artifact-cache-workflow: vcpkg-cache.yml
+        artifact-cache-branch: ${{ env.VCPKG_CACHE_BRANCH }}
         triplet: ${{ matrix.config.vcpkg_triplet }}
         extra-args: >-
           --clean-after-build
@@ -389,10 +390,12 @@ jobs:
         mkdir -p ws/src
         vcs import --input tesseract_nanobind/dependencies.rosinstall ws/src
     - name: vcpkg build
-      uses: johnwason/vcpkg-action@v8
+      uses: johnwason/github-actions-scratch/vcpkg-action@vcpkg-artifact-cache
       with:
-        pkgs: >-
-          ${{ env.VCPKG_PKGS }}
+        pkgs-file: tesseract_nanobind/.github/vcpkg/packages.txt
+        revision: ${{ env.VCPKG_REVISION }}
+        artifact-cache-workflow: vcpkg-cache.yml
+        artifact-cache-branch: ${{ env.VCPKG_CACHE_BRANCH }}
         triplet: ${{ matrix.config.arch }}-osx-dynamic-release
         extra-args: >-
           --clean-after-build

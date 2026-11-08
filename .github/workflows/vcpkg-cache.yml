@@ -1,0 +1,112 @@
+name: vcpkg cache
+
+# Builds the vcpkg binary cache of the wheel builds and uploads it as artifacts, which the build
+# jobs of wheels.yml restore read-only (johnwason vcpkg-action, artifact-cache-workflow). Only this
+# workflow, on the trusted branch, writes the cache: pull requests read it and cannot replace it.
+# Each run starts from its previous artifact, so a change rebuilds only the packages it affects.
+#
+# Every matrix entry must configure vcpkg exactly as the matching wheels.yml build job does
+# (runner, triplet, cache-key, extra-args, the tools installed before vcpkg and VCPKG_REVISION):
+# anything that differs changes the package ABI hashes, and the build job restores nothing.
+
+on:
+  push:
+    branches:
+      - main
+      - dev/vcpkg-artifact-cache
+    paths:
+      - .github/vcpkg/**
+      - .github/workflows/vcpkg_triplets/**
+      - .github/workflows/vcpkg_overlays/**
+      - .github/workflows/vcpkg-cache.yml
+      - dependencies.rosinstall   # tesseract_planning's overlay ports come from its checkout
+  schedule:
+    - cron: '0 6 * * 1'  # Mondays 06:00 UTC: picks up runner image updates, keeps artifacts fresh
+  workflow_dispatch:
+
+permissions:
+  actions: read   # the previous cache artifact
+  contents: read
+
+env:
+  VCPKG_REVISION: '2026.10.16'  # as wheels.yml
+
+jobs:
+  vcpkg-cache:
+    runs-on: ${{ matrix.config.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - runner: ubuntu-24.04
+            triplet: x64-linux-dynamic-release
+            cache_key: linux-x64-linux-dynamic-release
+            overlay_triplets: true
+            own_overlay_ports: true
+          - runner: ubuntu-24.04-arm
+            triplet: arm64-linux-dynamic-release
+            cache_key: linux-arm64-linux-dynamic-release
+            overlay_triplets: true
+            own_overlay_ports: true
+          - runner: windows-2022
+            triplet: x64-windows-release
+            cache_key: win-x64-nanobind
+            overlay_triplets: false
+            own_overlay_ports: false
+          - runner: macos-15-intel
+            triplet: x64-osx-dynamic-release
+            cache_key: osx-x64-vcpkg
+            overlay_triplets: true
+            own_overlay_ports: true
+          - runner: macos-15
+            triplet: arm64-osx-dynamic-release
+            cache_key: osx-arm64-vcpkg
+            overlay_triplets: true
+            own_overlay_ports: true
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        path: tesseract_nanobind
+    - name: apt
+      if: runner.os == 'Linux'
+      # as wheels.yml build-ubuntu: the tools vcpkg ports need, and the system cmake/ninja
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install python3-pip python3-venv python3-dev git cmake ninja-build \
+          build-essential pkg-config curl zip unzip tar autoconf autoconf-archive automake \
+          libtool bison flex perl linux-libc-dev -y -qq
+        echo "VCPKG_FORCE_SYSTEM_BINARIES=1" >> "$GITHUB_ENV"
+    - name: brew
+      if: runner.os == 'macOS'
+      run: brew install libomp cmake automake autoconf autoconf-archive libtool gcc ninja
+    - uses: actions/setup-python@v6
+      with:
+        python-version: '3.12'
+    - name: vcs import
+      shell: bash
+      run: |
+        python -m pip install vcs2l
+        mkdir -p ws/src
+        vcs import --input tesseract_nanobind/dependencies.rosinstall ws/src
+    - name: vcpkg arguments
+      id: args
+      shell: bash
+      run: |
+        args="--clean-after-build"
+        if [ "${{ matrix.config.overlay_triplets }}" = true ]; then
+          args="$args --overlay-triplets=${{ github.workspace }}/tesseract_nanobind/.github/workflows/vcpkg_triplets"
+        fi
+        if [ "${{ matrix.config.own_overlay_ports }}" = true ]; then
+          args="$args --overlay-ports=${{ github.workspace }}/tesseract_nanobind/.github/workflows/vcpkg_overlays"
+        fi
+        args="$args --overlay-ports=${{ github.workspace }}/ws/src/tesseract_planning/.github/workflows/vcpkg_overlays"
+        echo "extra-args=$args" >> "$GITHUB_OUTPUT"
+    - name: build the vcpkg binary cache
+      uses: johnwason/github-actions-scratch/vcpkg-action/build-cache@vcpkg-artifact-cache
+      with:
+        pkgs-file: tesseract_nanobind/.github/vcpkg/packages.txt
+        triplet: ${{ matrix.config.triplet }}
+        extra-args: ${{ steps.args.outputs.extra-args }}
+        cache-key: ${{ matrix.config.cache_key }}
+        revision: ${{ env.VCPKG_REVISION }}
+        token: ${{ github.token }}

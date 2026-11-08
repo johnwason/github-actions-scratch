@@ -1,0 +1,14 @@
+# vcpkg packages of the PyPI wheel builds: one list for the producer (vcpkg-cache.yml), which
+# builds the binary cache artifacts, and the build jobs of wheels.yml, which read them.
+boost-dll boost-program-options
+boost-serialization boost-filesystem
+boost-stacktrace boost-algorithm
+boost-format cereal
+tinyxml2 spdlog assimp
+urdfdom octomap orocos-kdl pcl
+gtest benchmark flann jsoncpp
+yaml-cpp eigen3
+openblas
+fcl ompl taskflow
+bullet3[multithreading,double-precision,rtti]
+ccd[double-precision] gperftools

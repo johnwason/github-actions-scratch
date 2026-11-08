@@ -1,3 +1,4 @@
 # vcpkg packages for the artifact cache experiment: one list for the producer and every consumer
 zlib fmt
 tinyxml2
+jsoncpp

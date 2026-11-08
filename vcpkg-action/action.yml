@@ -56,6 +56,13 @@ inputs:
       artifact-cache-branch, downloaded read-only, instead of actions/cache.
     required: false
     default: ''
+  artifact-cache-repository:
+    description: >-
+      Repository whose producer artifacts are read: owner/repo, or 'auto' for this repository and
+      then, if it is a fork, its parent (so a fork's own pushes restore upstream's cache).
+      Default: this repository. The token must be able to read that repository's Actions.
+    required: false
+    default: ''
   artifact-cache-branch:
     description: "Branch whose producer runs are trusted (default: the repository's default branch)"
     required: false
@@ -161,6 +168,7 @@ runs:
       GH_TOKEN: ${{ inputs.token }}
       WORKFLOW: ${{ inputs.artifact-cache-workflow }}
       BRANCH: ${{ inputs.artifact-cache-branch }}
+      CACHE_REPOSITORY: ${{ inputs.artifact-cache-repository }}
       NAME: ${{ steps.artifact-name.outputs.name }}
     run: bash "${{ github.action_path }}/scripts/find-cache-artifact.sh"
   - name: download-artifact-cache
@@ -170,6 +178,7 @@ runs:
       name: ${{ steps.artifact-name.outputs.name }}
       path: ${{ runner.temp }}/vcpkg_cache
       run-id: ${{ steps.find-artifact.outputs.run-id }}
+      repository: ${{ steps.find-artifact.outputs.repository }}
       github-token: ${{ inputs.token }}
   - name: artifact-cache-contents
     if: ${{ steps.find-artifact.outputs.found == 'true' }}

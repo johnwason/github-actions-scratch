@@ -1,0 +1,272 @@
+name: vcpkg-action
+description: Simple action to run vcpkg and cache results
+inputs:
+  pkgs:
+    description: "List of packages to build, separated by spaces. Cannot be used with manifest-dir"
+    required: false
+  triplet:
+    description: "vcpkg triplet to use"
+    required: true
+  extra-args:
+    description: "Extra vcpkg install command line args (optional)"
+    required: false
+    default: ''
+  cache-key:
+    description: "Additional cache key component (optional)"
+    required: false
+  disable-cache:
+    description: "Disable cache (useful for release builds)"
+    required: false
+    default: 'false'
+  revision:
+    description: "vcpkg revision to checkout."
+    required: false
+    default: ''
+  token:
+    description: "GitHub token to authenticate API requests. Recommended to use  github.token "
+    required: false
+    default: ''
+  manifest-dir:
+    description: Directory containing vcpkg.json manifest file. Cannot be used with pkgs.
+    required: false
+    default: ''
+  fetch-depth:
+    description: "Fetch depth for vcpkg checkout"
+    required: false
+    default: "1"
+  vcpkg-subdir:
+    description: "The subdirectory into which to install VCPKG"
+    required: false
+    default: "vcpkg"
+  collect-logs:
+    description: Collect vcpkg logs and artifacts either 'always', 'on-failure', or 'never'.
+    required: false
+    default: ''
+
+  pkgs-file:
+    description: >-
+      File listing the packages to build (whitespace or newline separated, # starts a comment),
+      relative to the workspace. Alternative to pkgs, so several workflows share one list.
+    required: false
+    default: ''
+  artifact-cache-workflow:
+    description: >-
+      Workflow file name (e.g. vcpkg-cache.yml) of a producer workflow that runs build-cache.
+      When set, the binary cache is the newest artifact that workflow uploaded on
+      artifact-cache-branch, downloaded read-only, instead of actions/cache.
+    required: false
+    default: ''
+  artifact-cache-branch:
+    description: "Branch whose producer runs are trusted (default: the repository's default branch)"
+    required: false
+    default: ''
+  artifact-cache-name:
+    description: "Artifact name (default: vcpkg-cache-<os>-<triplet>-<cache-key>)"
+    required: false
+    default: ''
+outputs:
+  vcpkg-cmake-config:
+    description: Configure options for cmake to use vcpkg
+    value: ${{ steps.vcpkg-cmake-config.outputs.vcpkg-cmake-config }}
+  vcpkg-cache-hash:
+    description: Hash of the vcpkg cache key
+    value: ${{ steps.vcpkg-cmake-config.outputs.vcpkg-cache-hash }}
+  binary-cache-dir:
+    description: The vcpkg binary cache directory (VCPKG_DEFAULT_BINARY_CACHE)
+    value: ${{ steps.binary-cache.outputs.dir }}
+  artifact-cache-name:
+    description: Artifact name the binary cache is read from (build-cache uploads under it)
+    value: ${{ steps.artifact-name.outputs.name }}
+  artifact-cache-found:
+    description: Whether a producer artifact was found and restored
+    value: ${{ steps.find-artifact.outputs.found }}
+runs:
+  using: "composite"
+  steps:
+  - name: resolve-pkgs
+    id: pkgs
+    shell: bash
+    run: |
+      if [ -n "${{ inputs.pkgs-file }}" ]; then
+        pkgs=$(sed 's/#.*//' "${{ github.workspace }}/${{ inputs.pkgs-file }}" | tr -s ' \t\r\n' ' ')
+      else
+        pkgs="${{ steps.pkgs.outputs.pkgs }}"
+      fi
+      echo "pkgs=$pkgs" >> "$GITHUB_OUTPUT"
+      echo "vcpkg packages: $pkgs"
+  - name: Get latest Github release
+    uses: cardinalby/git-get-release-action@v1
+    id: get-latest-vcpkg-release
+    env:
+      GITHUB_TOKEN: ${{ inputs.token }}
+      VCPKG_ROOT: "${{ github.workspace }}/${{ inputs.vcpkg-subdir }}"
+    with:
+      latest: true
+      repo: microsoft/vcpkg
+      prerelease: false
+      draft: false    
+  - name: Determine checkout tag
+    shell: bash
+    id: determine-checkout-revision
+    run: |
+      if [[ "${{ inputs.revision }}" != "" ]]; then
+        echo "vcpkg-revision=${{ inputs.revision }}" >> $GITHUB_OUTPUT
+      else
+        echo "vcpkg-revision=${{ steps.get-latest-vcpkg-release.outputs.tag_name }}" >> $GITHUB_OUTPUT
+      fi
+    env:
+      VCPKG_ROOT: "${{ github.workspace }}/${{ inputs.vcpkg-subdir }}"
+  - name: checkout-vcpkg
+    uses: actions/checkout@v6
+    with:
+      path: ${{ github.workspace }}/${{ inputs.vcpkg-subdir }}
+      repository: microsoft/vcpkg
+      ref: '${{ steps.determine-checkout-revision.outputs.vcpkg-revision }}'
+      fetch-depth: ${{ inputs.fetch-depth }}
+    env:
+      VCPKG_ROOT: "${{ github.workspace }}/${{ inputs.vcpkg-subdir }}"
+  - name: bootstrap-vcpkg-win
+    if: runner.os == 'Windows'
+    working-directory: ${{ github.workspace }}\${{ inputs.vcpkg-subdir }}
+    run: bootstrap-vcpkg.bat
+    shell: cmd
+    env:
+      VCPKG_ROOT: "${{ github.workspace }}/${{ inputs.vcpkg-subdir }}"
+  - name: bootstrap-vcpkg-unix
+    if: runner.os != 'Windows'
+    working-directory: ${{ github.workspace }}/${{ inputs.vcpkg-subdir }}
+    run: ./bootstrap-vcpkg.sh
+    shell: bash
+    env:
+      VCPKG_ROOT: "${{ github.workspace }}/${{ inputs.vcpkg-subdir }}"
+  - name: set-binarycache-variable
+    id: binary-cache
+    shell: bash
+    run: |
+      echo VCPKG_DEFAULT_BINARY_CACHE='${{ runner.temp }}/vcpkg_cache' >> $GITHUB_ENV
+      mkdir -p '${{ runner.temp }}/vcpkg_cache'
+      echo "dir=${{ runner.temp }}/vcpkg_cache" >> "$GITHUB_OUTPUT"
+  - name: artifact-cache-name
+    id: artifact-name
+    shell: bash
+    run: |
+      name="${{ inputs.artifact-cache-name }}"
+      if [ -z "$name" ]; then name="vcpkg-cache-${{ runner.os }}-${{ inputs.triplet }}-${{ inputs.cache-key }}"; fi
+      echo "name=${name%-}" >> "$GITHUB_OUTPUT"
+  - name: find-artifact-cache
+    if: ${{ inputs.disable-cache != 'true' && inputs.artifact-cache-workflow != '' }}
+    id: find-artifact
+    shell: bash
+    env:
+      GH_TOKEN: ${{ inputs.token }}
+      WORKFLOW: ${{ inputs.artifact-cache-workflow }}
+      BRANCH: ${{ inputs.artifact-cache-branch }}
+      NAME: ${{ steps.artifact-name.outputs.name }}
+    run: bash "${{ github.action_path }}/scripts/find-cache-artifact.sh"
+  - name: download-artifact-cache
+    if: ${{ steps.find-artifact.outputs.found == 'true' }}
+    uses: actions/download-artifact@v8
+    with:
+      name: ${{ steps.artifact-name.outputs.name }}
+      path: ${{ runner.temp }}/vcpkg_cache
+      run-id: ${{ steps.find-artifact.outputs.run-id }}
+      github-token: ${{ inputs.token }}
+  - name: artifact-cache-contents
+    if: ${{ steps.find-artifact.outputs.found == 'true' }}
+    shell: bash
+    run: echo "restored $(find '${{ runner.temp }}/vcpkg_cache' -name '*.zip' | wc -l) archives from run ${{ steps.find-artifact.outputs.run-id }}"
+  - name: vcpkg-dry-run-win
+    if: runner.os == 'Windows' && inputs.manifest-dir == ''
+    working-directory: ${{ github.workspace }}\${{ inputs.vcpkg-subdir }}
+    shell: powershell
+    run: |
+      & "${{ github.workspace }}/${{ inputs.vcpkg-subdir }}/vcpkg.exe" install --dry-run --triplet ${{ inputs.triplet }} ${{ inputs.extra-args }} ${{ steps.pkgs.outputs.pkgs }} --x-write-nuget-packages-config=vcpkg_dry_run.txt
+    env:
+      VCPKG_ROOT: "${{ github.workspace }}/${{ inputs.vcpkg-subdir }}"
+  - name: vcpkg-dry-run-unix
+    if: runner.os != 'Windows' && inputs.manifest-dir == ''
+    working-directory: ${{ github.workspace }}/${{ inputs.vcpkg-subdir }}
+    shell: bash
+    run: |
+      "${{ github.workspace }}/${{ inputs.vcpkg-subdir }}/vcpkg" install --dry-run --triplet ${{ inputs.triplet }} ${{ inputs.extra-args }} ${{ steps.pkgs.outputs.pkgs }} --x-write-nuget-packages-config=vcpkg_dry_run.txt
+    env:
+      VCPKG_ROOT: "${{ github.workspace }}/${{ inputs.vcpkg-subdir }}"
+  - name: vcpkg-dry-run-win-manifest
+    if: runner.os == 'Windows' && inputs.manifest-dir != ''
+    working-directory: ${{ github.workspace }}\${{ inputs.vcpkg-subdir }}
+    shell: powershell
+    run: |
+      & "${{ github.workspace }}/${{ inputs.vcpkg-subdir }}/vcpkg.exe" install --dry-run --triplet ${{ inputs.triplet }} ${{ inputs.extra-args }} --x-manifest-root=${{ inputs.manifest-dir }} --x-install-root=${{ github.workspace }}\${{ inputs.vcpkg-subdir }}\installed --x-write-nuget-packages-config=vcpkg_dry_run.txt
+    env:
+      VCPKG_ROOT: "${{ github.workspace }}/${{ inputs.vcpkg-subdir }}"
+  - name: vcpkg-dry-run-unix-manifest
+    if: runner.os != 'Windows' && inputs.manifest-dir != ''
+    working-directory: ${{ github.workspace }}/${{ inputs.vcpkg-subdir }}
+    shell: bash
+    run: |
+      "${{ github.workspace }}/${{ inputs.vcpkg-subdir }}/vcpkg" install --dry-run --triplet ${{ inputs.triplet }} ${{ inputs.extra-args }} --x-manifest-root=${{ inputs.manifest-dir }} --x-install-root=${{ github.workspace }}/${{ inputs.vcpkg-subdir }}/installed --x-write-nuget-packages-config=vcpkg_dry_run.txt
+    env:
+      VCPKG_ROOT: "${{ github.workspace }}/${{ inputs.vcpkg-subdir }}"
+  - name: cache-vcpkg-archives-restore
+    if: ${{ inputs.disable-cache != 'true' && inputs.artifact-cache-workflow == '' }}
+    id: cache-vcpkg-archives-restore
+    uses: actions/cache/restore@v5
+    with:
+      path: ${{ runner.temp }}/vcpkg_cache
+      key: ${{ runner.os }}-${{ inputs.triplet }}-vcpkg-${{ hashFiles(format('{0}/vcpkg_dry_run.txt',inputs.vcpkg-subdir)) }}-${{ inputs.cache-key }}
+    env:
+      VCPKG_ROOT: "${{ github.workspace }}/${{ inputs.vcpkg-subdir }}"
+  - name: build-vcpkg-win
+    if: runner.os == 'Windows' && inputs.manifest-dir == ''
+    shell: cmd
+    working-directory: ${{ github.workspace }}\${{ inputs.vcpkg-subdir }}
+    run: |
+      "${{ github.workspace }}/${{ inputs.vcpkg-subdir }}/vcpkg.exe" install --triplet ${{ inputs.triplet }} ${{ inputs.extra-args }} ${{ steps.pkgs.outputs.pkgs }}
+    env:
+      VCPKG_ROOT: "${{ github.workspace }}/${{ inputs.vcpkg-subdir }}"
+  - name: build-vcpkg-unix
+    if: runner.os != 'Windows' && inputs.manifest-dir == ''
+    shell: bash
+    working-directory: ${{ github.workspace }}/${{ inputs.vcpkg-subdir }}
+    run: |
+      "${{ github.workspace }}/${{ inputs.vcpkg-subdir }}/vcpkg" install --triplet ${{ inputs.triplet }} ${{ inputs.extra-args }} ${{ steps.pkgs.outputs.pkgs }}
+    env:
+      VCPKG_ROOT: "${{ github.workspace }}/${{ inputs.vcpkg-subdir }}"
+  - name: build-vcpkg-win
+    if: runner.os == 'Windows' && inputs.manifest-dir != ''
+    shell: cmd
+    working-directory: ${{ github.workspace }}\${{ inputs.vcpkg-subdir }}
+    run: |
+      "${{ github.workspace }}/${{ inputs.vcpkg-subdir }}/vcpkg.exe" install --triplet ${{ inputs.triplet }} ${{ inputs.extra-args }} --x-manifest-root=${{ inputs.manifest-dir }} --x-install-root=${{ github.workspace }}/${{ inputs.vcpkg-subdir }}/installed
+    env:
+      VCPKG_ROOT: "${{ github.workspace }}/${{ inputs.vcpkg-subdir }}"
+  - name: build-vcpkg-unix
+    if: runner.os != 'Windows' && inputs.manifest-dir != ''
+    shell: bash
+    working-directory: ${{ github.workspace }}/${{ inputs.vcpkg-subdir }}
+    run: |
+      "${{ github.workspace }}/${{ inputs.vcpkg-subdir }}/vcpkg" install --triplet ${{ inputs.triplet }} ${{ inputs.extra-args }} --x-manifest-root=${{ inputs.manifest-dir }} --x-install-root=${{ github.workspace }}/${{ inputs.vcpkg-subdir }}/installed
+    env:
+      VCPKG_ROOT: "${{ github.workspace }}/${{ inputs.vcpkg-subdir }}"
+  - name: vcpkg cmake configure 
+    shell: bash
+    id: vcpkg-cmake-config
+    run: |
+      echo "vcpkg-cmake-config=-DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/${{ inputs.vcpkg-subdir }}/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=${{ inputs.triplet }} -DVCPKG_MANIFEST_MODE=OFF" >> $GITHUB_OUTPUT
+      echo "vcpkg-cache-hash=${{ hashFiles('${{ inputs.vcpkg-subdir }}/vcpkg_dry_run.txt') }}-${{ inputs.cache-key }}" >> $GITHUB_OUTPUT
+  - uses: actions/upload-artifact@v7
+    id: upload-vcpkg-logs
+    if: ${{ (failure() && (inputs.collect-logs == 'on-failure' || inputs.collect-logs == 'always')) || (inputs.collect-logs == 'always') }}
+    with:
+      name: vcpkg-logs-${{ runner.os }}-${{ inputs.triplet }}-vcpkg-${{ hashFiles(format('{0}/vcpkg_dry_run.txt',inputs.vcpkg-subdir)) }}-${{ inputs.cache-key }}
+      path: "${{ inputs.vcpkg-subdir }}/**/*.log"
+      retention-days: 7
+  - name: cache-vcpkg-archives-save
+    if: ${{ inputs.disable-cache != 'true' && inputs.artifact-cache-workflow == '' && success() && steps.cache-vcpkg-archives-restore.outputs.cache-hit != 'true'}}
+    id: cache-vcpkg-archives-save
+    uses: actions/cache/save@v5
+    with:
+      path: ${{ runner.temp }}/vcpkg_cache
+      key: ${{ runner.os }}-${{ inputs.triplet }}-vcpkg-${{ hashFiles(format('{0}/vcpkg_dry_run.txt',inputs.vcpkg-subdir)) }}-${{ inputs.cache-key }}
+    env:
+      VCPKG_ROOT: "${{ github.workspace }}/${{ inputs.vcpkg-subdir }}"

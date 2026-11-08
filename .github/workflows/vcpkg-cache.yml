@@ -1,0 +1,36 @@
+name: vcpkg-cache
+
+# Producer: builds the vcpkg binary cache and uploads it as artifacts that consumers read.
+# In a real repository: on the default branch, weekly and when the package list changes.
+on:
+  workflow_dispatch:
+  push:
+    branches: [vcpkg-artifact-cache]
+    paths:
+      - test/packages.txt
+      - vcpkg-action/**
+      - .github/workflows/vcpkg-cache.yml
+
+permissions:
+  actions: read   # find and download the previous cache artifact
+  contents: read
+
+jobs:
+  build-cache:
+    runs-on: ${{ matrix.config.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - { runner: ubuntu-24.04, triplet: x64-linux }
+          - { runner: windows-2022, triplet: x64-windows }
+          - { runner: macos-15, triplet: arm64-osx }
+    steps:
+    - uses: actions/checkout@v6
+    - uses: ./vcpkg-action/build-cache
+      with:
+        pkgs-file: test/packages.txt
+        triplet: ${{ matrix.config.triplet }}
+        revision: '2026.10.16'
+        cache-key: experiment
+        token: ${{ github.token }}

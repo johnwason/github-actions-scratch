@@ -1,0 +1,91 @@
+name: vcpkg-build-cache
+description: >-
+  Producer for vcpkg-action's artifact cache: build the packages, starting from this workflow's
+  previous cache artifact, prune the binary cache to what the install uses, and upload it as an
+  artifact that vcpkg-action reads with artifact-cache-workflow. Run it from a trusted workflow on
+  the default branch (a schedule, and pushes that change the package list); consumers only read.
+inputs:
+  pkgs:
+    description: "List of packages to build, separated by spaces"
+    required: false
+    default: ''
+  pkgs-file:
+    description: "File listing the packages to build, relative to the workspace (see vcpkg-action)"
+    required: false
+    default: ''
+  triplet:
+    description: "vcpkg triplet to use"
+    required: true
+  extra-args:
+    description: "Extra vcpkg install command line args (optional)"
+    required: false
+    default: ''
+  cache-key:
+    description: "Additional cache key component; part of the artifact name (optional)"
+    required: false
+    default: ''
+  revision:
+    description: "vcpkg revision to checkout. Pin it: consumers must check out the same one"
+    required: false
+    default: ''
+  token:
+    description: "GitHub token, for the artifact lookup and download (github.token)"
+    required: true
+  vcpkg-subdir:
+    description: "The subdirectory into which to install VCPKG"
+    required: false
+    default: "vcpkg"
+  artifact-cache-name:
+    description: "Artifact name (default: vcpkg-cache-<os>-<triplet>-<cache-key>)"
+    required: false
+    default: ''
+  retention-days:
+    description: "Days the cache artifact is kept (at most the repository's limit, 90 by default)"
+    required: false
+    default: '90'
+outputs:
+  artifact-cache-name:
+    description: The artifact name the cache was uploaded under
+    value: ${{ steps.vcpkg.outputs.artifact-cache-name }}
+
+runs:
+  using: "composite"
+  steps:
+  - name: producer-workflow
+    id: workflow
+    shell: bash
+    # github.workflow_ref: owner/repo/.github/workflows/<file>@<ref>
+    run: |
+      ref="${{ github.workflow_ref }}"
+      file="${ref%@*}"
+      echo "file=${file##*/}" >> "$GITHUB_OUTPUT"
+  - name: vcpkg
+    id: vcpkg
+    # incremental: restore this workflow's previous cache on this branch, then build what changed
+    uses: johnwason/github-actions-scratch/vcpkg-action@vcpkg-artifact-cache
+    with:
+      pkgs: ${{ inputs.pkgs }}
+      pkgs-file: ${{ inputs.pkgs-file }}
+      triplet: ${{ inputs.triplet }}
+      extra-args: ${{ inputs.extra-args }}
+      cache-key: ${{ inputs.cache-key }}
+      revision: ${{ inputs.revision }}
+      token: ${{ inputs.token }}
+      vcpkg-subdir: ${{ inputs.vcpkg-subdir }}
+      artifact-cache-workflow: ${{ steps.workflow.outputs.file }}
+      artifact-cache-branch: ${{ github.ref_name }}
+      artifact-cache-name: ${{ inputs.artifact-cache-name }}
+  - name: prune-binary-cache
+    shell: bash
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}/${{ inputs.vcpkg-subdir }}
+      CACHE_DIR: ${{ steps.vcpkg.outputs.binary-cache-dir }}
+    run: bash "${{ github.action_path }}/../scripts/prune-cache.sh"
+  - name: upload-binary-cache
+    uses: actions/upload-artifact@v7
+    with:
+      name: ${{ steps.vcpkg.outputs.artifact-cache-name }}
+      path: ${{ steps.vcpkg.outputs.binary-cache-dir }}
+      retention-days: ${{ inputs.retention-days }}
+      compression-level: 0  # the archives are zips already
+      if-no-files-found: error

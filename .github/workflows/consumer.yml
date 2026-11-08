@@ -1,0 +1,40 @@
+name: consumer
+
+# Consumer: installs the packages, reading the producer's newest artifact (read-only); whatever is
+# missing from it builds locally and is not uploaded.
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  consume:
+    runs-on: ${{ matrix.config.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - { runner: ubuntu-24.04, triplet: x64-linux }
+          - { runner: windows-2022, triplet: x64-windows }
+          - { runner: macos-15, triplet: arm64-osx }
+    steps:
+    - uses: actions/checkout@v6
+    - uses: ./vcpkg-action
+      id: vcpkg
+      with:
+        pkgs-file: test/packages.txt
+        triplet: ${{ matrix.config.triplet }}
+        revision: '2026.10.16'
+        cache-key: experiment
+        token: ${{ github.token }}
+        artifact-cache-workflow: vcpkg-cache.yml
+        artifact-cache-branch: vcpkg-artifact-cache
+    - name: report
+      shell: bash
+      run: |
+        echo "artifact found: ${{ steps.vcpkg.outputs.artifact-cache-found }}"
+        built=$(ls vcpkg/buildtrees 2>/dev/null | grep -v '^detect_compiler$' || true)
+        echo "built locally: ${built:-none}"
+        echo "## ${{ matrix.config.triplet }}: artifact found ${{ steps.vcpkg.outputs.artifact-cache-found }}, built locally: $(echo ${built:-none})" >> "$GITHUB_STEP_SUMMARY"

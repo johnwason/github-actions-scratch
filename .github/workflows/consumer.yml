@@ -40,7 +40,4 @@ jobs:
     - name: report
       shell: bash
       run: |
-        echo "artifact found: ${{ steps.vcpkg.outputs.artifact-cache-found }}"
-        built=$(ls vcpkg/buildtrees 2>/dev/null | grep -v '^detect_compiler$' || true)
-        echo "built locally: ${built:-none}"
-        echo "## ${{ matrix.config.triplet }}: artifact found ${{ steps.vcpkg.outputs.artifact-cache-found }}, built locally: $(echo ${built:-none})" >> "$GITHUB_STEP_SUMMARY"
+        echo "## ${{ matrix.config.triplet }}: artifact found ${{ steps.vcpkg.outputs.artifact-cache-found }}" >> "$GITHUB_STEP_SUMMARY"

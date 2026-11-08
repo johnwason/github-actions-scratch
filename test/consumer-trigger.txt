@@ -1,1 +1,1 @@
-experiment 1: consumer before any producer artifact
+experiment 3: consumer with the producer's artifact

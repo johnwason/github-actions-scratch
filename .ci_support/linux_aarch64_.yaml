@@ -1,0 +1,14 @@
+DOCKER_PLATFORM:
+- linux/aarch64
+channel_sources:
+- wasontech,conda-forge
+channel_targets:
+- wasontech main
+cxx_compiler:
+- gxx
+cxx_compiler_version:
+- '15'
+docker_image:
+- quay.io/condaforge/linux-anvil-aarch64:alma10
+target_platform:
+- linux-aarch64

@@ -1,0 +1,8 @@
+channel_sources:
+- wasontech,conda-forge
+channel_targets:
+- wasontech main
+cxx_compiler:
+- vs2022
+target_platform:
+- win-64

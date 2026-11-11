@@ -1,0 +1,58 @@
+schema_version: 1
+
+context:
+  name: drekar-launch-process-cpp
+  version: "0.1.0"
+
+package:
+  name: ${{ name }}
+  version: ${{ version }}
+
+source:
+  url: https://github.com/johnwason/drekar-launch-process-cpp/archive/refs/tags/v${{ version }}.tar.gz
+  sha256: 1edb66380ddc911d1fa217a317422f42b659e04120ac178ec9dbb3476719ecc6
+
+build:
+  number: 1
+
+requirements:
+  build:
+    - ${{ compiler('cxx') }}
+    - cmake
+    - ninja
+  run_exports:
+    - ${{ pin_subpackage(name, upper_bound='x.x') }}
+
+tests:
+  - package_contents:
+      include:
+        - drekar_launch_process_cpp/drekar_launch_process_cpp.h
+      lib:
+        - drekar-launch-process-cpp
+      files:
+        - if: win
+          then: Library/lib/cmake/drekar-launch-process-cpp/drekar-launch-process-cpp-config.cmake
+          else: lib/cmake/drekar-launch-process-cpp/drekar-launch-process-cpp-config.cmake
+  # Build and link a program against the installed CMake package
+  - files:
+      recipe:
+        - test/
+    requirements:
+      run:
+        - ${{ compiler('cxx') }}
+        - cmake
+        - ninja
+    script:
+      - cmake -GNinja -S test -B test_build
+      - cmake --build test_build
+
+about:
+  homepage: https://github.com/johnwason/drekar-launch-process-cpp
+  repository: https://github.com/johnwason/drekar-launch-process-cpp
+  license: Apache-2.0
+  license_file: LICENSE.txt
+  summary: C++ client library for drekar-launch
+
+extra:
+  recipe-maintainers:
+    - johnwason

@@ -1,0 +1,112 @@
+# Cross-platform build and test on GitHub-hosted runners (CLAUDE.md S6).
+# scripts/push-ci.sh copies this to .github/workflows/ in an orphan snapshot
+# commit pushed to a ci/ branch of the scratch repo.
+name: rmw_intraprocess cross-platform
+
+on:
+  push:
+    branches: ['ci/rmw_intraprocess']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: ${{ matrix.os }} (RoboStack Jazzy)
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    env:
+      # Same as the local gate (scripts/in-container/env.sh): ament_cppcheck
+      # otherwise skips itself for cppcheck >= 2.x.
+      AMENT_CPPCHECK_ALLOW_SLOW_VERSIONS: '1'
+      # Short paths on Windows (MAX_PATH; see the pixi tasks).
+      CI_BUILD_BASE: ${{ matrix.os == 'windows-2022' && 'C:/b' || 'build' }}
+      CI_INSTALL_BASE: ${{ matrix.os == 'windows-2022' && 'C:/i' || 'install' }}
+    steps:
+      # The linters (uncrustify, copyright, ...) check exact bytes; keep LF.
+      - name: Keep LF line endings
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: prefix-dev/setup-pixi@v0.8.1
+        with:
+          cache: false
+      - name: Environment
+        run: pixi list
+      # conda-forge's Windows cppcheck has its build machine's FILESDIR baked in
+      # and cannot find std.cfg; cppcheck also searches <exe dir>/cfg.
+      - name: Fix cppcheck cfg path (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          env=.pixi/envs/default
+          cfg=$(find "$env" -name std.cfg | head -1)
+          exe=$(find "$env" -iname cppcheck.exe | head -1)
+          echo "std.cfg: ${cfg}"
+          echo "cppcheck: ${exe}"
+          test -n "${cfg}" && test -n "${exe}"
+          cp -r "$(dirname "${cfg}")" "$(dirname "${exe}")/cfg"
+      - name: Build
+        run: pixi run build
+      - name: Test
+        run: pixi run test
+      - name: Test results
+        if: always()
+        run: pixi run test-result
+      # upload-artifact only takes files inside the workspace; the build base is
+      # outside it on Windows.
+      - name: Collect test results
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p test_results
+          for pkg in rmw_intraprocess_cpp rmw_intraprocess_torture; do
+            if [ -d "${CI_BUILD_BASE}/${pkg}/test_results" ]; then
+              cp -r "${CI_BUILD_BASE}/${pkg}/test_results" "test_results/${pkg}"
+            fi
+          done
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-${{ matrix.os }}
+          path: |
+            log/
+            test_results/
+          if-no-files-found: ignore
+
+  # ThreadSanitizer, with the same image and scripts as the local gate (podman,
+  # --network=none inside the container). Locally TSan cannot start under the
+  # host kernel's mmap ASLR entropy (docs/unsupported.md); on this disposable
+  # runner VM the entropy is lowered with sysctl instead.
+  tsan:
+    name: ubuntu-24.04 TSan (podman, local-gate image)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      RMW_INTRAPROCESS_ENABLE_TSAN: '1'
+    steps:
+      - name: Keep LF line endings
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - name: Lower mmap ASLR entropy for TSan (runner VM only)
+        run: sudo sysctl -w vm.mmap_rnd_bits=28
+      - name: Tool versions
+        run: podman --version && uname -r
+      - name: Build image
+        working-directory: src/rmw_intraprocess
+        run: scripts/build-image.sh
+      - name: Build (tsan)
+        working-directory: src/rmw_intraprocess
+        run: scripts/build.sh tsan
+      - name: Test (tsan)
+        working-directory: src/rmw_intraprocess
+        run: scripts/test.sh tsan

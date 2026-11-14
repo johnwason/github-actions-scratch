@@ -1,0 +1,34 @@
+# ThreadSanitizer suppressions. Each entry needs a comment with the reason and,
+# where possible, an upstream issue. Never suppress races in rmw_intraprocess code.
+
+# rosbag2_cpp internal race between its SequentialWriter/MessageCache threads
+# (swap_buffers vs. buffer release); no rmw_intraprocess frames in either
+# stack. Seen in test_rosbag2_components on the GitHub TSan runner. Approved
+# by the user 2026-11-13 ("suppress by library"); docs/unsupported.md.
+race:librosbag2_cpp.so
+
+# rclcpp graph listener thread releases an rclcpp::Event (NodeGraph::
+# notify_graph_change) while the test drops its shared_ptr to it: shared_ptr
+# refcount atomics inside the uninstrumented librclcpp are invisible to TSan.
+# Narrowed to this function (not librclcpp.so: nearly every stack in the rclcpp
+# tests passes through rclcpp before reaching this RMW). No rmw_intraprocess
+# frames. Seen intermittently in test_rclcpp_graph on the GitHub TSan runner.
+# Same user decision as the entries above (upstream races suppressed narrowly).
+race:rclcpp::node_interfaces::NodeGraph::notify_graph_change
+
+# rclcpp MultiThreadedExecutor workers during an entity recollect (nodes added
+# by rclcpp_components::ComponentManager): one worker frees an object another
+# worker used under a mutex in NodeBase::callback_group_in_node; the ordering is
+# a shared_ptr refcount inside the uninstrumented librclcpp. Both stacks are
+# entirely in librclcpp, no rmw_intraprocess or test frames. Seen
+# intermittently in test_composition_demo on the GitHub TSan runner. Same user
+# decision as the entries above (upstream races suppressed narrowly).
+race:rclcpp::node_interfaces::NodeBase::callback_group_in_node
+
+# rclcpp: a MultiThreadedExecutor worker frees a callback group's notify guard
+# condition while another worker triggers it
+# (CallbackGroup::trigger_notify_guard_condition -> GuardCondition::trigger).
+# Both stacks entirely in librclcpp, no rmw_intraprocess or test frames. Seen
+# intermittently in test_composition_demo on the GitHub TSan runner
+# (2026-11-14). Same user decision as the entries above.
+race:rclcpp::CallbackGroup::trigger_notify_guard_condition

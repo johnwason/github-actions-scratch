@@ -1,0 +1,9 @@
+# Statistics of a torture component. With stop = true the component first
+# stops generating new work (in-flight work still completes).
+bool stop
+---
+string component
+string[] keys
+int64[] values
+# Invariant violations and unexpected exceptions, one line each.
+string[] errors

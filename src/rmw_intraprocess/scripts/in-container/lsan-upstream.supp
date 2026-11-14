@@ -1,0 +1,8 @@
+# LeakSanitizer suppressions for UPSTREAM test_rmw_implementation runs only
+# (scripts/in-container/upstream-test.sh). Each entry is a leak in the upstream
+# test code itself, not in rmw_intraprocess_cpp; see docs/unsupported.md.
+#
+# test_service.cpp / test_client.cpp (rmw_implementation 2.15.6) "check_qos"
+# create a service/client and never destroy it.
+leak:TestService_check_qos_Test::TestBody
+leak:TestClient_check_qos_Test::TestBody

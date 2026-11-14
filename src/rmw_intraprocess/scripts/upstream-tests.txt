@@ -1,0 +1,23 @@
+# Upstream test_rmw_implementation suites that must pass (one ctest name prefix
+# per line, without the __rmw_intraprocess_cpp suffix). check-all.sh runs them
+# for every variant. Add suites as milestones land; never remove one without
+# recording it in docs/unsupported.md with the user's approval.
+# M1
+test_init_shutdown
+test_init_options
+test_create_destroy_node
+# M2 (test_wait_set and test_unique_identifiers need services/clients: M4)
+test_publisher
+test_subscription
+test_serialize_deserialize
+test_qos_profile_check_compatible
+# M3
+test_event
+test_duration_infinite
+# M4
+test_service
+test_client
+test_wait_set
+test_unique_identifiers
+# M5
+test_graph_api

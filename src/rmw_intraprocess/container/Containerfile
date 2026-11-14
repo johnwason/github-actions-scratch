@@ -1,0 +1,88 @@
+# rmw_intraprocess development/test image (ROS 2 Jazzy, Ubuntu 24.04).
+#
+# Network is used ONLY while this image is built (scripts/build-image.sh).
+# Sources fetched here (keep this list current; note additions in commits):
+#   - docker.io/library/ros (base image, pinned by digest)
+#   - Ubuntu and ROS 2 apt mirrors configured in the base image
+#   - github.com/ros2/{rcl,rclcpp,rmw_implementation} tag tarballs (pinned tags)
+#
+# Every build/test container started from this image runs with --network=none.
+
+# ros:jazzy-ros-base, Ubuntu 24.04.5, amd64. Pinned by digest.
+ARG BASE_IMAGE=docker.io/library/ros@sha256:00b8d47a6e6384a2834e3d01fa87ae767876543baa574f2d64a75c04ea33c698
+FROM ${BASE_IMAGE}
+
+ARG BASE_IMAGE
+# Upstream test sources for M7, pinned to the tags matching the Jazzy debs in the
+# base image (rcl 9.2.11, rclcpp 28.1.22, rmw_implementation 2.15.6).
+# system_tests is added in M7 once its Jazzy tag is confirmed.
+ARG RCL_TAG=9.2.11
+ARG RCLCPP_TAG=28.1.22
+ARG RMW_IMPLEMENTATION_TAG=2.15.6
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Build tools and the test dependencies of the upstream suites run in M7.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      binutils \
+      file \
+      gdb \
+      python3-pytest \
+      ros-jazzy-ament-cmake-gmock \
+      ros-jazzy-ament-cmake-google-benchmark \
+      ros-jazzy-ament-cmake-gtest \
+      ros-jazzy-ament-lint-auto \
+      ros-jazzy-ament-lint-common \
+      ros-jazzy-launch-testing-ament-cmake \
+      ros-jazzy-mimick-vendor \
+      ros-jazzy-osrf-testing-tools-cpp \
+      ros-jazzy-performance-test-fixture \
+      ros-jazzy-rmw-implementation-cmake \
+      ros-jazzy-rosidl-typesupport-fastrtps-c \
+      ros-jazzy-rosidl-typesupport-fastrtps-cpp \
+      ros-jazzy-rosidl-typesupport-introspection-c \
+      ros-jazzy-rosidl-typesupport-introspection-cpp \
+      ros-jazzy-test-msgs \
+      ros-jazzy-composition \
+      ros-jazzy-demo-nodes-cpp \
+      ros-jazzy-action-tutorials-cpp \
+      ros-jazzy-lifecycle \
+      ros-jazzy-example-interfaces \
+ && rm -rf /var/lib/apt/lists/*
+
+# Upstream sources (not built here; M7 builds them against this RMW).
+RUN set -eu; \
+    mkdir -p /opt/upstream_src; cd /opt/upstream_src; \
+    fetch() { \
+      mkdir -p "$1"; \
+      curl -fsSL "https://github.com/ros2/$1/archive/refs/tags/$2.tar.gz" \
+        | tar -xz -C "$1" --strip-components=1; \
+      echo "$1 $2" >> /opt/upstream_src/VERSIONS; \
+    }; \
+    fetch rcl "${RCL_TAG}"; \
+    fetch rclcpp "${RCLCPP_TAG}"; \
+    fetch rmw_implementation "${RMW_IMPLEMENTATION_TAG}"; \
+    cat /opt/upstream_src/VERSIONS
+
+# system_tests (M7): Jazzy branch version 0.20.4 (separate layer so the
+# earlier fetches stay cached).
+ARG SYSTEM_TESTS_TAG=0.20.4
+RUN set -eu; \
+    mkdir -p /opt/upstream_src/system_tests; \
+    curl -fsSL "https://github.com/ros2/system_tests/archive/refs/tags/${SYSTEM_TESTS_TAG}.tar.gz" \
+      | tar -xz -C /opt/upstream_src/system_tests --strip-components=1; \
+    echo "system_tests ${SYSTEM_TESTS_TAG}" >> /opt/upstream_src/VERSIONS; \
+    cat /opt/upstream_src/VERSIONS
+
+RUN mkdir -p /ws/src /ws/build /ws/install /ws/log
+
+LABEL org.opencontainers.image.title="rmw_intraprocess-dev" \
+      org.opencontainers.image.base.name="${BASE_IMAGE}" \
+      rmw_intraprocess.ros_distro="jazzy" \
+      rmw_intraprocess.upstream.rcl="${RCL_TAG}" \
+      rmw_intraprocess.upstream.rclcpp="${RCLCPP_TAG}" \
+      rmw_intraprocess.upstream.rmw_implementation="${RMW_IMPLEMENTATION_TAG}" \
+      rmw_intraprocess.upstream.system_tests="${SYSTEM_TESTS_TAG}"
+
+WORKDIR /ws

@@ -1,0 +1,8 @@
+# Self-terminating: the action client calls rclcpp::shutdown() when its goal
+# succeeds, so container_host exits with status 0 on its own.
+executor: {type: multi_threaded, threads: 2}
+components:
+  - package: action_tutorials_cpp
+    plugin: action_tutorials_cpp::FibonacciActionServer
+  - package: action_tutorials_cpp
+    plugin: action_tutorials_cpp::FibonacciActionClient

@@ -1,0 +1,54 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>rmw_intraprocess_cpp</name>
+  <version>0.0.0</version>
+  <description>ROS 2 middleware implementation that communicates only within a single process.</description>
+  <maintainer email="wason@wasontech.com">John Wason</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>fastcdr</depend>
+  <depend>rcutils</depend>
+  <depend>rmw</depend>
+  <depend>rosidl_runtime_c</depend>
+  <depend>rosidl_typesupport_fastrtps_c</depend>
+  <depend>rosidl_typesupport_fastrtps_cpp</depend>
+  <depend>rosidl_typesupport_introspection_c</depend>
+  <depend>rosidl_typesupport_introspection_cpp</depend>
+
+  <!-- Dispatching type supports registered with register_rmw_implementation. -->
+  <exec_depend>rosidl_typesupport_c</exec_depend>
+  <exec_depend>rosidl_typesupport_cpp</exec_depend>
+
+  <test_depend>action_msgs</test_depend>
+  <test_depend>action_tutorials_cpp</test_depend>
+  <test_depend>action_tutorials_interfaces</test_depend>
+  <test_depend>ament_cmake_gtest</test_depend>
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_index_cpp</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+  <test_depend>class_loader</test_depend>
+  <test_depend>composition</test_depend>
+  <test_depend>composition_interfaces</test_depend>
+  <test_depend>demo_nodes_cpp</test_depend>
+  <test_depend>example_interfaces</test_depend>
+  <test_depend>lifecycle_msgs</test_depend>
+  <test_depend>rcl_interfaces</test_depend>
+  <test_depend>rclcpp</test_depend>
+  <test_depend>rclcpp_action</test_depend>
+  <test_depend>rclcpp_components</test_depend>
+  <test_depend>rclcpp_lifecycle</test_depend>
+  <test_depend>rcpputils</test_depend>
+  <test_depend>rosbag2_cpp</test_depend>
+  <test_depend>rosbag2_storage_mcap</test_depend>
+  <test_depend>rosbag2_transport</test_depend>
+  <test_depend>std_msgs</test_depend>
+  <test_depend>test_msgs</test_depend>
+
+  <member_of_group>rmw_implementation_packages</member_of_group>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

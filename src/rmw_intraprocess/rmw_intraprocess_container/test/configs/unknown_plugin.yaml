@@ -1,0 +1,3 @@
+components:
+  - package: composition
+    plugin: composition::DoesNotExist

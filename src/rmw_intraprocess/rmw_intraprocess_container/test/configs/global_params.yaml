@@ -1,0 +1,4 @@
+/**:
+  ros__parameters:
+    from_global_file: "global"
+    overridden: 1

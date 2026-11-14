@@ -1,0 +1,38 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>rmw_intraprocess_container</name>
+  <version>0.0.0</version>
+  <description>container_host: a component container for single-process ROS 2 applications (for example with rmw_intraprocess_cpp). It loads the components listed in a simple YAML file into one process, without launch or services from another process.</description>
+  <maintainer email="wason@wasontech.com">John Wason</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>ament_index_cpp</depend>
+  <depend>class_loader</depend>
+  <depend>composition_interfaces</depend>
+  <depend>rcl_yaml_param_parser</depend>
+  <depend>rclcpp</depend>
+  <depend>rclcpp_components</depend>
+  <depend>rcpputils</depend>
+  <depend>rcutils</depend>
+  <depend>rmw</depend>
+  <depend>yaml_cpp_vendor</depend>
+
+  <!-- The default RMW of container_host (any RMW can be selected). Also
+       build-time for colcon ordering: the tests locate the RMW library. -->
+  <depend>rmw_intraprocess_cpp</depend>
+
+  <test_depend>action_tutorials_cpp</test_depend>
+  <test_depend>ament_cmake_gtest</test_depend>
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+  <test_depend>composition</test_depend>
+  <test_depend>demo_nodes_cpp</test_depend>
+  <test_depend>rcl_interfaces</test_depend>
+  <test_depend>std_msgs</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

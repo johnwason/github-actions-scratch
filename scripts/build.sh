@@ -11,6 +11,9 @@ JOBS=${JOBS:-2}
 BUILD_TYPE=${BUILD_TYPE:-RelWithDebInfo}
 RR_TESTING=${RR_TESTING:-OFF}
 
+# Keep build outputs out of the Go module (./... must not see generated files)
+mkdir -p "$BUILD"; [ -f "$BUILD/go.mod" ] || printf "module rrgo_build_ignore\n" > "$BUILD/go.mod"
+
 cmake -S "$RR_SRC" -B "$BUILD/rr" -G Ninja \
   -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
   -DCMAKE_INSTALL_PREFIX="$BUILD/install" \

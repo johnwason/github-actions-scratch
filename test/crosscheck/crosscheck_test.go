@@ -47,6 +47,10 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 	defer ts3root.Shutdown()
+	if _, err := testservices.RegisterTestService5(setup.Node); err != nil {
+		fmt.Println("register ts5:", err)
+		os.Exit(1)
+	}
 	code := m.Run()
 	for _, r := range roots {
 		r.Shutdown()
@@ -73,3 +77,7 @@ func TestCppClientTestService1(t *testing.T) { runCpp(t, "robotraconteur_test_se
 // TestCppClientTestService3 runs the C++ ServiceTestClient2 (TestService3)
 // against the Go testroot3 service.
 func TestCppClientTestService3(t *testing.T) { runCpp(t, "robotraconteur_test_service2") }
+
+// TestCppClientTestService5 runs the C++ ServiceTestClient3 (TestService5,
+// asynchronous service) against the Go asynctestroot service.
+func TestCppClientTestService5(t *testing.T) { runCpp(t, "robotraconteur_test_service3") }

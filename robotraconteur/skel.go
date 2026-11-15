@@ -15,9 +15,11 @@ type ServiceSkel interface {
 	// RRInit is called when the skeleton is attached to the service. It
 	// creates pipe/wire servers, connects events and attaches callbacks.
 	RRInit(b *SkelBase) error
-	RRCallGetProperty(name string) (*Element, error)
-	RRCallSetProperty(name string, value *Element) error
-	RRCallFunction(name string, args []*Element) (*Element, error)
+	// The async adapter is non-nil when the call may be completed
+	// asynchronously (see AsyncAdapter).
+	RRCallGetProperty(name string, async *AsyncAdapter) (*Element, error)
+	RRCallSetProperty(name string, value *Element, async *AsyncAdapter) error
+	RRCallFunction(name string, args []*Element, async *AsyncAdapter) (*Element, error)
 	// RRGetSubObj returns the object for an objref member and its fully
 	// qualified object type.
 	RRGetSubObj(name, index string) (obj any, objectType string, err error)
@@ -138,18 +140,19 @@ func (d *skelDirector) Init(skel swig.WrappedServiceSkel) {
 
 func (d *skelDirector) X_CallGetProperty(name string, async swig.WrappedServiceSkelAsyncAdapter) swig.MessageElement {
 	defer recoverDirector()
-	if async != nil && async.Swigcptr() != 0 {
-		defer swig.DeleteWrappedServiceSkelAsyncAdapter(async)
+	a := newAsyncAdapter(async)
+	defer a.release()
+	e, err := d.b.impl.RRCallGetProperty(name, a)
+	if a.IsAsync() {
+		return nil
 	}
-	e, err := d.b.impl.RRCallGetProperty(name)
 	return d.returnElement(e, err)
 }
 
 func (d *skelDirector) X_CallSetProperty(name string, m swig.MessageElement, async swig.WrappedServiceSkelAsyncAdapter) {
 	defer recoverDirector()
-	if async != nil && async.Swigcptr() != 0 {
-		defer swig.DeleteWrappedServiceSkelAsyncAdapter(async)
-	}
+	a := newAsyncAdapter(async)
+	defer a.release()
 	if m != nil && m.Swigcptr() != 0 {
 		defer swig.DeleteMessageElement(m)
 	}
@@ -158,22 +161,24 @@ func (d *skelDirector) X_CallSetProperty(name string, m swig.MessageElement, asy
 		setDirectorError(err)
 		return
 	}
-	if err := d.b.impl.RRCallSetProperty(name, e); err != nil {
+	if err := d.b.impl.RRCallSetProperty(name, e, a); err != nil && !a.IsAsync() {
 		setDirectorError(err)
 	}
 }
 
 func (d *skelDirector) X_CallFunction(name string, args swig.Vectorptr_messageelement, async swig.WrappedServiceSkelAsyncAdapter) swig.MessageElement {
 	defer recoverDirector()
-	if async != nil && async.Swigcptr() != 0 {
-		defer swig.DeleteWrappedServiceSkelAsyncAdapter(async)
-	}
+	a := newAsyncAdapter(async)
+	defer a.release()
 	elems, err := elementsFromNative(args)
 	if err != nil {
 		setDirectorError(err)
 		return nil
 	}
-	e, err := d.b.impl.RRCallFunction(name, elems)
+	e, err := d.b.impl.RRCallFunction(name, elems, a)
+	if a.IsAsync() {
+		return nil
+	}
 	return d.returnElement(e, err)
 }
 

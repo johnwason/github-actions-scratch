@@ -37,6 +37,10 @@ func main() {
 		os.Exit(1)
 	}
 	defer ts3root.Shutdown()
+	if _, err := testservices.RegisterTestService5(setup.Node); err != nil {
+		fmt.Fprintln(os.Stderr, "register ts5:", err)
+		os.Exit(1)
+	}
 	defer func() {
 		for _, r := range roots {
 			r.Shutdown()

@@ -1316,7 +1316,7 @@ void GenerateSkel(GenContext& ctx, const RR_SHARED_PTR<ServiceEntryDefinition>& 
     std::string kn = lower_first(name) + "Skel";
     std::map<std::string, std::string> mn = exported_names(e->Members);
 
-    w << "type " << kn << " struct {\n\tobj " << name << "\n\tb   *rr.SkelBase\n}\n\n";
+    w << "type " << kn << " struct {\n\tobj " << name << "\n\taobj Async" << name << "\n\tb   *rr.SkelBase\n}\n\n";
 
     // RRInit: pipes, wires, events, callbacks
     w << "func (rr_s *" << kn << ") RRInit(rr_b *rr.SkelBase) error {\n\trr_s.b = rr_b\n";
@@ -1370,33 +1370,42 @@ void GenerateSkel(GenContext& ctx, const RR_SHARED_PTR<ServiceEntryDefinition>& 
     w << "\treturn nil\n}\n\n";
 
     // properties
-    w << "func (rr_s *" << kn << ") RRCallGetProperty(rr_name string) (*rr.Element, error) {\n\tswitch rr_name {\n";
+    w << "func (rr_s *" << kn
+      << ") RRCallGetProperty(rr_name string, rr_async *rr.AsyncAdapter) (*rr.Element, error) {\n\tswitch rr_name {\n";
     BOOST_FOREACH (const RR_SHARED_PTR<MemberDefinition>& m, e->Members)
     {
         RR_SHARED_PTR<PropertyDefinition> p = RR_DYNAMIC_POINTER_CAST<PropertyDefinition>(m);
         if (!p || p->Direction() == MemberDefinition_Direction_writeonly)
             continue;
-        w << "\tcase " << go_string_literal(p->Name) << ":\n\t\trr_v, rr_err := rr_s.obj.Get" << mn[p->Name]
+        w << "\tcase " << go_string_literal(p->Name) << ":\n";
+        w << "\t\tif rr_s.aobj != nil && rr_async != nil {\n\t\t\trr_async.MakeAsync()\n\t\t\trr_s.aobj.AsyncGet"
+          << mn[p->Name] << "(rr.TimeoutInfinite, func(rr_v " << go_type(ctx, *p->Type)
+          << ", rr_err error) {\n\t\t\t\tif rr_err != nil {\n\t\t\t\t\trr_async.End(nil, rr_err)\n\t\t\t\t\treturn\n\t\t\t\t}\n"
+          << "\t\t\t\trr_async.End(" << go_codec(ctx, *p->Type) << ".Pack(\"value\", rr_v))\n\t\t\t})\n\t\t\treturn nil, nil\n\t\t}\n";
+        w << "\t\trr_v, rr_err := rr_s.obj.Get" << mn[p->Name]
           << "()\n\t\tif rr_err != nil {\n\t\t\treturn nil, rr_err\n\t\t}\n\t\treturn " << go_codec(ctx, *p->Type)
           << ".Pack(\"value\", rr_v)\n";
     }
     w << "\t}\n\treturn nil, rr.NewMemberNotFound(\"property \" + rr_name + \" not found\")\n}\n\n";
 
-    w << "func (rr_s *" << kn << ") RRCallSetProperty(rr_name string, rr_value *rr.Element) error {\n\tswitch rr_name {\n";
+    w << "func (rr_s *" << kn
+      << ") RRCallSetProperty(rr_name string, rr_value *rr.Element, rr_async *rr.AsyncAdapter) error {\n\tswitch rr_name {\n";
     BOOST_FOREACH (const RR_SHARED_PTR<MemberDefinition>& m, e->Members)
     {
         RR_SHARED_PTR<PropertyDefinition> p = RR_DYNAMIC_POINTER_CAST<PropertyDefinition>(m);
         if (!p || p->Direction() == MemberDefinition_Direction_readonly)
             continue;
         w << "\tcase " << go_string_literal(p->Name) << ":\n\t\trr_v, rr_err := " << go_codec(ctx, *p->Type)
-          << ".Unpack(rr_value)\n\t\tif rr_err != nil {\n\t\t\treturn rr_err\n\t\t}\n\t\treturn rr_s.obj.Set"
-          << mn[p->Name] << "(rr_v)\n";
+          << ".Unpack(rr_value)\n\t\tif rr_err != nil {\n\t\t\treturn rr_err\n\t\t}\n";
+        w << "\t\tif rr_s.aobj != nil && rr_async != nil {\n\t\t\trr_async.MakeAsync()\n\t\t\trr_s.aobj.AsyncSet" << mn[p->Name]
+          << "(rr_v, rr.TimeoutInfinite, func(rr_err error) { rr_async.End(nil, rr_err) })\n\t\t\treturn nil\n\t\t}\n";
+        w << "\t\treturn rr_s.obj.Set" << mn[p->Name] << "(rr_v)\n";
     }
     w << "\t}\n\t_ = rr_value\n\treturn rr.NewMemberNotFound(\"property \" + rr_name + \" not found\")\n}\n\n";
 
     // functions
     w << "func (rr_s *" << kn
-      << ") RRCallFunction(rr_name string, rr_args []*rr.Element) (*rr.Element, error) {\n\tswitch rr_name {\n";
+      << ") RRCallFunction(rr_name string, rr_args []*rr.Element, rr_async *rr.AsyncAdapter) (*rr.Element, error) {\n\tswitch rr_name {\n";
     BOOST_FOREACH (const RR_SHARED_PTR<MemberDefinition>& m, e->Members)
     {
         RR_SHARED_PTR<FunctionDefinition> f = RR_DYNAMIC_POINTER_CAST<FunctionDefinition>(m);
@@ -1415,6 +1424,18 @@ void GenerateSkel(GenContext& ctx, const RR_SHARED_PTR<ServiceEntryDefinition>& 
         }
         w << "\tcase " << go_string_literal(f->Name) << ":\n";
         w << unpack_args(ctx, f->Parameters, "\t\t", "return nil, rr_err");
+        {
+            std::string pn = params_names(f->Parameters);
+            w << "\t\tif rr_s.aobj != nil && rr_async != nil {\n\t\t\trr_async.MakeAsync()\n\t\t\trr_s.aobj.Async" << mn[f->Name]
+              << "(" << pn << (pn.empty() ? "" : ", ") << "rr.TimeoutInfinite, ";
+            if (is_void(f->ReturnType))
+                w << "func(rr_err error) { rr_async.End(nil, rr_err) })\n";
+            else
+                w << "func(rr_r " << go_type(ctx, *f->ReturnType)
+                  << ", rr_err error) {\n\t\t\t\tif rr_err != nil {\n\t\t\t\t\trr_async.End(nil, rr_err)\n\t\t\t\t\treturn\n\t\t\t\t}\n\t\t\t\trr_async.End("
+                  << go_codec(ctx, *f->ReturnType) << ".Pack(\"return\", rr_r))\n\t\t\t})\n";
+            w << "\t\t\treturn nil, nil\n\t\t}\n";
+        }
         if (is_void(f->ReturnType))
         {
             w << "\t\treturn nil, rr_s.obj." << mn[f->Name] << "(" << params_names(f->Parameters) << ")\n";
@@ -1628,7 +1649,8 @@ void GenerateFactory(GenContext& ctx, const std::string& defstring, std::ostream
         w << "\tcase " << go_string_literal(qualified_name(ctx.def, e->Name)) << ":\n";
         w << "\t\to, ok := obj.(" << name << ")\n\t\tif !ok {\n\t\t\treturn nil, rr.NewInvalidArgument(\"object does not implement "
           << qualified_name(ctx.def, e->Name) << "\")\n\t\t}\n";
-        w << "\t\treturn &" << lower_first(name) << "Skel{obj: o}, nil\n";
+        w << "\t\tao, _ := obj.(Async" << name << ")\n";
+        w << "\t\treturn &" << lower_first(name) << "Skel{obj: o, aobj: ao}, nil\n";
     }
     w << "\t}\n\treturn nil, rr.NewServiceError(\"unknown object type \" + objectType)\n}\n\n";
     w << "func (serviceFactory) DownCastError(e *rr.Error) error {\n\tswitch e.Name {\n";

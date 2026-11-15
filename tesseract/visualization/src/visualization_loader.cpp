@@ -1,0 +1,82 @@
+/**
+ * @file visualization_loader.h
+ * @brief Visualization Loader
+ *
+ * @author Levi Armstrong
+ * @date July 29, 2020
+ *
+ * @copyright Copyright (c) 2020, Southwest Research Institute
+ *
+ * @par License
+ * Software License Agreement (Apache License)
+ * @par
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * @par
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#include <tesseract/common/logging.h>
+#include <tesseract/visualization/visualization_loader.h>
+#include <tesseract/visualization/visualization.h>
+#include <tesseract/visualization/visualization_factory.h>
+
+const std::string TESSERACT_IGNITION_LIBRARY_NAME = "tesseract_visualization_ignition_visualization_plugin";
+const std::string TESSERACT_IGNITION_SYMBOL_NAME = "TesseractIgnitionVisualizationPlugin";
+
+const std::string TESSERACT_VISUALIZATION_PLUGIN_DIRECTORIES_ENV = "TESSERACT_VISUALIZATION_PLUGIN_DIRECTORIES";
+const std::string TESSERACT_VISUALIZATION_PLUGINS_ENV = "TESSERACT_VISUALIZATION_PLUGINS";
+
+namespace tesseract::visualization
+{
+namespace
+{
+/** @brief Members are destroyed in reverse order, so the object goes before the library holding its code */
+struct LoadedVisualization
+{
+  VisualizationFactory::Ptr factory;
+  std::unique_ptr<Visualization> visualization;
+};
+}  // namespace
+
+VisualizationLoader::VisualizationLoader()
+{
+  search_paths_env = TESSERACT_VISUALIZATION_PLUGIN_DIRECTORIES_ENV;
+  search_libraries_env = TESSERACT_VISUALIZATION_PLUGINS_ENV;
+  search_libraries.emplace_back(TESSERACT_IGNITION_LIBRARY_NAME);
+  search_paths.emplace_back(TESSERACT_VISUALIZATION_PLUGIN_PATH);
+}
+
+std::shared_ptr<Visualization> VisualizationLoader::get(std::string plugin_name, const YAML::Node& config) const
+{
+  if (plugin_name.empty())
+    plugin_name = TESSERACT_IGNITION_SYMBOL_NAME;
+
+  const std::scoped_lock lock(instances_mutex_);
+  const auto it = instances_.find(plugin_name);
+  if (it != instances_.end())
+    return it->second;
+
+  try
+  {
+    auto loaded = std::make_shared<LoadedVisualization>();
+    loaded->factory = createInstance<VisualizationFactory>(plugin_name);
+    loaded->visualization = loaded->factory->create(plugin_name, config);
+    std::shared_ptr<Visualization> instance(loaded, loaded->visualization.get());
+    instances_[plugin_name] = instance;
+    return instance;
+  }
+  catch (const std::exception&)
+  {
+    TESSERACT_LOG_WARN("Failed to load symbol '{}'", plugin_name);
+    return nullptr;
+  }
+}
+
+}  // namespace tesseract::visualization

@@ -1,0 +1,13 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+find_dependency(tesseract COMPONENTS common)
+find_dependency(yaml-cpp)
+find_dependency(cereal)
+if(@TESSERACT_CONDA_FIND_LIBARCHIVE@)
+  find_dependency(LibArchive)
+  find_dependency(OpenSSL COMPONENTS Crypto)
+endif()
+
+include("${CMAKE_CURRENT_LIST_DIR}/tesseract_conda-targets.cmake")
+check_required_components(tesseract_conda)

@@ -1,0 +1,327 @@
+/**
+ * @file discrete_contact_manager.h
+ * @brief This is the discrete contact manager base class
+ *
+ * It should be used to perform discrete contact checking.
+ *
+ * @author Levi Armstrong
+ * @date Dec 18, 2017
+ *
+ * @copyright Copyright (c) 2017, Southwest Research Institute
+ *
+ * @par License
+ * Software License Agreement (Apache License)
+ * @par
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * @par
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+#ifndef TESSERACT_COLLISION_DISCRETE_CONTACT_MANAGER_H
+#define TESSERACT_COLLISION_DISCRETE_CONTACT_MANAGER_H
+
+#include <tesseract/common/macros.h>
+TESSERACT_COMMON_IGNORE_WARNINGS_PUSH
+#include <memory>
+TESSERACT_COMMON_IGNORE_WARNINGS_POP
+
+#include <tesseract/collision/types.h>
+#include <tesseract/common/fwd.h>
+#include <tesseract/common/types.h>
+
+namespace tesseract::collision
+{
+class DiscreteContactManager
+{
+public:
+  // LCOV_EXCL_START
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  // LCOV_EXCL_STOP
+
+  using Ptr = std::shared_ptr<DiscreteContactManager>;
+  using ConstPtr = std::shared_ptr<const DiscreteContactManager>;
+  using UPtr = std::unique_ptr<DiscreteContactManager>;
+  using ConstUPtr = std::unique_ptr<const DiscreteContactManager>;
+
+  DiscreteContactManager() = default;
+  virtual ~DiscreteContactManager() = default;
+  DiscreteContactManager(const DiscreteContactManager&) = delete;
+  DiscreteContactManager& operator=(const DiscreteContactManager&) = delete;
+  DiscreteContactManager(DiscreteContactManager&&) = delete;
+  DiscreteContactManager& operator=(DiscreteContactManager&&) = delete;
+
+  /**
+   * @brief Get the name of the contact manager
+   * @return The name
+   */
+  virtual std::string getName() const = 0;
+
+  /**
+   * @brief Clone the manager
+   *
+   * This is to be used for multi threaded application. A user should
+   * make a clone for each thread.
+   */
+  virtual DiscreteContactManager::UPtr clone() const = 0;
+
+  /**
+   * @brief Add a object to the checker
+   * @param id              The LinkId of the object, must be unique.
+   * @param mask_id         User defined id which gets stored in the results structure.
+   * @param shapes          A vector of shapes that make up the collision object.
+   * @param shape_poses     A vector of poses for each shape, must be same length as shapes
+   * @return true if successfully added, otherwise false.
+   */
+  virtual bool addCollisionObject(const tesseract::common::LinkId& id,
+                                  const int& mask_id,
+                                  const CollisionShapesConst& shapes,
+                                  const tesseract::common::VectorIsometry3d& shape_poses,
+                                  bool enabled = true) = 0;
+
+  /**
+   * @brief Add a batch of collision objects, applying one broadphase update per batch where the backend
+   *        supports it
+   *
+   * Observably equivalent to calling addCollisionObject once per entry, in order. A false return still leaves
+   * every object that was added registered; only the failing ones are absent. Within one batch a repeated id
+   * behaves as the repeated single calls do: the last entry naming that id decides both the object and its
+   * position in getCollisionObjects(), and if that last entry fails the id is left unregistered even when an
+   * earlier entry for it succeeded. Equivalence covers returns, not throws: building an object may throw, and a
+   * backend that builds the whole batch before it mutates anything then leaves the manager untouched where the
+   * repeated single calls would have left the earlier entries applied.
+   *
+   * @param objects The objects to add
+   * @return False if any object failed to be added
+   */
+  virtual bool addCollisionObjects(const std::vector<CollisionObjectSpec>& objects);
+
+  /**
+   * @brief Get a collision objects collision geometries
+   * @param id The collision object's LinkId
+   * @return A vector of collision geometries. The vector will be empty if the collision object is not found.
+   */
+  virtual const CollisionShapesConst& getCollisionObjectGeometries(const tesseract::common::LinkId& id) const = 0;
+
+  /**
+   * @brief Get a collision objects collision geometries transforms
+   * @param id The collision object's LinkId
+   * @return A vector of collision geometries transforms. The vector will be empty if the collision object is not found.
+   */
+  virtual const tesseract::common::VectorIsometry3d&
+  getCollisionObjectGeometriesTransforms(const tesseract::common::LinkId& id) const = 0;
+
+  /**
+   * @brief Find if a collision object already exists
+   * @param id The LinkId of the collision object
+   * @return true if it exists, otherwise false.
+   */
+  virtual bool hasCollisionObject(const tesseract::common::LinkId& id) const = 0;
+
+  /**
+   * @brief Remove an object from the checker
+   * @param id The LinkId of the object
+   * @return true if successfully removed, otherwise false.
+   */
+  virtual bool removeCollisionObject(const tesseract::common::LinkId& id) = 0;
+
+  /**
+   * @brief Remove a batch of collision objects, applying one broadphase and cache update per batch where the
+   *        backend supports it
+   *
+   * Observably equivalent to calling removeCollisionObject once per id, in order. Within one batch a repeated id
+   * behaves as the repeated single calls do: the first occurrence removes it and the second reports it absent.
+   *
+   * @param ids The LinkIds to remove; ids the manager does not hold are skipped
+   * @return False if any id was absent; every id that was present is still removed
+   */
+  virtual bool removeCollisionObjects(const std::vector<tesseract::common::LinkId>& ids);
+
+  /**
+   * @brief Enable an object
+   * @param id The LinkId of the object
+   */
+  virtual bool enableCollisionObject(const tesseract::common::LinkId& id) = 0;
+
+  /**
+   * @brief Disable an object
+   * @param id The LinkId of the object
+   */
+  virtual bool disableCollisionObject(const tesseract::common::LinkId& id) = 0;
+
+  /**
+   * @brief Check if collision object is enabled
+   * @param id The LinkId of the object
+   * @return True if enabled, otherwise false
+   */
+  virtual bool isCollisionObjectEnabled(const tesseract::common::LinkId& id) const = 0;
+
+  /**
+   * @brief Enable or disable a batch of collision objects, applying one broadphase update per batch where the
+   *        backend supports it
+   *
+   * Observably equivalent to calling enableCollisionObject or disableCollisionObject once per entry. A map key
+   * occurs at most once, so there is no duplicate-id case.
+   *
+   * @param enabled Map of [link id] to true (enable) or false (disable); ids the manager does not hold are skipped
+   * @return False if any id was absent; every id that was present is still applied
+   */
+  virtual bool setCollisionObjectsEnabled(const std::unordered_map<tesseract::common::LinkId, bool>& enabled);
+
+  /**
+   * @brief Enable or disable a batch of collision objects that all take the same state
+   *
+   * Builds the map form's argument and forwards to it, so it carries that overload's contract exactly. It is not
+   * virtual: a backend customises the batch by overriding the map overload.
+   *
+   * @param ids The link ids to enable or disable; ids the manager does not hold are skipped
+   * @param enabled True to enable every named object, false to disable every named object
+   * @return False if any id was absent; every id that was present is still applied
+   */
+  bool setCollisionObjectsEnabled(const std::vector<tesseract::common::LinkId>& ids, bool enabled);
+
+  /**
+   * @brief Set a single collision object's transforms
+   * @param id The LinkId of the object
+   * @param pose The transformation in world
+   */
+  virtual void setCollisionObjectsTransform(const tesseract::common::LinkId& id, const Eigen::Isometry3d& pose) = 0;
+
+  /**
+   * @brief Get the world transform of a single collision object
+   * @param id The LinkId of the object
+   * @return The world transform of the collision object
+   * @throws std::out_of_range if the LinkId is not registered with the manager
+   */
+  virtual Eigen::Isometry3d getCollisionObjectsTransform(const tesseract::common::LinkId& id) const = 0;
+
+  /**
+   * @brief Set a series of collision object's transforms
+   * @param transforms A transform map <LinkId, pose>
+   */
+  virtual void setCollisionObjectsTransform(const tesseract::common::LinkIdTransformMap& transforms) = 0;
+
+  /**
+   * @brief Set a series of collision object's transforms
+   * @param ids The LinkIds of the objects
+   * @param poses The poses, one per id
+   * @throws std::runtime_error if ids and poses differ in size
+   */
+  virtual void setCollisionObjectsTransform(const std::vector<tesseract::common::LinkId>& ids,
+                                            const tesseract::common::VectorIsometry3d& poses);
+
+  /**
+   * @brief Set the transforms of a set of collision objects from a transform map
+   * @param ids The LinkIds of the objects to update
+   * @param state A transform map that must contain every id
+   * @throws std::out_of_range if an id is absent from @p state
+   */
+  virtual void setCollisionObjectsTransform(const std::unordered_set<tesseract::common::LinkId>& ids,
+                                            const tesseract::common::LinkIdTransformMap& state);
+
+  /** @brief Set the transforms of a list of collision objects from a transform map
+   *  @throws std::out_of_range if an id is absent from @p state */
+  virtual void setCollisionObjectsTransform(const std::vector<tesseract::common::LinkId>& ids,
+                                            const tesseract::common::LinkIdTransformMap& state);
+
+  /**
+   * @brief Get all collision objects
+   * @return A list of collision object IDs
+   */
+  virtual const std::vector<tesseract::common::LinkId>& getCollisionObjects() const = 0;
+
+  /**
+   * @brief Set which collision objects can move
+   * @param ids A set of LinkIds identifying the active collision objects
+   */
+  virtual void setActiveCollisionObjects(const std::unordered_set<tesseract::common::LinkId>& ids) = 0;
+
+  /** @brief Set which collision objects can move by vector (delegates to set overload) */
+  virtual void setActiveCollisionObjects(const std::vector<tesseract::common::LinkId>& ids);
+
+  /** @brief Set which collision objects can move by initializer list (delegates to set overload) */
+  virtual void setActiveCollisionObjects(std::initializer_list<tesseract::common::LinkId> ids);
+
+  /**
+   * @brief Get which collision objects can move
+   * @return A set of active collision object LinkIds
+   */
+  virtual const std::unordered_set<tesseract::common::LinkId>& getActiveCollisionObjects() const = 0;
+
+  /**
+   * @brief Set the contact distance threshold
+   * @param collision_margin_data The contact distance
+   */
+  virtual void setCollisionMarginData(CollisionMarginData collision_margin_data) = 0;
+
+  /**
+   * @brief Get the contact distance threshold
+   * @return The contact distance
+   */
+  virtual const CollisionMarginData& getCollisionMarginData() const = 0;
+
+  /**
+   * @brief Set the contact distance thresholds for which collision should be considered on a per pair basis
+   * @param pair_margin_data Contains the pair collision margins that will replace the current settings
+   * @param override_type This determines how the provided CollisionMarginData is applied
+   */
+  virtual void setCollisionMarginPairData(
+      const CollisionMarginPairData& pair_margin_data,
+      CollisionMarginPairOverrideType override_type = CollisionMarginPairOverrideType::REPLACE) = 0;
+
+  /**
+   * @brief Set the default collision margin
+   * @param default_collision_margin New default collision margin
+   */
+  virtual void setDefaultCollisionMargin(double default_collision_margin) = 0;
+
+  /**
+   * @brief Set the margin for a given contact pair
+   *
+   * The order of the object ids does not matter, that is handled internal to
+   * the class.
+   *
+   * @param obj1 The first object id. Order doesn't matter
+   * @param obj2 The Second object id. Order doesn't matter
+   * @param collision_margin contacts with distance < collision_margin are considered in collision
+   * @note Each call re-evaluates the margin of every object in the manager. To set many pairs, build a
+   *       CollisionMarginPairData and use setCollisionMarginPairData, which does that sweep once.
+   */
+  virtual void setCollisionMarginPair(const tesseract::common::LinkId& id1,
+                                      const tesseract::common::LinkId& id2,
+                                      double collision_margin) = 0;
+
+  /**
+   * @brief Increment the collision margin data by some value
+   * @param increment The value to increment the collision margin value
+   */
+  virtual void incrementCollisionMargin(double increment) = 0;
+
+  /** @brief Set the active function for determining if two links are allowed to be in collision */
+  virtual void
+  setContactAllowedValidator(std::shared_ptr<const tesseract::common::ContactAllowedValidator> validator) = 0;
+
+  /** @brief Get the active function for determining if two links are allowed to be in collision */
+  virtual std::shared_ptr<const tesseract::common::ContactAllowedValidator> getContactAllowedValidator() const = 0;
+
+  /**
+   * @brief Perform a contact test for all objects based
+   * @param collisions The contact results data
+   * @param request The contact request data
+   */
+  virtual void contactTest(ContactResultMap& collisions, const ContactRequest& request) = 0;
+
+  /**
+   * @brief Applies settings in the config
+   * @param config Settings to be applies
+   */
+  virtual void applyContactManagerConfig(const ContactManagerConfig& config);
+};
+
+}  // namespace tesseract::collision
+#endif  // TESSERACT_COLLISION_DISCRETE_CONTACT_MANAGER_H

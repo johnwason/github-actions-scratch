@@ -1,0 +1,547 @@
+/**
+@page property_tree PropertyTree Configuration System
+
+@brief A hierarchical, schema-based configuration system with built-in validation and metadata support.
+
+PropertyTree is a powerful configuration management system that bridges YAML-based configuration
+files with C++ applications. It provides:
+
+- <b>Hierarchical Structure</b>: Organize configuration as a tree of properties
+- <b>Schema Support</b>: Define the expected structure, types, and constraints
+- <b>Metadata Attachment</b>: Attach documentation, UI hints, and custom attributes to properties
+- <b>Config Merge</b>: Apply user configurations to schemas with automatic defaults
+- <b>Comprehensive Validation</b>: Collect ALL validation errors at once, not just the first
+- <b>Custom Validation</b>: Attach domain-specific validator functions to properties
+- <b>Type Safety</b>: Enforce type constraints (int, string, double, enums, sequences, maps, etc.)
+- <b>Range Constraints</b>: Enforce minimum/maximum values for numeric properties
+- <b>String Constraints</b>: Enforce minimum/maximum lengths for string properties
+- <b>UI Generation</b>: Use metadata to auto-generate configuration UI
+
+@section pt_architecture Architecture
+
+@subsection pt_core Core Components
+
+- <b>PropertyTree</b>: A single node representing a property with value, attributes, and children
+- <b>PropertyTreeBuilder</b>: Fluent API for constructing schemas with clean syntax
+- <b>SchemaRegistry</b>: Global registry for named, reusable schemas
+- <b>Validators</b>: Built-in validators (required, enum, type, range) + custom validators
+
+@subsection pt_workflow Typical Workflow
+
+@code
+// 1. Define a schema using PropertyTreeBuilder
+auto schema = PropertyTreeBuilder()
+    .container("robot")
+        .string("name").required().done()
+        .int32("dof").minimum(1).maximum(20).done()
+    .done()
+    .build();
+
+// 2. Load user configuration from YAML
+YAML::Node user_config = YAML::LoadFile("config.yaml");
+
+// 3. Apply configuration, defaults, and collect all validation errors
+auto errors = schema.applyConfig(user_config);
+if (!errors.empty()) {
+    for (const auto& error : errors)
+        std::cerr << error << "\n";
+    return false;
+}
+
+// 5. Access validated configuration
+std::string robot_name = schema.at("robot").at("name").as<std::string>();
+int dof = schema.at("robot").at("dof").as<int>();
+@endcode
+
+@section pt_attributes Attributes
+
+PropertyTree supports metadata attributes that control behavior and appearance:
+
+<b>Type Attributes:</b>
+- `type`: The property type (container, string, int, double, bool, custom types, etc.)
+- `required`: Is this property mandatory?
+- `default`: Default value if not provided in config
+- `enum`: List of allowed string values
+- `minimum`: Minimum value for numeric types
+- `maximum`: Maximum value for numeric types
+- `minimum_length`: Minimum string length
+- `maximum_length`: Maximum string length
+
+<b>GUI Metadata:</b>
+- `label`: Display name (e.g., "Robot Name")
+- `doc`: Documentation/help text
+- `placeholder`: Hint text for empty fields
+- `group`: Category for organizing in UI (e.g., "general", "advanced")
+- `read_only`: If true, property is not user-editable
+- `hidden`: If true, hide from GUI
+
+@section pt_types Type System
+
+PropertyTree supports the following types:
+
+<b>Scalar Types:</b>
+- `bool`: Boolean (true/false)
+- `char`: Single character
+- `string`: Text strings
+- `int`: 32-bit integers
+- `unsigned int`: Unsigned 32-bit integers
+- `long int`: 64-bit signed integers
+- `long unsigned int`: 64-bit unsigned integers
+- `float`: 32-bit floating point
+- `double`: 64-bit floating point
+
+<b>Composite Types:</b>
+- `container`: A container of named child properties
+- `List[type]`: Dynamic sequence of items of type
+- `List[type,N]`: Fixed-size sequence of N items of type
+- `Map[key,type]`: Map from key type to value type
+- Custom types: Any registered user-defined type
+
+Dynamic and fixed-size lists validate sequence shape, and fixed-size lists also validate length.
+Registered custom element types are validated element-by-element with indexed error paths. For built-in
+element types, add a custom validator when element conversion itself must be enforced. For example,
+the plugin discovery schema validates `List[String]` by converting the complete value to
+`std::vector<std::string>` so mappings and other non-string elements are rejected.
+
+<b>Eigen Types (built-in):</b>
+- `Eigen::Isometry3d`: 4x4 homogeneous transformation
+- `Eigen::VectorXd`: Dynamic vector
+- `Eigen::Vector2d`: 2D vector
+- `Eigen::Vector3d`: 3D vector
+
+@section pt_builder Fluent Builder API
+
+PropertyTreeBuilder provides a clean, readable syntax for defining schemas:
+
+@code
+auto schema = PropertyTreeBuilder()
+    // Type methods create children and descend
+    .container("config")
+        // Attribute setters modify the current node
+        .doc("Main configuration")
+        .string("name")
+            .required()
+            .minimumLength(1)
+            .maximumLength(64)
+            .doc("Application name")
+            .label("App Name")
+            .placeholder("my_app")
+        .done()  // Pop back to parent
+        .int32("version")
+            .minimum(1)
+            .maximum(999)
+            .defaultVal(1)
+        .done()
+    .done()
+    .build();
+@endcode
+
+Type methods: `container`, `string`, `character`, `boolean`, `int32`, `uint32`,
+`int64`, `uint64`, `float32`, `float64`, `customType`
+
+Composition method: `compose` (copy children from an existing PropertyTree into the current scope)
+
+OneOf methods: `oneOf` (for a standalone oneOf schema) and `beginOneOf` / `endOneOf`
+(for inline oneOf groups within a container)
+
+Plugin methods: `acceptsDerivedTypes`, `pluginContainer`, `pluginContainerMap`
+
+Attribute setters: `doc`, `required`, `defaultVal`, `enumValues`, `minimum`, `maximum`,
+`minimumLength`, `maximumLength`,
+`label`, `placeholder`, `group`, `readOnly`, `hidden`, `validator`, `attribute`
+
+@subsection pt_compose Schema Composition
+
+The `compose()` method copies all children from another PropertyTree into the current
+builder scope.  This enables building schemas incrementally by reusing base schemas:
+
+@code
+// Base schema for a task node
+auto node_schema = PropertyTreeBuilder()
+    .attribute(TYPE, CONTAINER)
+    .string("namespace").done()
+    .boolean("conditional").done()
+    .container("inputs").done()
+    .container("outputs").done()
+    .build();
+
+// Task schema inherits all node fields, adds trigger_abort
+auto task_schema = PropertyTreeBuilder()
+    .attribute(TYPE, CONTAINER)
+    .compose(node_schema)           // namespace, conditional, inputs, outputs
+    .boolean("trigger_abort").done()
+    .build();
+
+// Concrete task schema inherits all task fields, adds its own
+auto remap_schema = PropertyTreeBuilder()
+    .attribute(TYPE, CONTAINER)
+    .compose(task_schema)           // all task fields
+    .boolean("copy").done()
+    .build();
+@endcode
+
+This pattern eliminates the need for helper functions that pass builders around.
+Each class can define a static `schema()` method that returns a complete PropertyTree,
+and derived schemas simply call `compose()` to pull in the base fields.
+
+@section pt_validation Validation
+
+PropertyTree supports multiple validation mechanisms:
+
+<b>Built-in Validators (automatic from attributes):</b>
+- Required field presence
+- Enum value membership
+- Type casting correctness
+- Numeric range constraints (min/max)
+- Sequence/map structure validation
+- Container child presence
+
+<b>Custom Validators:</b>
+@code
+schema.at("filepath").addValidator(
+    [](const PropertyTree& node, const std::string& path, std::vector<std::string>& errors) {
+        auto val = node.getValue().as<std::string>();
+        if (!val.ends_with(".yaml"))
+            errors.push_back(path + ": must end with .yaml");
+    }
+);
+@endcode
+
+<b>Error Collection:</b>
+The validate() method returns a vector of ALL errors, not just the first one:
+@code
+auto errors = schema.validate();
+if (!errors.empty()) {
+    std::cerr << "Validation failed with " << errors.size() << " errors:\n";
+    for (const auto& error : errors)
+        std::cerr << "  - " << error << "\n";
+}
+@endcode
+
+@subsection pt_extra_properties Strict and Permissive Extra Properties
+
+`applyConfig()` accepts an `allow_extra_properties` argument and performs application and validation in one call:
+
+@code{.cpp}
+// Strict validation: unknown keys are retained as marked nodes and reported.
+auto strict_tree = schema;
+auto strict_errors = strict_tree.applyConfig(config, false);
+// Example: "unknown_field: property does not exist in schema"
+
+// Permissive validation: unknown keys are ignored by the schema traversal.
+auto partial_tree = schema;
+auto partial_errors = partial_tree.applyConfig(config, true);
+@endcode
+
+Strict mode is the default and should be used for complete configuration validation. Permissive mode is useful
+for validating a known subset of a larger document, such as plugin discovery metadata before plugin libraries
+have registered their complete schemas. It is not a substitute for a later strict validation pass.
+
+`applyConfig()` mutates the tree. Start from a fresh schema copy for each independent validation pass.
+
+@section pt_oneof OneOf - Polymorphic Configuration
+
+OneOf enables polymorphic configuration structures where a config must match exactly one of
+multiple branches. This is useful for:
+
+- <b>Union-like Types</b>: Choose between different configuration variants
+- <b>Plugin Selection</b>: Allow different plugin configurations mutually exclusively
+- <b>Shape Definitions</b>: Specify geometry as circle (radius) OR rectangle (width/height)
+- <b>Communication Types</b>: Define transport as USB OR Ethernet with type-specific fields
+
+<b>How OneOf Works:</b>
+When merging config into a oneOf schema, PropertyTree:
+
+1. Filters branches by YAML value shape (scalar, sequence, or map)
+2. Uses required fields to distinguish map-shaped branches
+3. Validates remaining same-shape candidates when shape alone is ambiguous
+4. Fails if zero branches match (no branch applicable to config)
+5. Fails if multiple branches match (ambiguous - could be either)
+6. Selects the matching branch and flattens the schema to that branch's structure
+
+@subsection pt_oneof_standalone Standalone OneOf
+
+Use a standalone oneOf when the entire config is one-of-many variants and there are
+no shared fields:
+
+@code
+auto shape_schema = PropertyTreeBuilder()
+    .oneOf()
+    .container("circle")
+        .float64("radius").required().minimum(0.0).done()
+        .done()
+    .container("rectangle")
+        .float64("width").required().minimum(0.0).done()
+        .float64("height").required().minimum(0.0).done()
+        .done()
+    .build();
+
+// Configuration specifies circle
+YAML::Node config1;
+config1["radius"] = 5.0;
+auto error1 = shape_schema.applyConfig(config1);  // Selects and validates the "circle" branch
+@endcode
+
+A standalone oneOf may also select between different YAML value shapes. This is
+useful for compact configuration syntax that accepts either one value or several:
+
+@code
+auto string_or_list_schema = PropertyTreeBuilder()
+        .oneOf()
+            .string("single").done()
+            .customType("multiple", createList(STRING)).done()
+        .build();
+
+auto errors = string_or_list_schema.applyConfig(YAML::Load("[first, second]"));
+// The resolved schema type is now List[string].
+@endcode
+
+Branch names are schema identifiers and do not appear in the configuration. For
+an absent value, the first branch supplies the concrete representation used by
+schema consumers such as editors.
+
+@subsection pt_oneof_inline Inline OneOf (within a container)
+
+Use an inline oneOf when a config has shared fields alongside mutually exclusive fields.
+The `beginOneOf()` / `endOneOf()` builder methods create an inline oneOf group where:
+
+- Shared fields are defined normally in the parent container
+- Only the mutually exclusive portions go inside `beginOneOf()` / `endOneOf()`
+- During merge, branch selection uses the parent's full config
+- The chosen branch's children are hoisted into the parent alongside the shared fields
+
+<b>Example - Robot kinematics with model enum OR explicit parameters:</b>
+@code
+auto schema = PropertyTreeBuilder()
+    .attribute(TYPE, CONTAINER)
+    .string("base_link").required().done()
+    .string("tip_link").required().done()
+    .beginOneOf()
+        .container("by_model")
+            .string("model").required()
+                .enumValues({"UR3", "UR5", "UR10"}).done()
+        .done()
+        .container("by_params")
+            .container("params").required()
+                .float64("d1").required().done()
+                .float64("a2").required().done()
+            .done()
+        .done()
+    .endOneOf()
+    .build();
+
+// Config using model enum
+YAML::Node config;
+config["base_link"] = "base";
+config["tip_link"] = "tool0";
+config["model"] = "UR5";
+auto errors = schema.applyConfig(config);  // Selects "by_model" and validates all fields
+@endcode
+
+Note: `base_link` and `tip_link` are defined once and shared across all branches, avoiding
+duplication. The branch names ("by_model", "by_params") are for selection only - they do not
+appear in the YAML config.
+
+<b>Branch Selection Rules:</b>
+- Scalar, sequence, and map branches must match the corresponding YAML value shape
+- A map branch is "applicable" if all its required fields are present in the config
+- Same-shape candidates are validated when structural matching cannot select one
+- If zero branches are applicable, reports `oneOf: no branch matches`
+- If multiple branches are applicable, reports `oneOf: multiple branches match`
+  (This can happen if branches have no required fields or overlapping required fields)
+
+See @ref oneof_property_tree_example for a detailed working example.
+
+@section pt_polymorphic Derived Types & Plugin Architecture
+
+While oneOf handles mutually exclusive branches, derived types enable inheritance hierarchies
+where a field can accept any type that extends a base type using the standard Tesseract plugin info structure.
+This is ideal for:
+
+- <b>Type Hierarchies</b>: Support base types and all registered derived types
+- <b>Plugin Architectures</b>: Accept different implementations of the same interface
+- <b>Extensibility</b>: New derived types can be registered without modifying existing schemas
+- <b>Heterogeneous Collections</b>: Lists and maps can contain different derived types
+
+<b>The Plugin Info Structure:</b>
+
+The standard Tesseract plugin info structure uses two fields:
+- <b>`class`</b>: String identifier for the concrete derived type (required)
+- <b>`config`</b>: YAML map containing type-specific configuration (optional but recommended)
+
+<b>How Derived Types Work:</b>
+
+1. <b>Register Schemas</b>: Register schemas for base and derived types
+2. <b>Register Hierarchy</b>: Tell the registry which types derive from which base type
+3. <b>Mark Field</b>: Use `acceptsDerivedTypes()` on a field to enable plugin info structure validation
+4. <b>Validation</b>: Each element is validated using its specified "class" type's schema
+
+
+For detailed examples covering schema registration, validation, handling single entries, arrays, maps, and error
+handling for derived types, see @ref derived_types_example.
+
+Error messages are hierarchical and contextual:
+@code
+// Missing class field
+"constraints[0]: plugin info structure missing required 'class' field"
+
+// Invalid derived type
+"constraints[1].class: type 'UnknownConstraint' does not derive from 'BaseConstraint'"
+
+// Configuration error
+"scenario.constraints[home_position].config.joint: value cannot be empty"
+@endcode
+
+<b>Container Type Support:</b>
+
+Derived types work with all container types:
+
+1. <b>Single Entry</b>: `{ class: Type, config: {...} }`
+2. <b>Sequences/Arrays</b>: `List[BaseType]` - each element is a plugin info structure
+3. <b>Maps</b>: `Map[String,BaseType]` - each value is a plugin info structure
+
+@code
+// Single entry
+.customType("constraint", "BaseConstraint")
+.acceptsDerivedTypes()
+
+// Sequence
+.customType("constraints", "List[BaseConstraint]")
+.acceptsDerivedTypes()
+
+// Map
+.customType("named_constraints", "Map[String,BaseConstraint]")
+.acceptsDerivedTypes()
+@endcode
+
+<b>Backward Compatibility:</b>
+
+The legacy "type" field approach is still supported when `acceptsDerivedTypes()` is NOT set:
+
+@code
+YAML (legacy - still works):
+constraint:
+  type: JointPositionConstraint
+  joint: "joint_1"
+  position: 0.785
+@endcode
+
+However, the plugin info structure (class + config) is the recommended approach as it:
+- Clearly separates type identification from configuration
+- Aligns with Tesseract's standard PluginInfo pattern
+- Supports nesting and composition better
+- Provides clearer YAML structure
+
+<b>Derived Types vs OneOf:</b>
+
+| Feature | Derived Types | OneOf |
+|---------|---|---|
+| <b>Use Case</b> | Type inheritance hierarchies | Mutually exclusive variants |
+| <b>Type Specification</b> | Via "class" field (explicit) | Via required field match (implicit) |
+| <b>Registration</b> | Compile-time macros/API | Schema structure |
+| <b>Extensibility</b> | Easy - register new derived types | Requires schema change |
+| <b>Performance</b> | Direct type lookup | Branch matching algorithm |
+| <b>Structure</b> | Plugin info (class + config) | Branch containers |
+| <b>Example</b> | Constraint hierarchy | Shape (circle vs rectangle) |
+
+<b>For Comprehensive Coverage:</b> See @ref property_tree_derived_types for a complete guide including quick start, architecture, all container types, error messages, best practices, and migration information.
+
+@section pt_schema_registry Schema Registry
+
+Register and retrieve schemas globally:
+
+@code
+auto registry = SchemaRegistry::instance();
+
+// Register a schema
+auto schema = PropertyTreeBuilder()...build();
+registry->registerSchema("my::Config", schema);
+
+// Retrieve a schema
+auto retrieved = registry->get("my::Config");
+
+// Check if schema exists
+if (registry->contains("my::Config")) {
+    ...
+}
+@endcode
+
+Built-in schemas are registered for Eigen types and tesseract common types via
+the YAML::convert specializations in yaml_extensions.cpp.
+
+Schemas containing callbacks supplied by plugin libraries require those libraries to remain loaded. See
+@ref ptdt_plugin_loading for the discovery, loading, lifetime-retention, and strict-validation workflow.
+
+@section pt_examples Examples
+
+See the following examples for detailed working code:
+
+- @ref basic_property_tree_example
+- @ref advanced_property_tree_example
+- @ref oneof_property_tree_example
+- @ref derived_types_example
+
+@section pt_usage Common Patterns
+
+<b>Pattern 1: Configuration File Loading</b>
+@code
+// Load schema
+auto schema = PropertyTreeBuilder()...build();
+
+// Load user config
+YAML::Node user_config = YAML::LoadFile("app.yaml");
+
+// Apply and validate
+auto errors = schema.applyConfig(user_config);
+if (!errors.empty()) return false;
+
+// Extract values
+auto name = schema.at("name").as<std::string>();
+@endcode
+
+<b>Pattern 2: Schema Registration for Reuse</b>
+@code
+// Register schema once
+PropertyTreeBuilder builder;
+builder.container("settings")...;
+SchemaRegistry::instance()->registerSchema("AppSettings", builder.build());
+
+// Use many times
+auto schema = SchemaRegistry::instance()->get("AppSettings");
+auto errors = schema.applyConfig(user_config);
+@endcode
+
+<b>Pattern 3: UI Generation</b>
+@code
+// Schema has metadata
+auto schema = PropertyTreeBuilder()
+    .string("name").label("User Name").placeholder("Enter name...").done()
+    .int32("age").minimum(0).maximum(150).label("Age").done()
+    .build();
+
+// UI generator extracts metadata for form building
+for (const auto& key : schema.keys()) {
+    auto& prop = schema.at(key);
+    auto label = prop.getAttribute("label");
+    auto doc = prop.getAttribute("doc");
+    auto type = prop.getAttribute("type");
+    // Build UI field with label, doc tooltip, and type-specific widget
+}
+@endcode
+
+@section pt_best_practices Best Practices
+
+1. <b>Define Schemas Early</b>: Build schemas at module initialization when possible
+2. <b>Register Reusable Schemas</b>: Use SchemaRegistry for schemas used in multiple places
+3. <b>Use Fluent API</b>: PropertyTreeBuilder is cleaner than manual tree construction
+4. <b>Validate Before Use</b>: Always call validate() and check the error vector
+5. <b>Attach Metadata</b>: Use doc, label, group for better UI and documentation
+6. <b>Custom Validators</b>: Add domain-specific validators for complex constraints
+7. <b>Meaningful Defaults</b>: Provide sensible defaults for optional properties
+8. <b>Error Messages</b>: Make error messages actionable and include the error path
+9. <b>Test Schemas</b>: Write unit tests for schema validation with valid and invalid configs
+10. <b>Document Attributes</b>: Use doc attributes to explain what each property does
+11. <b>Validate Strictly Before Decode</b>: Use permissive validation only for an intentional bootstrap subset
+12. <b>Copy Before Merge</b>: Treat registered schemas as templates and merge each config into a fresh copy
+
+*/

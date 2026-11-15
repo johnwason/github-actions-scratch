@@ -1,0 +1,411 @@
+/**
+ * @file utils.cpp
+ * @brief Kinematics utility functions.
+ *
+ * @author Levi Armstrong
+ * @date April 15, 2018
+ *
+ * @copyright Copyright (c) 2013, Southwest Research Institute
+ *
+ * @par License
+ * Software License Agreement (Apache License)
+ * @par
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * @par
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#include <tesseract/common/macros.h>
+TESSERACT_COMMON_IGNORE_WARNINGS_PUSH
+#include <Eigen/Dense>
+TESSERACT_COMMON_IGNORE_WARNINGS_POP
+
+#include <cmath>
+#include <limits>
+#include <tuple>
+#include <utility>
+
+#include <tesseract/kinematics/utils.h>
+#include <tesseract/kinematics/joint_group.h>
+#include <tesseract/kinematics/forward_kinematics.h>
+#include <tesseract/scene_graph/graph.h>
+#include <tesseract/scene_graph/joint.h>
+
+namespace tesseract::kinematics
+{
+void numericalJacobian(Eigen::Ref<Eigen::MatrixXd> jacobian,
+                       const Eigen::Isometry3d& change_base,
+                       const ForwardKinematics& kin,
+                       const Eigen::Ref<const Eigen::VectorXd>& joint_values,
+                       const tesseract::common::LinkId& link_id,
+                       const Eigen::Ref<const Eigen::Vector3d>& link_point)
+{
+  Eigen::VectorXd njvals;
+  double delta = 1e-8;
+  TESSERACT_THREAD_LOCAL tesseract::common::LinkIdTransformMap poses;
+  poses.clear();
+  kin.calcFwdKin(poses, joint_values);
+  Eigen::Isometry3d pose{ change_base * poses.at(link_id) };
+
+  for (int i = 0; i < static_cast<int>(joint_values.size()); ++i)
+  {
+    njvals = joint_values;
+    njvals[i] += delta;
+    kin.calcFwdKin(poses, njvals);
+    Eigen::Isometry3d updated_pose = change_base * poses.at(link_id);
+
+    Eigen::Vector3d temp{ pose * link_point };
+    Eigen::Vector3d temp2{ updated_pose * link_point };
+    jacobian(0, i) = (temp2.x() - temp.x()) / delta;
+    jacobian(1, i) = (temp2.y() - temp.y()) / delta;
+    jacobian(2, i) = (temp2.z() - temp.z()) / delta;
+
+    Eigen::Vector3d omega = (pose.rotation() * tesseract::common::calcRotationalError(pose.rotation().transpose() *
+                                                                                      updated_pose.rotation())) /
+                            delta;
+    jacobian(3, i) = omega(0);
+    jacobian(4, i) = omega(1);
+    jacobian(5, i) = omega(2);
+  }
+}
+
+void numericalJacobian(Eigen::Ref<Eigen::MatrixXd> jacobian,
+                       const Eigen::Isometry3d& change_base,
+                       const JointGroup& joint_group,
+                       const Eigen::Ref<const Eigen::VectorXd>& joint_values,
+                       const tesseract::common::LinkId& link_id,
+                       const Eigen::Ref<const Eigen::Vector3d>& link_point)
+{
+  Eigen::VectorXd njvals;
+  constexpr double delta = 1e-8;
+  tesseract::common::LinkIdTransformMap poses = joint_group.calcFwdKin(joint_values);
+  Eigen::Isometry3d pose = change_base * poses.at(link_id);
+
+  for (int i = 0; i < static_cast<int>(joint_values.size()); ++i)
+  {
+    njvals = joint_values;
+    njvals(i) += delta;  // NOLINT
+    tesseract::common::LinkIdTransformMap updated_poses = joint_group.calcFwdKin(njvals);
+    Eigen::Isometry3d updated_pose = change_base * updated_poses.at(link_id);
+
+    Eigen::Vector3d temp = pose * link_point;
+    Eigen::Vector3d temp2 = updated_pose * link_point;
+    jacobian(0, i) = (temp2.x() - temp.x()) / delta;
+    jacobian(1, i) = (temp2.y() - temp.y()) / delta;
+    jacobian(2, i) = (temp2.z() - temp.z()) / delta;
+
+    Eigen::VectorXd omega = (pose.rotation() * tesseract::common::calcRotationalError(pose.rotation().transpose() *
+                                                                                      updated_pose.rotation())) /
+                            delta;
+    jacobian(3, i) = omega(0);
+    jacobian(4, i) = omega(1);
+    jacobian(5, i) = omega(2);
+  }
+}
+
+void numericalJacobian(Eigen::Ref<Eigen::MatrixXd> jacobian,
+                       const JointGroup& joint_group,
+                       const Eigen::Ref<const Eigen::VectorXd>& joint_values,
+                       const tesseract::common::LinkId& base_link_id,
+                       const Eigen::Isometry3d& base_link_offset,
+                       const tesseract::common::LinkId& link_id,
+                       const Eigen::Isometry3d& link_offset)
+{
+  constexpr double delta = 1e-8;
+  tesseract::common::LinkIdTransformMap poses;
+  const auto relative_pose = [&](const Eigen::Ref<const Eigen::VectorXd>& jvals) -> Eigen::Isometry3d {
+    joint_group.calcFwdKin(poses, jvals);
+    return (poses.at(base_link_id) * base_link_offset).inverse() * poses.at(link_id) * link_offset;
+  };
+
+  const Eigen::Isometry3d pose = relative_pose(joint_values);
+  Eigen::VectorXd njvals;
+  for (Eigen::Index i = 0; i < joint_values.size(); ++i)
+  {
+    njvals = joint_values;
+    njvals(i) += delta;
+    const Eigen::Isometry3d updated_pose = relative_pose(njvals);
+
+    jacobian.col(i).head<3>() = (updated_pose.translation() - pose.translation()) / delta;
+    jacobian.col(i).tail<3>() = (pose.rotation() * tesseract::common::calcRotationalError(pose.rotation().transpose() *
+                                                                                          updated_pose.rotation())) /
+                                delta;
+  }
+}
+
+bool solvePInv(const Eigen::Ref<const Eigen::MatrixXd>& A,
+               const Eigen::Ref<const Eigen::VectorXd>& b,
+               Eigen::Ref<Eigen::VectorXd> x)
+{
+  const double eps = 0.00001;  // TODO: Turn into class member var
+  const double lambda = 0.01;  // TODO: Turn into class member var
+
+  if ((A.rows() == 0) || (A.cols() == 0))
+  {
+    TESSERACT_LOG_ERROR("Empty matrices not supported in solvePinv()");
+    return false;
+  }
+
+  if (A.rows() != b.size())
+  {
+    TESSERACT_LOG_ERROR("Matrix size mismatch: A({}, {}), b({})", A.rows(), A.cols(), b.size());
+    return false;
+  }
+
+  // Calculate A+ (pseudoinverse of A) = V S+ U*, where U* is Hermition of U (just transpose if all values of U are
+  // real)
+  // in order to solve Ax=b -> x*=A+ b
+  Eigen::JacobiSVD<Eigen::MatrixXd> svd;
+  svd.compute(A, Eigen::ComputeThinU | Eigen::ComputeThinV);
+
+  const Eigen::MatrixXd& U = svd.matrixU();
+  const Eigen::VectorXd& Sv = svd.singularValues();
+  const Eigen::MatrixXd& V = svd.matrixV();
+
+  // calculate the reciprocal of Singular-Values
+  // damp inverse with lambda so that inverse doesn't oscillate near solution
+  long int nSv = Sv.size();
+  Eigen::VectorXd inv_Sv(nSv);
+  for (long int i = 0; i < nSv; ++i)
+  {
+    if (fabs(Sv(i)) > eps)
+      inv_Sv(i) = 1 / Sv(i);
+    else
+      inv_Sv(i) = Sv(i) / (Sv(i) * Sv(i) + lambda * lambda);
+  }
+  x = V * inv_Sv.asDiagonal() * U.transpose() * b;
+  return true;
+}
+
+bool dampedPInv(const Eigen::Ref<const Eigen::MatrixXd>& A, Eigen::Ref<Eigen::MatrixXd> P, double eps, double lambda)
+{
+  if ((A.rows() == 0) || (A.cols() == 0))
+  {
+    TESSERACT_LOG_ERROR("Empty matrices not supported in dampedPInv()");
+    return false;
+  }
+
+  // Calculate A+ (pseudoinverse of A) = V S+ U*, where U* is Hermition of U (just transpose if all values of U are
+  // real)
+  // in order to solve Ax=b -> x*=A+ b
+  Eigen::JacobiSVD<Eigen::MatrixXd> svd;
+  svd.compute(A, Eigen::ComputeThinU | Eigen::ComputeThinV);
+  const Eigen::MatrixXd& U = svd.matrixU();
+  const Eigen::VectorXd& Sv = svd.singularValues();
+  const Eigen::MatrixXd& V = svd.matrixV();
+
+  // calculate the reciprocal of Singular-Values
+  // damp inverse with lambda so that inverse doesn't oscillate near solution
+  long int nSv = Sv.size();
+  Eigen::VectorXd inv_Sv(nSv);
+  for (long int i = 0; i < nSv; ++i)
+  {
+    if (fabs(Sv(i)) > eps)
+      inv_Sv(i) = 1 / Sv(i);
+    else
+    {
+      inv_Sv(i) = Sv(i) / (Sv(i) * Sv(i) + lambda * lambda);
+    }
+  }
+  P = V * inv_Sv.asDiagonal() * U.transpose();
+  return true;
+}
+
+bool isNearSingularity(const Eigen::Ref<const Eigen::MatrixXd>& jacobian, double threshold)
+{
+  const Eigen::JacobiSVD<Eigen::MatrixXd> svd(jacobian);
+  return (svd.singularValues().tail(1).value() < threshold);
+}
+
+namespace
+{
+/**
+ * @brief Velocity and force ellipsoids of one jacobian block, from the singular values of the block
+ * @details The eigenvalues of J*J^T are the squared singular values of J, padded with zeros when J has fewer columns
+ * than rows, and those of (J*J^T)^-1 are their reciprocals. Computing them from the SVD of J rather than from J*J^T
+ * avoids squaring the condition number, which loses every singular value below sqrt(epsilon) relative to the largest.
+ * A singular value is zero when it lies below the decomposition's numerical rank threshold.
+ * @return The velocity ellipsoid (first) and the force ellipsoid (second)
+ */
+std::pair<ManipulabilityEllipsoid, ManipulabilityEllipsoid>
+calcEllipsoids(const Eigen::Ref<const Eigen::MatrixXd>& jacobian)
+{
+  const Eigen::JacobiSVD<Eigen::MatrixXd> svd(jacobian);
+  const Eigen::Index rows = jacobian.rows();
+  const Eigen::Index rank = svd.rank();
+
+  // Singular values in increasing order, as the eigenvalues were reported, with the zero ones exactly zero
+  Eigen::VectorXd sv = Eigen::VectorXd::Zero(rows);
+  sv.tail(rank) = svd.singularValues().head(rank).reverse();
+
+  ManipulabilityEllipsoid m;
+  m.eigen_values = sv.array().square();
+  m.volume = sv.prod();
+
+  ManipulabilityEllipsoid f;
+  f.eigen_values = sv.reverse().array().square().inverse();  // +inf along a singular direction
+  f.volume = 1.0 / m.volume;                                 // +inf when singular
+
+  if (rank < rows)
+  {
+    m.measure = std::numeric_limits<double>::max();
+    m.condition = std::numeric_limits<double>::max();
+    f.measure = std::numeric_limits<double>::max();
+    f.condition = std::numeric_limits<double>::max();
+  }
+  else
+  {
+    m.measure = sv(rows - 1) / sv(0);
+    m.condition = m.measure * m.measure;
+    f.measure = m.measure;
+    f.condition = m.condition;
+  }
+
+  return { m, f };
+}
+}  // namespace
+
+Manipulability calcManipulability(const Eigen::Ref<const Eigen::MatrixXd>& jacobian)
+{
+  Manipulability manip;
+  std::tie(manip.m, manip.f) = calcEllipsoids(jacobian);
+  std::tie(manip.m_linear, manip.f_linear) = calcEllipsoids(jacobian.topRows(3));
+  std::tie(manip.m_angular, manip.f_angular) = calcEllipsoids(jacobian.bottomRows(3));
+  return manip;
+}
+
+double computeChainReachUpperBound(const tesseract::scene_graph::SceneGraph& scene_graph,
+                                   const tesseract::common::LinkId& base_link_id,
+                                   const tesseract::common::LinkId& tip_link_id)
+{
+  if (scene_graph.getLink(base_link_id) == nullptr)
+    throw std::runtime_error("computeChainReachUpperBound: base link '" + base_link_id.name() +
+                             "' not found in scene graph");
+  if (scene_graph.getLink(tip_link_id) == nullptr)
+    throw std::runtime_error("computeChainReachUpperBound: tip link '" + tip_link_id.name() +
+                             "' not found in scene graph");
+
+  if (base_link_id == tip_link_id)
+    return 0.0;
+
+  const auto path = scene_graph.getShortestPath(base_link_id, tip_link_id);
+  if (path.joints.empty())
+    throw std::runtime_error("computeChainReachUpperBound: no path from '" + base_link_id.name() + "' to '" +
+                             tip_link_id.name() + "'");
+
+  double bound = 0.0;
+  for (const auto& joint_id : path.joints)
+  {
+    const auto joint = scene_graph.getJoint(joint_id);
+    if (joint == nullptr)
+      throw std::runtime_error("computeChainReachUpperBound: joint '" + joint_id.name() + "' missing from scene graph");
+
+    bound += joint->parent_to_joint_origin_transform.translation().norm();
+
+    switch (joint->type)
+    {
+      case tesseract::scene_graph::JointType::REVOLUTE:
+      case tesseract::scene_graph::JointType::CONTINUOUS:
+      case tesseract::scene_graph::JointType::FIXED:
+        break;  // No additional linear contribution.
+      case tesseract::scene_graph::JointType::PRISMATIC:
+      {
+        // Mimic prismatics follow another joint: own `limits` are typically unset, so the
+        // max-extension formula would silently under-count. Refuse rather than produce a bound
+        // that can be violated.
+        if (joint->mimic != nullptr)
+          throw std::runtime_error("computeChainReachUpperBound: prismatic joint '" + joint_id.name() +
+                                   "' is a mimic joint (unsupported)");
+        if (joint->limits == nullptr)
+          throw std::runtime_error("computeChainReachUpperBound: prismatic joint '" + joint_id.name() +
+                                   "' has no limits");
+        if (!std::isfinite(joint->limits->lower) || !std::isfinite(joint->limits->upper))
+          throw std::runtime_error("computeChainReachUpperBound: prismatic joint '" + joint_id.name() +
+                                   "' has non-finite limits");
+        bound += std::max(std::abs(joint->limits->lower), std::abs(joint->limits->upper));
+        break;
+      }
+      case tesseract::scene_graph::JointType::FLOATING:
+      case tesseract::scene_graph::JointType::PLANAR:
+      case tesseract::scene_graph::JointType::UNKNOWN:
+      default:
+        throw std::runtime_error("computeChainReachUpperBound: joint '" + joint_id.name() +
+                                 "' has unsupported type for reach derivation");
+    }
+  }
+  return bound;
+}
+
+Eigen::MatrixX2d gatherJointLimits(const tesseract::scene_graph::SceneGraph& scene_graph,
+                                   const std::vector<tesseract::common::JointId>& joint_ids)
+{
+  const auto n = static_cast<Eigen::Index>(joint_ids.size());
+  Eigen::MatrixX2d limits(n, 2);
+  for (Eigen::Index i = 0; i < n; ++i)
+  {
+    const auto& id = joint_ids[static_cast<std::size_t>(i)];
+    auto joint = scene_graph.getJoint(id);
+    if (joint == nullptr)
+      throw std::runtime_error("gatherJointLimits: joint '" + id.name() + "' not found in scene graph");
+    if (joint->type == tesseract::scene_graph::JointType::CONTINUOUS)
+    {
+      limits(i, 0) = -M_PI;
+      limits(i, 1) = M_PI;
+      continue;
+    }
+    if (joint->limits == nullptr)
+      throw std::runtime_error("gatherJointLimits: joint '" + id.name() + "' has no limits");
+    limits(i, 0) = joint->limits->lower;
+    limits(i, 1) = joint->limits->upper;
+  }
+  return limits;
+}
+
+std::vector<Eigen::VectorXd> buildSampleGrid(const Eigen::MatrixX2d& range, const Eigen::VectorXd& resolution)
+{
+  // Upper bound on samples for a single joint. Not a modelling limit - it turns a misconfigured
+  // range/resolution pair into a diagnosable exception instead of a multi-gigabyte allocation.
+  // Any legitimate positioner discretisation is orders of magnitude below this.
+  constexpr Eigen::Index max_samples_per_joint = 10000000;
+
+  const Eigen::Index n = range.rows();
+  if (resolution.size() != n)
+    throw std::runtime_error("buildSampleGrid: resolution size (" + std::to_string(resolution.size()) +
+                             ") does not match range row count (" + std::to_string(n) + ")");
+
+  std::vector<Eigen::VectorXd> grid;
+  grid.reserve(static_cast<std::size_t>(n));
+  for (Eigen::Index d = 0; d < n; ++d)
+  {
+    const auto joint = [d]() { return "joint " + std::to_string(d); };
+
+    if (!std::isfinite(range(d, 0)) || !std::isfinite(range(d, 1)))
+      throw std::runtime_error("buildSampleGrid: " + joint() + " has a non-finite sample range");
+    if (range(d, 0) > range(d, 1))
+      throw std::runtime_error("buildSampleGrid: " + joint() + " sample range minimum is greater than maximum");
+    if (!std::isfinite(resolution(d)) || resolution(d) <= 0)
+      throw std::runtime_error("buildSampleGrid: " + joint() + " resolution is not a finite positive number");
+
+    // Compute the interval count in double before narrowing: narrowing a value the target type
+    // cannot represent is undefined, and Eigen::LinSpaced would then read the result as a size.
+    const double steps = std::ceil((range(d, 1) - range(d, 0)) / resolution(d));
+    if (steps + 1 > static_cast<double>(max_samples_per_joint))
+      throw std::runtime_error("buildSampleGrid: " + joint() + " would require more than " +
+                               std::to_string(max_samples_per_joint) + " samples to cover range [" +
+                               std::to_string(range(d, 0)) + ", " + std::to_string(range(d, 1)) + "] at resolution " +
+                               std::to_string(resolution(d)));
+
+    const auto cnt = static_cast<Eigen::Index>(steps) + 1;
+    grid.emplace_back(Eigen::VectorXd::LinSpaced(cnt, range(d, 0), range(d, 1)));
+  }
+  return grid;
+}
+
+}  // namespace tesseract::kinematics

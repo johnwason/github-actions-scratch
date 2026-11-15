@@ -1,0 +1,78 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>tesseract</name>
+  <version>0.35.0</version>
+  <description>Tesseract motion planning framework</description>
+  <maintainer email="levi.armstrong@gmail.com">Levi Armstrong</maintainer>
+  <license>Apache 2.0</license>
+  <license>BSD</license>
+  <author>Levi Armstrong</author>
+
+  <!-- Following recommendations of REP 136 -->
+  <buildtool_depend>cmake</buildtool_depend>
+
+  <build_depend>ros_industrial_cmake_boilerplate</build_depend>
+  <build_depend>eigen</build_depend>
+  <build_export_depend>eigen</build_export_depend>
+
+  <!-- Boost -->
+  <build_depend>libboost-system-dev</build_depend>
+  <build_export_depend>libboost-system-dev</build_export_depend>
+  <exec_depend>libboost-system</exec_depend>
+
+  <build_depend>libboost-filesystem-dev</build_depend>
+  <build_export_depend>libboost-filesystem-dev</build_export_depend>
+  <exec_depend>libboost-filesystem</exec_depend>
+
+  <build_depend>libboost-program-options-dev</build_depend>
+  <build_export_depend>libboost-program-options-dev</build_export_depend>
+  <exec_depend>libboost-program-options</exec_depend>
+
+  <!-- PCL -->
+  <build_depend>libpcl-all-dev</build_depend>
+  <exec_depend>libpcl-common</exec_depend>
+  <exec_depend>libpcl-io</exec_depend>
+
+  <!-- Core dependencies -->
+  <depend>spdlog</depend>
+  <depend>tinyxml2</depend>
+  <depend>yaml-cpp</depend>
+  <depend>boost_plugin_loader</depend>
+  <depend>liboctomap-dev</depend>
+  <build_depend>libcereal-dev</build_depend>
+  <build_export_depend>libcereal-dev</build_export_depend>
+
+  <!-- Add dependency on Cereal package for Ubuntu Jammy since the system package is broken. 
+  TODO: remove these keys once support for Jammy is dropped. -->
+  <build_depend>cereal</build_depend>
+  <build_export_depend>cereal</build_export_depend>
+
+  <build_depend>assimp-dev</build_depend>
+  <build_export_depend>assimp-dev</build_export_depend>
+  <exec_depend>assimp</exec_depend>
+  <build_depend>liborocos-kdl-dev</build_depend>
+  <build_export_depend>liborocos-kdl-dev</build_export_depend>
+  <exec_depend>liborocos-kdl</exec_depend>
+
+  <!-- Collision -->
+  <depend>bullet</depend>
+  <depend>bullet-extras</depend>
+  <build_depend>libfcl-dev</build_depend>
+  <build_export_depend>libfcl-dev</build_export_depend>
+  <exec_depend>libfcl</exec_depend>
+
+  <!-- Kinematics -->
+  <depend>opw_kinematics</depend>
+
+  <!-- Test dependencies -->
+  <test_depend>gtest</test_depend>
+  <test_depend>benchmark</test_depend>
+  <test_depend>lcov</test_depend>
+  <test_depend>libclang-dev</test_depend>
+  <test_depend>libomp-dev</test_depend>
+  <test_depend>liblapack-dev</test_depend>
+
+  <export>
+    <build_type>cmake</build_type>
+  </export>
+</package>

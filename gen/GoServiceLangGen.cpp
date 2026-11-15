@@ -548,6 +548,8 @@ void GenerateStructure(GenContext& ctx, const RR_SHARED_PTR<ServiceEntryDefiniti
     w << "}\n\n";
     w << "// RRType returns the Robot Raconteur type name.\n";
     w << "func (s *" << name << ") RRType() string { return " << go_string_literal(qname) << " }\n\n";
+    w << "// RRCodec returns the codec for *" << name << " (rr.CodecProvider).\n";
+    w << "func (*" << name << ") RRCodec() any { return rr.StructureCodec[" << name << "]() }\n\n";
     w << "// RRPack packs the structure fields.\n";
     w << "func (s *" << name << ") RRPack() ([]*rr.Element, error) {\n\tvar b rr.ElementBuilder\n";
     BOOST_FOREACH (const RR_SHARED_PTR<MemberDefinition>& m, e->Members)
@@ -634,6 +636,10 @@ void GeneratePod(GenContext& ctx, const RR_SHARED_PTR<ServiceEntryDefinition>& e
     w << "}\n\n";
     w << "// RRType returns the Robot Raconteur type name.\n";
     w << "func (" << name << ") RRType() string { return " << go_string_literal(qname) << " }\n\n";
+    w << "// RRCodec returns the codec for " << name << " (rr.CodecProvider).\n";
+    w << "func (" << name << ") RRCodec() any { return rr.PodCodec[" << name << "]() }\n\n";
+    w << "// RRArrayCodec returns the codec for []" << name << " (rr.ArrayCodecProvider).\n";
+    w << "func (" << name << ") RRArrayCodec() any { return rr.PodArrayCodec[" << name << "](0, false) }\n\n";
     w << "// RRPackPod packs the pod fields.\n";
     w << "func (s " << name << ") RRPackPod() ([]*rr.Element, error) {\n\tvar b rr.ElementBuilder\n";
     BOOST_FOREACH (const RR_SHARED_PTR<MemberDefinition>& m, e->Members)
@@ -674,6 +680,11 @@ void GenerateNamedArray(GenContext& ctx, const RR_SHARED_PTR<ServiceEntryDefinit
     w << "}\n\n";
     w << "// RRType returns the Robot Raconteur type name.\n";
     w << "func (" << name << ") RRType() string { return " << go_string_literal(qname) << " }\n\n";
+    w << "// RRCodec returns the codec for " << name << " (rr.CodecProvider).\n";
+    w << "func (" << name << ") RRCodec() any { return rr.NamedArrayCodec[" << name << ", " << el << "]() }\n\n";
+    w << "// RRArrayCodec returns the codec for []" << name << " (rr.ArrayCodecProvider).\n";
+    w << "func (" << name << ") RRArrayCodec() any { return rr.NamedArrayArrayCodec[" << name << ", " << el
+      << "](0, false) }\n\n";
     w << "// RRElementCount returns the number of " << el << " elements in the namedarray.\n";
     w << "func (" << name << ") RRElementCount() int { return " << count << " }\n\n";
 

@@ -32,10 +32,14 @@ func TestMain(m *testing.M) {
 	}
 	setup, err := rr.ServerNodeSetup("testprog_go", port,
 		rr.WithFlags(rr.NodeSetupEnableTcpTransport|rr.NodeSetupTcpTransportStartServer|rr.NodeSetupEnableIntraTransport|
-			rr.NodeSetupIntraTransportStartServer))
+			rr.NodeSetupIntraTransportStartServer|rr.NodeSetupEnableLocalTransport|rr.NodeSetupLocalTransportStartServer|
+			rr.NodeSetupLocalTransportStartClient))
 	if err != nil {
 		fmt.Println("node setup:", err)
 		os.Exit(1)
+	}
+	if lt := setup.LocalTransport(); lt != nil {
+		lt.EnableNodeDiscoveryListening()
 	}
 	roots, err := testservices.RegisterTestService1(setup.Node)
 	if err != nil {
@@ -93,4 +97,9 @@ func TestGoClientTestService1(t *testing.T) {
 // Go test services.
 func TestGoClientTestService3(t *testing.T) {
 	clienttests.RunTestService3(t, rr.DefaultNode(), fmt.Sprintf("rr+tcp://localhost:%d", port))
+}
+
+// TestGoClientSubscriptions tests subscriptions against the Go test services.
+func TestGoClientSubscriptions(t *testing.T) {
+	clienttests.RunSubscriptions(t, rr.DefaultNode(), fmt.Sprintf("rr+tcp://localhost:%d", port), "testprog_go")
 }

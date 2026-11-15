@@ -80,6 +80,10 @@ func TestMain(m *testing.M) {
 		cmd.Process.Kill()
 		os.Exit(1)
 	}
+	// local transport discovery only (never network discovery)
+	if lt := setup.LocalTransport(); lt != nil {
+		lt.EnableNodeDiscoveryListening()
+	}
 	code := m.Run()
 	setup.Close()
 	io.WriteString(stdin, "\n")

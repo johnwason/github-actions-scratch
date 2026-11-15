@@ -19,3 +19,8 @@ func TestGoClientTestService1(t *testing.T) {
 func TestGoClientTestService3(t *testing.T) {
 	clienttests.RunTestService3(t, rr.DefaultNode(), fmt.Sprintf("rr+tcp://localhost:%d", serverPort))
 }
+
+// TestGoClientSubscriptions tests subscriptions against the C++ test server.
+func TestGoClientSubscriptions(t *testing.T) {
+	clienttests.RunSubscriptions(t, rr.DefaultNode(), fmt.Sprintf("rr+tcp://localhost:%d", serverPort), "testprog")
+}

@@ -1,0 +1,154 @@
+/**
+ * @file collision_margins.h
+ * @brief Parse config files
+ *
+ * @author Levi Armstrong
+ * @date January 25, 2022
+ *
+ * @copyright Copyright (c) 2022, Southwest Research Institute
+ *
+ * @par License
+ * Software License Agreement (Apache License)
+ * @par
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * @par
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+#ifndef TESSERACT_SRDF_CONFIGS_H
+#define TESSERACT_SRDF_CONFIGS_H
+
+#include <tesseract/common/macros.h>
+TESSERACT_COMMON_IGNORE_WARNINGS_PUSH
+#include <array>
+TESSERACT_COMMON_IGNORE_WARNINGS_POP
+
+#include <tesseract/common/fwd.h>
+#include <filesystem>
+
+namespace tinyxml2
+{
+class XMLElement;  // NOLINT
+}
+
+namespace YAML
+{
+class Node;  // NOLINT
+}
+
+namespace tesseract::srdf
+{
+/**
+ * @brief Parse a config xml element
+ * @details It expects the element to have the attribute 'filename'
+ * @param locator The locator used to process the file name URL
+ * @param xml_element The xml element to process
+ * @param version The SRDF version
+ * @return The extracted file path
+ */
+std::filesystem::path parseConfigFilePath(const tesseract::common::ResourceLocator& locator,
+                                          const tinyxml2::XMLElement* xml_element,
+                                          const std::array<int, 3>& version);
+
+/**
+ * @brief Parse calibration config xml element
+ * @param scene_graph The scene graph
+ * @param locator The locator used to process the file name URL
+ * @param xml_element The xml element to process
+ * @param version The SRDF version
+ * @return The calibration information
+ */
+tesseract::common::CalibrationInfo parseCalibrationConfig(const tesseract::scene_graph::SceneGraph& scene_graph,
+                                                          const tesseract::common::ResourceLocator& locator,
+                                                          const tinyxml2::XMLElement* xml_element,
+                                                          const std::array<int, 3>& version);
+
+/**
+ * @brief Parse calibration config from yaml
+ * @param scene_graph The scene graph
+ * @param locator The locator used to process the file name URL
+ * @param config The yaml node to process
+ * @return The calibration information
+ */
+tesseract::common::CalibrationInfo parseCalibrationConfig(const tesseract::scene_graph::SceneGraph& scene_graph,
+                                                          const tesseract::common::ResourceLocator& locator,
+                                                          const YAML::Node& config);
+
+/**
+ * @brief Parse calibration config from yaml string
+ * @param scene_graph The scene graph
+ * @param locator The locator used to process the file name URL
+ * @param config The yaml config as a string
+ * @return The calibration information
+ */
+tesseract::common::CalibrationInfo parseCalibrationConfig(const tesseract::scene_graph::SceneGraph& scene_graph,
+                                                          const tesseract::common::ResourceLocator& locator,
+                                                          const std::string& config);
+
+/**
+ * @brief Parse kinematics plugin config xml element
+ * @param locator The locator used to process the file name URL
+ * @param xml_element The xml element to process
+ * @param version The SRDF version
+ * @return The kinematics plugin information
+ */
+tesseract::common::KinematicsPluginInfo parseKinematicsPluginConfig(const tesseract::common::ResourceLocator& locator,
+                                                                    const tinyxml2::XMLElement* xml_element,
+                                                                    const std::array<int, 3>& version);
+
+/**
+ * @brief Parse kinematics plugin config yaml node
+ * @param locator The locator used to process the file name URL
+ * @param config The yaml config node
+ * @return The kinematics plugin information
+ */
+tesseract::common::KinematicsPluginInfo parseKinematicsPluginConfig(const tesseract::common::ResourceLocator& locator,
+                                                                    const YAML::Node& config);
+
+/**
+ * @brief Parse kinematics plugin config yaml string
+ * @param locator The locator used to process the file name URL
+ * @param config The yaml config as a string
+ * @return The kinematics plugin information
+ */
+tesseract::common::KinematicsPluginInfo parseKinematicsPluginConfig(const tesseract::common::ResourceLocator& locator,
+                                                                    const std::string& config);
+
+/**
+ * @brief Parse contact managers plugin config xml element
+ * @param locator The locator used to process the file name URL
+ * @param xml_element The xml element to process
+ * @param version The SRDF version
+ * @return The contact managers plugin information
+ */
+tesseract::common::ContactManagersPluginInfo
+parseContactManagersPluginConfig(const tesseract::common::ResourceLocator& locator,
+                                 const tinyxml2::XMLElement* xml_element,
+                                 const std::array<int, 3>& version);
+
+/**
+ * @brief Parse contact managers plugin config yaml node
+ * @param locator The locator used to process the file name URL
+ * @param config The yaml config node
+ * @return The contact managers plugin information
+ */
+tesseract::common::ContactManagersPluginInfo
+parseContactManagersPluginConfig(const tesseract::common::ResourceLocator& locator, const YAML::Node& config);
+
+/**
+ * @brief Parse contact managers plugin config yaml string
+ * @param locator The locator used to process the file name URL
+ * @param config The yaml config string
+ * @return The contact managers plugin information
+ */
+tesseract::common::ContactManagersPluginInfo
+parseContactManagersPluginConfig(const tesseract::common::ResourceLocator& locator, const std::string& config);
+
+}  // namespace tesseract::srdf
+#endif  // TESSERACT_SRDF_CONFIGS_H

@@ -1,0 +1,53 @@
+name: Ubuntu
+
+on:
+  push:
+    branches:
+      - 'tesseract-conda-resource/**'
+
+# Supersede in-progress pull-request runs; queue everything else so two runs on one ref never race.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  ci:
+    name: ${{ matrix.distro }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distro: jammy
+            vcs_file: dependencies_jammy.repos
+            rosdep_skip_keys: libcereal-dev
+          - distro: noble
+            vcs_file: dependencies.repos
+            rosdep_skip_keys: cereal
+    container:
+      image: ubuntu:${{ matrix.distro }}
+      env:
+        DEBIAN_FRONTEND: noninteractive
+        TZ: Etc/UTC
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          path: target_ws/src
+
+      - name: Install Depends
+        shell: bash
+        run: |
+          apt update
+          apt upgrade -y
+          apt install -y liboctomap-dev libarchive-dev libssl-dev
+
+      - name: Build and Tests
+        uses: tesseract-robotics/colcon-action@v16
+        with:
+          ccache-prefix: ubuntu-${{ matrix.distro }}
+          vcs-file: tesseract/${{ matrix.vcs_file }}
+          rosdep-install-args: -iry --skip-keys ${{ matrix.rosdep_skip_keys }}
+          upstream-args: --cmake-args -DCMAKE_BUILD_TYPE=Release
+          target-path: target_ws/src
+          target-args: --cmake-args -DCMAKE_BUILD_TYPE=Debug -DTESSERACT_ENABLE_TESTING=ON -DTESSERACT_ENABLE_BENCHMARKING=ON -DTESSERACT_ENABLE_RUN_BENCHMARKING=OFF -DTESSERACT_PACKAGE=ON -DTESSERACT_CONDA_ENABLE_TESTING=ON

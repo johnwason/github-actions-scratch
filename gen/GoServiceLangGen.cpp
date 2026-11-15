@@ -1085,7 +1085,13 @@ void GenerateObjectInterface(GenContext& ctx, const RR_SHARED_PTR<ServiceEntryDe
         else if (RR_SHARED_PTR<FunctionDefinition> f = RR_DYNAMIC_POINTER_CAST<FunctionDefinition>(m))
         {
             if (f->IsGenerator())
+            {
+                GenInfo g = gen_info(f);
+                std::string pd = params_decl(ctx, g.args);
+                w << "\tAsync" << n << "(" << pd << (pd.empty() ? "" : ", ")
+                  << "rr_timeout time.Duration, rr_handler func(" << gen_go_type(ctx, g) << ", error))\n";
                 continue;
+            }
             std::string pd = params_decl(ctx, f->Parameters);
             std::string h = is_void(f->ReturnType) ? "func(error)" : "func(" + go_type(ctx, *f->ReturnType) + ", error)";
             w << "\tAsync" << n << "(" << pd << (pd.empty() ? "" : ", ") << "rr_timeout time.Duration, rr_handler " << h
@@ -1208,6 +1214,12 @@ void GenerateStub(GenContext& ctx, const RR_SHARED_PTR<ServiceEntryDefinition>& 
                 w << pack_args(ctx, g.args);
                 w << "\treturn rr.CallGenerator" << gen_kind(g) << "Function(rr_s.StubBase, " << mname << ", &rr_b"
                   << gen_codecs(ctx, g) << ")\n}\n\n";
+                std::string pd = params_decl(ctx, g.args);
+                w << "func (rr_s *" << sn << ") Async" << n << "(" << pd << (pd.empty() ? "" : ", ")
+                  << "rr_timeout time.Duration, rr_handler func(" << gen_go_type(ctx, g) << ", error)) {\n";
+                w << pack_args(ctx, g.args);
+                w << "\trr.AsyncCallGenerator" << gen_kind(g) << "Function(rr_s.StubBase, " << mname << ", &rr_b"
+                  << gen_codecs(ctx, g) << ", rr_timeout, rr_handler)\n}\n\n";
                 continue;
             }
             std::string pd = params_decl(ctx, f->Parameters);
@@ -1427,8 +1439,11 @@ void GenerateSkel(GenContext& ctx, const RR_SHARED_PTR<ServiceEntryDefinition>& 
             GenInfo g = gen_info(f);
             w << "\tcase " << go_string_literal(f->Name) << ":\n";
             w << unpack_args(ctx, g.args, "\t\t", "return nil, rr_err");
-            w << "\t\trr_g, rr_err := rr_s.obj." << mn[f->Name] << "(" << params_names(g.args) << ")\n";
-            w << "\t\tif rr_err != nil {\n\t\t\treturn nil, rr_err\n\t\t}\n";
+            // As in the C++ skeletons, generator functions always call the
+            // synchronous implementation (Async<Object> provides them for
+            // clients).
+            w << "\t\trr_g, rr_gerr := rr_s.obj." << mn[f->Name] << "(" << params_names(g.args) << ")\n";
+            w << "\t\tif rr_gerr != nil {\n\t\t\treturn nil, rr_gerr\n\t\t}\n";
             w << "\t\treturn rr.RegisterGenerator" << gen_kind(g) << "(rr_s.b, " << go_string_literal(f->Name)
               << ", rr_g" << gen_codecs(ctx, g) << ")\n";
             continue;

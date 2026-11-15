@@ -140,6 +140,62 @@ func TestGenerators(t *testing.T, r ts3.Testroot3) {
 	if _, err := g3.Next(); !rr.IsStopIteration(err) {
 		t.Errorf("gen_func2: expected StopIteration, got %v", err)
 	}
+	testAsyncGenerators(t, r)
+}
+
+// testAsyncGenerators covers the asynchronous generator client API (Go only).
+func testAsyncGenerators(t *testing.T, r ts3.Testroot3) {
+	ar, ok := r.(ts3.AsyncTestroot3)
+	if !ok {
+		t.Fatal("stub does not implement AsyncTestroot3")
+	}
+	type res struct {
+		g   rr.Generator1[[]uint8, []uint8]
+		err error
+	}
+	ch := make(chan res, 1)
+	ar.AsyncGen_func4(5*time.Second, func(g rr.Generator1[[]uint8, []uint8], err error) { ch <- res{g, err} })
+	gr := <-ch
+	must(t, gr.err)
+	g, ok := gr.g.(rr.AsyncGenerator1[[]uint8, []uint8])
+	if !ok {
+		t.Fatal("generator does not implement AsyncGenerator1")
+	}
+	type next struct {
+		v   []uint8
+		err error
+	}
+	nch := make(chan next, 1)
+	a := []uint8{2, 3, 4}
+	for i := 0; i < 7; i++ {
+		g.AsyncNext(a, 5*time.Second, func(v []uint8, err error) { nch <- next{v, err} })
+		n := <-nch
+		expectNoErr(t, "async gen next", n.err)
+		if i == 6 {
+			eq(t, "async gen value", n.v, []uint8{8, 9, 10})
+		}
+	}
+	ech := make(chan error, 1)
+	g.AsyncClose(5*time.Second, func(err error) { ech <- err })
+	expectNoErr(t, "async gen close", <-ech)
+	g.AsyncNext(a, 5*time.Second, func(v []uint8, err error) { nch <- next{v, err} })
+	if n := <-nch; !rr.IsStopIteration(n.err) {
+		t.Errorf("expected StopIteration after close, got %v", n.err)
+	}
+
+	gch := make(chan rr.Generator2[[]uint8], 1)
+	ar.AsyncGen_func2("x", 5*time.Second, func(g rr.Generator2[[]uint8], err error) {
+		expectNoErr(t, "async gen_func2", err)
+		gch <- g
+	})
+	g2 := (<-gch).(rr.AsyncGenerator2[[]uint8])
+	v2 := make(chan next, 1)
+	g2.AsyncNext(5*time.Second, func(v []uint8, err error) { v2 <- next{v, err} })
+	n := <-v2
+	expectNoErr(t, "async gen_func2 next", n.err)
+	eq(t, "async gen_func2 value", n.v, []uint8{0})
+	g2.AsyncAbort(5*time.Second, func(err error) { ech <- err })
+	expectNoErr(t, "async gen_func2 abort", <-ech)
 }
 
 // TestNamedArrays ports ServiceTestClient2::TestNamedArrays.

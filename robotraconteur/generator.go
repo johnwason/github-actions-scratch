@@ -40,6 +40,31 @@ type Generator3[P any] interface {
 	Close() error
 }
 
+// AsyncGenerator1 is a client Generator1 with asynchronous operations.
+// Generators returned by stubs implement it (type assert the Generator1).
+type AsyncGenerator1[R, P any] interface {
+	Generator1[R, P]
+	AsyncNext(param P, timeout time.Duration, handler func(R, error))
+	AsyncAbort(timeout time.Duration, handler func(error))
+	AsyncClose(timeout time.Duration, handler func(error))
+}
+
+// AsyncGenerator2 is a client Generator2 with asynchronous operations.
+type AsyncGenerator2[R any] interface {
+	Generator2[R]
+	AsyncNext(timeout time.Duration, handler func(R, error))
+	AsyncAbort(timeout time.Duration, handler func(error))
+	AsyncClose(timeout time.Duration, handler func(error))
+}
+
+// AsyncGenerator3 is a client Generator3 with asynchronous operations.
+type AsyncGenerator3[P any] interface {
+	Generator3[P]
+	AsyncNext(param P, timeout time.Duration, handler func(error))
+	AsyncAbort(timeout time.Duration, handler func(error))
+	AsyncClose(timeout time.Duration, handler func(error))
+}
+
 // IsStopIteration reports whether err signals the end of a generator.
 func IsStopIteration(err error) bool { return errors.Is(err, ErrStopIteration) }
 
@@ -99,6 +124,49 @@ func (g *GeneratorClient[R, P]) next(param P, hasParam bool) (R, error) {
 	return out, cerr
 }
 
+func (g *GeneratorClient[R, P]) asyncNext(param P, hasParam bool, timeout time.Duration, handler func(R, error)) {
+	var zero R
+	var pe *Element
+	if hasParam {
+		e, err := g.param.Pack("parameter", param)
+		if err != nil {
+			go handler(zero, err)
+			return
+		}
+		pe = e
+	}
+	d, id := newAsyncRequest(func(e *Element, err error) {
+		if err != nil || g.ret == nil {
+			handler(zero, err)
+			return
+		}
+		handler(UnpackReturn(e, *g.ret))
+	})
+	var cerr error
+	err := callVoid(func() {
+		var pm swig.MessageElement
+		if pe != nil {
+			m, err := toNative(pe)
+			if err != nil {
+				cerr = err
+				return
+			}
+			defer swig.DeleteMessageElement(m)
+			pm = m
+		} else {
+			pm = swig.SwigcptrMessageElement(0)
+		}
+		g.native.AsyncNext(pm, timeoutMs(timeout), d, id)
+	})
+	if cerr != nil {
+		err = cerr
+	}
+	if err != nil {
+		heapRemove(id)
+		go handler(zero, err)
+	}
+}
+
 // Abort aborts the generator (the service sees an OperationAborted error).
 func (g *GeneratorClient[R, P]) Abort() error { return callVoid(func() { g.native.Abort() }) }
 
@@ -129,11 +197,21 @@ type Generator1Client[R, P any] struct{ GeneratorClient[R, P] }
 // Next sends param and returns the next value.
 func (g *Generator1Client[R, P]) Next(param P) (R, error) { return g.next(param, true) }
 
+// AsyncNext sends param and returns the next value asynchronously.
+func (g *Generator1Client[R, P]) AsyncNext(param P, timeout time.Duration, handler func(R, error)) {
+	g.asyncNext(param, true, timeout, handler)
+}
+
 // Generator2Client is the client side of a Generator2.
 type Generator2Client[R any] struct{ GeneratorClient[R, struct{}] }
 
 // Next returns the next value.
 func (g *Generator2Client[R]) Next() (R, error) { return g.next(struct{}{}, false) }
+
+// AsyncNext returns the next value asynchronously.
+func (g *Generator2Client[R]) AsyncNext(timeout time.Duration, handler func(R, error)) {
+	g.asyncNext(struct{}{}, false, timeout, handler)
+}
 
 // NextAll reads all remaining values.
 func (g *Generator2Client[R]) NextAll() ([]R, error) {
@@ -157,6 +235,107 @@ type Generator3Client[P any] struct{ GeneratorClient[struct{}, P] }
 func (g *Generator3Client[P]) Next(param P) error {
 	_, err := g.next(param, true)
 	return err
+}
+
+// AsyncNext sends param asynchronously.
+func (g *Generator3Client[P]) AsyncNext(param P, timeout time.Duration, handler func(error)) {
+	g.asyncNext(param, true, timeout, func(_ struct{}, err error) { handler(err) })
+}
+
+var (
+	_ AsyncGenerator1[int32, int32] = (*Generator1Client[int32, int32])(nil)
+	_ AsyncGenerator2[int32]        = (*Generator2Client[int32])(nil)
+	_ AsyncGenerator3[int32]        = (*Generator3Client[int32])(nil)
+)
+
+// ---- AsyncGeneratorClientReturnDirector ----
+
+type asyncGenerator struct {
+	handler func(swig.WrappedGeneratorClient, error)
+}
+
+func (d *asyncGenerator) Handler(g swig.WrappedGeneratorClient, info swig.HandlerErrorInfo) {
+	defer recoverDirector()
+	err := errorFromInfo(info)
+	if err == nil && (g == nil || g.Swigcptr() == 0) {
+		err = NewNullValue("null generator")
+	}
+	if err != nil {
+		if g != nil && g.Swigcptr() != 0 {
+			swig.DeleteWrappedGeneratorClient(g)
+		}
+		g = nil
+	}
+	go d.handler(g, err)
+}
+
+var _ swig.AsyncGeneratorClientReturnDirectorMethods = (*asyncGenerator)(nil)
+
+func asyncGeneratorCall(b *StubBase, name string, args *ElementBuilder, timeout time.Duration, handler func(swig.WrappedGeneratorClient, error)) {
+	a, err := args.Result()
+	if err != nil {
+		go handler(nil, err)
+		return
+	}
+	impl := &asyncGenerator{handler: handler}
+	d := swig.NewDirectorAsyncGeneratorClientReturnDirector(impl)
+	id := heapAdd(impl, func() { swig.DeleteDirectorAsyncGeneratorClientReturnDirector(d) })
+	var cerr error
+	err = callVoid(func() {
+		vec, err := elementsToNative(a)
+		if err != nil {
+			cerr = err
+			return
+		}
+		defer swig.DeleteVectorptr_messageelement(vec)
+		b.inner.Async_GeneratorFunctionCall(name, vec, timeoutMs(timeout), d, id)
+	})
+	if cerr != nil {
+		err = cerr
+	}
+	if err != nil {
+		heapRemove(id)
+		go handler(nil, err)
+	}
+}
+
+// AsyncCallGenerator1Function calls a generator function returning a
+// Generator1 asynchronously. The generator passed to handler implements
+// AsyncGenerator1.
+func AsyncCallGenerator1Function[R, P any](b *StubBase, name string, args *ElementBuilder, ret Codec[R], param Codec[P], timeout time.Duration, handler func(Generator1[R, P], error)) {
+	asyncGeneratorCall(b, name, args, timeout, func(g swig.WrappedGeneratorClient, err error) {
+		if err != nil {
+			handler(nil, err)
+			return
+		}
+		handler(&Generator1Client[R, P]{GeneratorClient[R, P]{native: g, ret: &ret, param: &param}}, nil)
+	})
+}
+
+// AsyncCallGenerator2Function calls a generator function returning a
+// Generator2 asynchronously. The generator passed to handler implements
+// AsyncGenerator2.
+func AsyncCallGenerator2Function[R any](b *StubBase, name string, args *ElementBuilder, ret Codec[R], timeout time.Duration, handler func(Generator2[R], error)) {
+	asyncGeneratorCall(b, name, args, timeout, func(g swig.WrappedGeneratorClient, err error) {
+		if err != nil {
+			handler(nil, err)
+			return
+		}
+		handler(&Generator2Client[R]{GeneratorClient[R, struct{}]{native: g, ret: &ret}}, nil)
+	})
+}
+
+// AsyncCallGenerator3Function calls a generator function returning a
+// Generator3 asynchronously. The generator passed to handler implements
+// AsyncGenerator3.
+func AsyncCallGenerator3Function[P any](b *StubBase, name string, args *ElementBuilder, param Codec[P], timeout time.Duration, handler func(Generator3[P], error)) {
+	asyncGeneratorCall(b, name, args, timeout, func(g swig.WrappedGeneratorClient, err error) {
+		if err != nil {
+			handler(nil, err)
+			return
+		}
+		handler(&Generator3Client[P]{GeneratorClient[struct{}, P]{native: g, param: &param}}, nil)
+	})
 }
 
 func generatorCall(b *StubBase, name string, args *ElementBuilder) (swig.WrappedGeneratorClient, error) {

@@ -61,6 +61,21 @@ func (a *Asynctestroot) AsyncErr_func(_ time.Duration, h func(error)) {
 func (a *Asynctestroot) AsyncErr_func2(_ time.Duration, h func(float64, error)) {
 	go h(0, ts5.NewAsynctestexp(""))
 }
+
+// Async generator functions are not used by the service skeleton (it calls
+// the synchronous ones, as in C++); NotImplemented as in ServiceTest3.cpp.
+func (a *Asynctestroot) AsyncF4(_ time.Duration, h func(rr.Generator2[float64], error)) {
+	go h(nil, rr.NewNotImplementedError(""))
+}
+func (a *Asynctestroot) AsyncF5(_ float64, _ time.Duration, h func(rr.Generator3[float64], error)) {
+	go h(nil, rr.NewNotImplementedError(""))
+}
+func (a *Asynctestroot) AsyncF6(_ float64, _ time.Duration, h func(rr.Generator1[*ts5.Teststruct4, *ts5.Teststruct5], error)) {
+	go h(nil, rr.NewNotImplementedError(""))
+}
+func (a *Asynctestroot) AsyncErr_func3(_ time.Duration, h func(rr.Generator2[float64], error)) {
+	go h(nil, rr.NewNotImplementedError(""))
+}
 func (a *Asynctestroot) Err_func3() (rr.Generator2[float64], error) {
 	return nil, rr.NewInvalidOperation("")
 }

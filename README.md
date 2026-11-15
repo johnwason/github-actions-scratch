@@ -93,6 +93,8 @@ state, ts, err := c.State().PeekInValue()
 ```
 
 Every member also has an async form (`AsyncTeleport(x, y, timeout, func(error))`).
+This includes generator functions. Generators returned by stubs implement
+`rr.AsyncGenerator1/2/3` (`AsyncNext`, `AsyncAbort`, `AsyncClose`).
 Wires, pipes, memories, object locks (`Node.RequestObjectLock`, `WithMonitorLock`),
 subscriptions (`Node.SubscribeService`, `SubscribeServiceByType`,
 `SubscribeServiceInfo2`, and wire/pipe subscriptions) and local-transport
@@ -142,6 +144,12 @@ node.SetLogRecordHandler(func(r rr.LogRecord) { log.Println(r) })
 node.OpenLogFile("rr.log", true)
 ```
 
+## Timers
+
+`Node.CreateTimer(period, oneshot, func(rr.TimerEvent, error))` and
+`Node.CreateRate(hz)` follow the node's time base, unlike `time.Ticker`.
+They matter when a custom time provider is installed (simulation).
+
 ## Testing
 
 `scripts/podman.sh test` runs in a container with `--network=none`. Only
@@ -161,5 +169,3 @@ test programs they skip.
 
 - Windows and macOS. The runtime is OS-neutral, but the core and toolchain setup for cgo is Linux-only for now.
 - Custom (Go) user authenticators. `AuthenticatedUser` cannot be constructed through SWIG.
-- Async variants of generator `Next`/`Close`/`Abort`.
-- Timers and rate objects (`time.Ticker` covers most uses).

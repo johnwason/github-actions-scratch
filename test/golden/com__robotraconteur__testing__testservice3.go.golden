@@ -652,6 +652,11 @@ type AsyncTestroot3 interface {
 	AsyncTestpod1_func2(rr_timeout time.Duration, rr_handler func(Testpod1, error))
 	AsyncGetTeststruct3_prop(rr_timeout time.Duration, rr_handler func(*Teststruct3, error))
 	AsyncSetTeststruct3_prop(value *Teststruct3, rr_timeout time.Duration, rr_handler func(error))
+	AsyncGen_func1(rr_timeout time.Duration, rr_handler func(rr.Generator2[float64], error))
+	AsyncGen_func2(name string, rr_timeout time.Duration, rr_handler func(rr.Generator2[[]uint8], error))
+	AsyncGen_func3(name string, rr_timeout time.Duration, rr_handler func(rr.Generator3[[]uint8], error))
+	AsyncGen_func4(rr_timeout time.Duration, rr_handler func(rr.Generator1[[]uint8, []uint8], error))
+	AsyncGen_func5(rr_timeout time.Duration, rr_handler func(rr.Generator1[*com__robotraconteur__testing__testservice1.Teststruct2, *com__robotraconteur__testing__testservice1.Teststruct2], error))
 	AsyncGetD1(rr_timeout time.Duration, rr_handler func([][]float64, error))
 	AsyncSetD1(value [][]float64, rr_timeout time.Duration, rr_handler func(error))
 	AsyncGetD2(rr_timeout time.Duration, rr_handler func([][]float64, error))
@@ -713,6 +718,8 @@ type AsyncTestroot3 interface {
 	AsyncGetNolock_test(rr_timeout time.Duration, rr_handler func(Obj5, error))
 	AsyncTest_exception_params1(rr_timeout time.Duration, rr_handler func(error))
 	AsyncTest_exception_params2(rr_timeout time.Duration, rr_handler func(error))
+	AsyncEnum_generator1(rr_timeout time.Duration, rr_handler func(rr.Generator2[Testenum1], error))
+	AsyncEnum_generator2(a int32, b int32, rr_timeout time.Duration, rr_handler func(rr.Generator1[Testenum1, Testenum1], error))
 }
 
 type testroot3Stub struct {
@@ -935,10 +942,21 @@ func (rr_s *testroot3Stub) Gen_func1() (rr.Generator2[float64], error) {
 	return rr.CallGenerator2Function(rr_s.StubBase, "gen_func1", &rr_b, rr.ScalarCodec[float64]())
 }
 
+func (rr_s *testroot3Stub) AsyncGen_func1(rr_timeout time.Duration, rr_handler func(rr.Generator2[float64], error)) {
+	var rr_b rr.ElementBuilder
+	rr.AsyncCallGenerator2Function(rr_s.StubBase, "gen_func1", &rr_b, rr.ScalarCodec[float64](), rr_timeout, rr_handler)
+}
+
 func (rr_s *testroot3Stub) Gen_func2(name string) (rr.Generator2[[]uint8], error) {
 	var rr_b rr.ElementBuilder
 	rr.PackField(&rr_b, "name", name, rr.StringCodec())
 	return rr.CallGenerator2Function(rr_s.StubBase, "gen_func2", &rr_b, rr.ArrayCodec[uint8](0, false))
+}
+
+func (rr_s *testroot3Stub) AsyncGen_func2(name string, rr_timeout time.Duration, rr_handler func(rr.Generator2[[]uint8], error)) {
+	var rr_b rr.ElementBuilder
+	rr.PackField(&rr_b, "name", name, rr.StringCodec())
+	rr.AsyncCallGenerator2Function(rr_s.StubBase, "gen_func2", &rr_b, rr.ArrayCodec[uint8](0, false), rr_timeout, rr_handler)
 }
 
 func (rr_s *testroot3Stub) Gen_func3(name string) (rr.Generator3[[]uint8], error) {
@@ -947,14 +965,30 @@ func (rr_s *testroot3Stub) Gen_func3(name string) (rr.Generator3[[]uint8], error
 	return rr.CallGenerator3Function(rr_s.StubBase, "gen_func3", &rr_b, rr.ArrayCodec[uint8](0, false))
 }
 
+func (rr_s *testroot3Stub) AsyncGen_func3(name string, rr_timeout time.Duration, rr_handler func(rr.Generator3[[]uint8], error)) {
+	var rr_b rr.ElementBuilder
+	rr.PackField(&rr_b, "name", name, rr.StringCodec())
+	rr.AsyncCallGenerator3Function(rr_s.StubBase, "gen_func3", &rr_b, rr.ArrayCodec[uint8](0, false), rr_timeout, rr_handler)
+}
+
 func (rr_s *testroot3Stub) Gen_func4() (rr.Generator1[[]uint8, []uint8], error) {
 	var rr_b rr.ElementBuilder
 	return rr.CallGenerator1Function(rr_s.StubBase, "gen_func4", &rr_b, rr.ArrayCodec[uint8](0, false), rr.ArrayCodec[uint8](0, false))
 }
 
+func (rr_s *testroot3Stub) AsyncGen_func4(rr_timeout time.Duration, rr_handler func(rr.Generator1[[]uint8, []uint8], error)) {
+	var rr_b rr.ElementBuilder
+	rr.AsyncCallGenerator1Function(rr_s.StubBase, "gen_func4", &rr_b, rr.ArrayCodec[uint8](0, false), rr.ArrayCodec[uint8](0, false), rr_timeout, rr_handler)
+}
+
 func (rr_s *testroot3Stub) Gen_func5() (rr.Generator1[*com__robotraconteur__testing__testservice1.Teststruct2, *com__robotraconteur__testing__testservice1.Teststruct2], error) {
 	var rr_b rr.ElementBuilder
 	return rr.CallGenerator1Function(rr_s.StubBase, "gen_func5", &rr_b, rr.StructureCodec[com__robotraconteur__testing__testservice1.Teststruct2](), rr.StructureCodec[com__robotraconteur__testing__testservice1.Teststruct2]())
+}
+
+func (rr_s *testroot3Stub) AsyncGen_func5(rr_timeout time.Duration, rr_handler func(rr.Generator1[*com__robotraconteur__testing__testservice1.Teststruct2, *com__robotraconteur__testing__testservice1.Teststruct2], error)) {
+	var rr_b rr.ElementBuilder
+	rr.AsyncCallGenerator1Function(rr_s.StubBase, "gen_func5", &rr_b, rr.StructureCodec[com__robotraconteur__testing__testservice1.Teststruct2](), rr.StructureCodec[com__robotraconteur__testing__testservice1.Teststruct2](), rr_timeout, rr_handler)
 }
 
 func (rr_s *testroot3Stub) GetD1() ([][]float64, error) {
@@ -1482,11 +1516,23 @@ func (rr_s *testroot3Stub) Enum_generator1() (rr.Generator2[Testenum1], error) {
 	return rr.CallGenerator2Function(rr_s.StubBase, "enum_generator1", &rr_b, rr.EnumCodec[Testenum1]())
 }
 
+func (rr_s *testroot3Stub) AsyncEnum_generator1(rr_timeout time.Duration, rr_handler func(rr.Generator2[Testenum1], error)) {
+	var rr_b rr.ElementBuilder
+	rr.AsyncCallGenerator2Function(rr_s.StubBase, "enum_generator1", &rr_b, rr.EnumCodec[Testenum1](), rr_timeout, rr_handler)
+}
+
 func (rr_s *testroot3Stub) Enum_generator2(a int32, b int32) (rr.Generator1[Testenum1, Testenum1], error) {
 	var rr_b rr.ElementBuilder
 	rr.PackField(&rr_b, "a", a, rr.ScalarCodec[int32]())
 	rr.PackField(&rr_b, "b", b, rr.ScalarCodec[int32]())
 	return rr.CallGenerator1Function(rr_s.StubBase, "enum_generator2", &rr_b, rr.EnumCodec[Testenum1](), rr.EnumCodec[Testenum1]())
+}
+
+func (rr_s *testroot3Stub) AsyncEnum_generator2(a int32, b int32, rr_timeout time.Duration, rr_handler func(rr.Generator1[Testenum1, Testenum1], error)) {
+	var rr_b rr.ElementBuilder
+	rr.PackField(&rr_b, "a", a, rr.ScalarCodec[int32]())
+	rr.PackField(&rr_b, "b", b, rr.ScalarCodec[int32]())
+	rr.AsyncCallGenerator1Function(rr_s.StubBase, "enum_generator2", &rr_b, rr.EnumCodec[Testenum1](), rr.EnumCodec[Testenum1](), rr_timeout, rr_handler)
 }
 
 func (rr_s *testroot3Stub) RRDispatchEvent(rr_name string, rr_args []*rr.Element) {
@@ -2554,9 +2600,9 @@ func (rr_s *testroot3Skel) RRCallFunction(rr_name string, rr_args []*rr.Element,
 		}
 		return rr.PodCodec[Testpod1]().Pack("return", rr_ret)
 	case "gen_func1":
-		rr_g, rr_err := rr_s.obj.Gen_func1()
-		if rr_err != nil {
-			return nil, rr_err
+		rr_g, rr_gerr := rr_s.obj.Gen_func1()
+		if rr_gerr != nil {
+			return nil, rr_gerr
 		}
 		return rr.RegisterGenerator2(rr_s.b, "gen_func1", rr_g, rr.ScalarCodec[float64]())
 	case "gen_func2":
@@ -2564,9 +2610,9 @@ func (rr_s *testroot3Skel) RRCallFunction(rr_name string, rr_args []*rr.Element,
 		if rr_err != nil {
 			return nil, rr_err
 		}
-		rr_g, rr_err := rr_s.obj.Gen_func2(name)
-		if rr_err != nil {
-			return nil, rr_err
+		rr_g, rr_gerr := rr_s.obj.Gen_func2(name)
+		if rr_gerr != nil {
+			return nil, rr_gerr
 		}
 		return rr.RegisterGenerator2(rr_s.b, "gen_func2", rr_g, rr.ArrayCodec[uint8](0, false))
 	case "gen_func3":
@@ -2574,21 +2620,21 @@ func (rr_s *testroot3Skel) RRCallFunction(rr_name string, rr_args []*rr.Element,
 		if rr_err != nil {
 			return nil, rr_err
 		}
-		rr_g, rr_err := rr_s.obj.Gen_func3(name)
-		if rr_err != nil {
-			return nil, rr_err
+		rr_g, rr_gerr := rr_s.obj.Gen_func3(name)
+		if rr_gerr != nil {
+			return nil, rr_gerr
 		}
 		return rr.RegisterGenerator3(rr_s.b, "gen_func3", rr_g, rr.ArrayCodec[uint8](0, false))
 	case "gen_func4":
-		rr_g, rr_err := rr_s.obj.Gen_func4()
-		if rr_err != nil {
-			return nil, rr_err
+		rr_g, rr_gerr := rr_s.obj.Gen_func4()
+		if rr_gerr != nil {
+			return nil, rr_gerr
 		}
 		return rr.RegisterGenerator1(rr_s.b, "gen_func4", rr_g, rr.ArrayCodec[uint8](0, false), rr.ArrayCodec[uint8](0, false))
 	case "gen_func5":
-		rr_g, rr_err := rr_s.obj.Gen_func5()
-		if rr_err != nil {
-			return nil, rr_err
+		rr_g, rr_gerr := rr_s.obj.Gen_func5()
+		if rr_gerr != nil {
+			return nil, rr_gerr
 		}
 		return rr.RegisterGenerator1(rr_s.b, "gen_func5", rr_g, rr.StructureCodec[com__robotraconteur__testing__testservice1.Teststruct2](), rr.StructureCodec[com__robotraconteur__testing__testservice1.Teststruct2]())
 	case "test_exception_params1":
@@ -2606,9 +2652,9 @@ func (rr_s *testroot3Skel) RRCallFunction(rr_name string, rr_args []*rr.Element,
 		}
 		return nil, rr_s.obj.Test_exception_params2()
 	case "enum_generator1":
-		rr_g, rr_err := rr_s.obj.Enum_generator1()
-		if rr_err != nil {
-			return nil, rr_err
+		rr_g, rr_gerr := rr_s.obj.Enum_generator1()
+		if rr_gerr != nil {
+			return nil, rr_gerr
 		}
 		return rr.RegisterGenerator2(rr_s.b, "enum_generator1", rr_g, rr.EnumCodec[Testenum1]())
 	case "enum_generator2":
@@ -2620,9 +2666,9 @@ func (rr_s *testroot3Skel) RRCallFunction(rr_name string, rr_args []*rr.Element,
 		if rr_err != nil {
 			return nil, rr_err
 		}
-		rr_g, rr_err := rr_s.obj.Enum_generator2(a, b)
-		if rr_err != nil {
-			return nil, rr_err
+		rr_g, rr_gerr := rr_s.obj.Enum_generator2(a, b)
+		if rr_gerr != nil {
+			return nil, rr_gerr
 		}
 		return rr.RegisterGenerator1(rr_s.b, "enum_generator2", rr_g, rr.EnumCodec[Testenum1](), rr.EnumCodec[Testenum1]())
 	}

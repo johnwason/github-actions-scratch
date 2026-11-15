@@ -1,0 +1,207 @@
+/**
+ * @file common.cpp
+ * @brief This is a collection of common methods
+ *
+ * @author Levi Armstrong
+ * @date Dec 18, 2017
+ *
+ * @copyright Copyright (c) 2017, Southwest Research Institute
+ *
+ * @par License
+ * Software License Agreement (Apache License)
+ * @par
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * @par
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#include <tesseract/common/macros.h>
+TESSERACT_COMMON_IGNORE_WARNINGS_PUSH
+#include <cassert>
+TESSERACT_COMMON_IGNORE_WARNINGS_POP
+
+#include <tesseract/common/logging.h>
+#include <tesseract/common/utils.h>
+#include <tesseract/common/types.h>
+#include <tesseract/collision/common.h>
+#include <tesseract/collision/contact_result_validator.h>
+
+namespace tesseract::collision
+{
+std::vector<tesseract::common::LinkIdPair>
+getCollisionObjectPairs(const std::vector<tesseract::common::LinkId>& active_links,
+                        const std::vector<tesseract::common::LinkId>& static_links,
+                        const std::shared_ptr<const tesseract::common::ContactAllowedValidator>& validator)
+{
+  std::size_t num_pairs = active_links.size() * (active_links.size() - 1) / 2;
+  num_pairs += (active_links.size() * static_links.size());
+
+  std::vector<tesseract::common::LinkIdPair> clp;
+  clp.reserve(num_pairs);
+
+  // Reusing a single pair across the loops keeps the rejected candidates allocation-free.
+  tesseract::common::LinkIdPair pair;
+
+  // Create active to active pairs
+  for (std::size_t i = 0; i + 1 < active_links.size(); ++i)
+  {
+    const auto& l1 = active_links[i];
+    for (std::size_t j = i + 1; j < active_links.size(); ++j)
+    {
+      const auto& l2 = active_links[j];
+      pair.assign(l1, l2);
+      if (validator == nullptr || !(*validator)(pair))
+        clp.push_back(pair);
+    }
+  }
+
+  // Create active to static pairs
+  for (const auto& l1 : active_links)
+  {
+    for (const auto& l2 : static_links)
+    {
+      pair.assign(l1, l2);
+      if (validator == nullptr || !(*validator)(pair))
+        clp.push_back(pair);
+    }
+  }
+
+  return clp;
+}
+
+bool isLinkActive(const std::unordered_set<tesseract::common::LinkId>& active, const tesseract::common::LinkId& id)
+{
+  return active.empty() || (active.count(id) > 0);
+}
+
+bool isContactAllowed(const tesseract::common::LinkIdPair& pair,
+                      const std::shared_ptr<const tesseract::common::ContactAllowedValidator>& validator,
+                      bool verbose)
+{
+  // do not distance check geoms part of the same object / link / attached body
+  if (pair.first() == pair.second())
+    return true;
+
+  if (validator != nullptr && (*validator)(pair))
+  {
+    if (verbose)
+    {
+      const auto [link1, link2] = pair.orderedNameView();
+      TESSERACT_LOG_ERROR("Collision between '{}' and '{}' is allowed. No contacts are computed.", link1, link2);
+    }
+    return true;
+  }
+
+  if (verbose)
+  {
+    const auto [link1, link2] = pair.orderedNameView();
+    TESSERACT_LOG_ERROR("Actually checking collisions between {} and {}", link1, link2);
+  }
+
+  return false;
+}
+
+bool isContactAllowed(const tesseract::common::LinkId& id1,
+                      const tesseract::common::LinkId& id2,
+                      const std::shared_ptr<const tesseract::common::ContactAllowedValidator>& validator,
+                      bool verbose)
+{
+  // do not distance check geoms part of the same object / link / attached body
+  if (id1 == id2)
+    return true;
+
+  if (validator != nullptr)
+  {
+    // Reusing a long-lived pair keeps the broadphase filter path allocation-free.
+    TESSERACT_THREAD_LOCAL tesseract::common::LinkIdPair key;
+    key.assign(id1, id2);
+
+    if ((*validator)(key))
+    {
+      if (verbose)
+      {
+        TESSERACT_LOG_ERROR(
+            "Collision between '{}' and '{}' is allowed. No contacts are computed.", id1.name(), id2.name());
+      }
+      return true;
+    }
+  }
+
+  if (verbose)
+  {
+    TESSERACT_LOG_ERROR("Actually checking collisions between {} and {}", id1.name(), id2.name());
+  }
+
+  return false;
+}
+
+ContactResult* processResult(ContactTestData& cdata,
+                             ContactResult& contact,
+                             const tesseract::common::LinkIdPair& key,
+                             double margin,
+                             bool found)
+{
+  if (cdata.req.is_valid && !(*cdata.req.is_valid)(contact))
+    return nullptr;
+
+  if ((cdata.req.calculate_distance || cdata.req.calculate_penetration) && (contact.distance > margin))
+    return nullptr;
+
+  if (!found)
+  {
+    if (cdata.req.type == ContactTestType::FIRST)
+      cdata.done = true;
+
+    return &(cdata.res->addContactResult(key, contact));
+  }
+
+  assert(cdata.req.type != ContactTestType::FIRST);
+  if (cdata.req.type == ContactTestType::ALL)
+    return &(cdata.res->addContactResult(key, contact));
+
+  if (cdata.req.type == ContactTestType::CLOSEST)
+  {
+    const auto& cv = cdata.res->at(key);
+    assert(!cv.empty());
+
+    if (contact.distance < cv.front().distance)
+      return &(cdata.res->setContactResult(key, contact));
+  }
+
+  //    else if (cdata.cdata.condition == DistanceRequestType::LIMITED)
+  //    {
+  //      assert(dr.size() < cdata.req->max_contacts_per_body);
+  //      dr.emplace_back(contact);
+  //      return &(dr.back());
+  //    }
+
+  return nullptr;
+}
+
+void scaleVertices(tesseract::common::VectorVector3d& vertices,
+                   const Eigen::Vector3d& center,
+                   const Eigen::Vector3d& scale)
+{
+  for (auto& v : vertices)
+    v = scale.cwiseProduct(v - center) + center;
+}
+
+void scaleVertices(tesseract::common::VectorVector3d& vertices, const Eigen::Vector3d& scale)
+{
+  Eigen::Vector3d center(0, 0, 0);
+  for (const auto& v : vertices)
+    center = center + v;
+
+  center = (1.0 / static_cast<double>(vertices.size())) * center;
+
+  scaleVertices(vertices, center, scale);
+}
+
+}  // namespace tesseract::collision

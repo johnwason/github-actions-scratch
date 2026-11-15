@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>tesseract_conda</name>
+  <version>0.1.0</version>
+  <description>Read Tesseract resources (URDF, SRDF, meshes, configs) directly from conda (.conda) packages</description>
+  <maintainer email="wason@wasontech.com">John Wason</maintainer>
+  <license>Apache 2.0</license>
+  <author>John Wason</author>
+
+  <buildtool_depend>cmake</buildtool_depend>
+
+  <depend>tesseract</depend>
+  <depend>yaml-cpp</depend>
+  <build_depend>libcereal-dev</build_depend>
+  <!-- No rosdep key exists for libarchive; install libarchive-dev (apt), libarchive (conda-forge, brew) or
+       libarchive[zstd] (vcpkg) yourself. -->
+
+  <test_depend>gtest</test_depend>
+
+  <export>
+    <build_type>cmake</build_type>
+  </export>
+</package>

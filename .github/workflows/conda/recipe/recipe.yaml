@@ -1,0 +1,101 @@
+context:
+    name: tesseract
+    version: "0.1.0"
+
+package:
+  name: ${{ name|lower }}
+  version: ${{ version }}
+
+source:
+    path: ../../workspace
+
+requirements:
+    build:
+      - ${{ compiler('c') }}
+      - ${{ compiler('cxx') }}
+      - benchmark
+      - gtest
+      - gmock
+      - cmake
+      - if: win
+        then:
+          - ninja
+      - if: unix
+        then:
+          - make
+      - pkg-config
+      - swig
+      - colcon-common-extensions 
+      - lcov
+      - if: linux
+        then:
+          - ${{ cdt('mesa-libgl-devel') }}
+          - ${{ cdt('mesa-dri-drivers') }}
+    host:
+      - libboost-devel
+      - cereal
+      - eigen-abi-devel
+      - tinyxml2
+      - spdlog
+      - assimp
+      - urdfdom
+      - fcl
+      - octomap 
+      - orocos-kdl 
+      - pcl
+      - gtest
+      - gmock
+      - pkg-config 
+      - xz
+      - flann
+      - yaml-cpp
+      - bullet-cpp
+      - blas
+      - libarchive
+      - if: unix
+        then:
+          - xorg-libx11
+          - xorg-libxext
+    run:
+      - libboost-devel
+      - cereal
+      - eigen
+      - tinyxml2
+      - spdlog
+      - assimp
+      - urdfdom
+      - fcl
+      - octomap 
+      - orocos-kdl 
+      - pcl
+      - gtest
+      - gmock
+      - xz
+      - taskflow 
+      - yaml-cpp
+      - bullet-cpp
+      - blas
+      - libarchive
+      - if: unix
+        then:
+          - xorg-libx11
+          - xorg-libxext
+tests:
+- package_contents:
+      files:
+      - if: unix
+        then:
+          - opt/tesseract_robotics/include/tesseract/common/fwd.h
+          - if: osx
+            then: opt/tesseract_robotics/lib/libtesseract_common.dylib
+            else: opt/tesseract_robotics/lib/libtesseract_common.so
+        else:
+          - opt/tesseract_robotics/include/tesseract/common/fwd.h
+          - opt/tesseract_robotics/bin/tesseract_common.dll
+
+build:
+  number: 0
+
+about:
+  homepage: https://github.com/ros-industrial-consortium/tesseract
+  summary: Tesseract robotics motion planning framework

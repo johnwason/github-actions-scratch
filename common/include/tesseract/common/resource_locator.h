@@ -1,0 +1,311 @@
+/**
+ * @file resource_locator.h
+ * @brief Locate and retrieve resource data
+ *
+ * @author John Wason
+ * @date October 25, 2019
+ *
+ * @copyright Copyright (c) 2019, Wason Technology, LLC
+ *
+ * @par License
+ * Software License Agreement (Apache License)
+ * @par
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * @par
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+#ifndef TESSERACT_COMMON_RESOURCE_LOCATOR_H
+#define TESSERACT_COMMON_RESOURCE_LOCATOR_H
+
+#include <tesseract/common/conda_config.h>
+#include <tesseract/common/macros.h>
+TESSERACT_COMMON_IGNORE_WARNINGS_PUSH
+#include <functional>
+#include <memory>
+#include <string>
+#include <unordered_map>
+#include <vector>
+#include <filesystem>
+TESSERACT_COMMON_IGNORE_WARNINGS_POP
+
+namespace tesseract::common
+{
+// Forward declare
+class Resource;
+class GeneralResourceLocator;
+class SimpleLocatedResource;
+class BytesResource;
+
+template <class Archive>
+void serialize(Archive& ar, Resource& obj);
+
+template <class Archive>
+void serialize(Archive& ar, GeneralResourceLocator& obj);
+
+template <class Archive>
+void serialize(Archive& ar, SimpleLocatedResource& obj);
+
+template <class Archive>
+void serialize(Archive& ar, BytesResource& obj);
+
+/** @brief Abstract class for resource loaders */
+class ResourceLocator
+{
+public:
+  using Ptr = std::shared_ptr<ResourceLocator>;
+  using ConstPtr = std::shared_ptr<const ResourceLocator>;
+
+  virtual ~ResourceLocator() = default;
+
+  /**
+   * @brief Locate a resource based on a URL
+   *
+   * @param url The URL of the resource
+   * @return A shared pointer to a Resource instance, or nullptr if not found
+   */
+  virtual std::shared_ptr<Resource> locateResource(const std::string& url) const = 0;
+
+  bool operator==(const ResourceLocator& rhs) const;
+  bool operator!=(const ResourceLocator& rhs) const;
+};
+
+/**
+ * @brief Resolve a URL given relative to another resource's URL
+ * @details The result is the directory of base_url joined (with the platform's preferred separator) with the file
+ * name of url. This is the rule every Resource type uses for relative lookups.
+ * @param base_url The URL of the resource the lookup is relative to
+ * @param url The relative URL
+ * @return The resolved URL, or an empty string if base_url has no directory part
+ */
+std::string resolveRelativeResourceUrl(const std::string& base_url, const std::string& url);
+
+/**
+ * @brief A general resource loaders using environment variable
+ * @details Also can set this environment variable TESSERACT_RESOURCE_PATH
+ * with ':' separated directories and then use the directires as package names
+ *
+ * Paths are directories searched recursively for ROS packages (directories containing package.xml). The
+ * directory name is the package name.
+ *
+ * @par Conda packages
+ * When tesseract is built with TESSERACT_ENABLE_CONDA_ARCHIVES (the default), a path may also name a .conda
+ * package, which is read in place and never extracted:
+ *  - An archive plus a directory inside it, e.g. `/x/ros-humble-foo-1.0-h123_0.conda/share`: the archive's
+ *    manifest is searched under that directory for package.xml files, like a directory on disk.
+ *  - A bare archive, e.g. `/x/foo.conda`: the packages are taken from the archive's tesseract resource index,
+ *    `extra.tesseract_resource_index` in info/about.json, or else `share/tesseract/resource_index/<name>.yaml` in
+ *    the package contents (see TesseractResourceIndex in conda_package.h). Without an index this is an error.
+ *
+ * Directories are never searched for .conda files. Resources inside an archive are returned as
+ * CondaArchiveResource: isFile() is false, and getFilePath() returns the path inside the archive (e.g.
+ * `/x/foo.conda/share/foo/urdf/robot.urdf`), which this locator accepts again, also as a `file:///` URL.
+ *
+ * Meshes inside archives are loaded from bytes, so mesh loaders can't resolve external files such as
+ * textures or .mtl files next to them. Use self-contained meshes (.glb or .stl) in conda packages.
+ */
+class GeneralResourceLocator : public ResourceLocator
+{
+public:
+  using Ptr = std::shared_ptr<GeneralResourceLocator>;
+  using ConstPtr = std::shared_ptr<const GeneralResourceLocator>;
+  /**
+   * @brief Construct a new General Resource Locator object using the TESSERACT_RESOURCE_PATH environment variable
+   *
+   * @param environment_variables A vector of environment variables to search for paths
+   */
+  GeneralResourceLocator(const std::vector<std::string>& environment_variables = { "TESSERACT_RESOURCE_PATH",
+                                                                                   "ROS_PACKAGE_PATH",
+                                                                                   "AMENT_PREFIX_PATH" });
+  /**
+   * @brief Construct a new General Resource Locator object using the provided paths and/or the TESSERACT_RESOURCE_PATH
+   * environment variable
+   *
+   * @param paths A vector of paths to search for resources
+   * @param environment_variables A vector of environment variables to search for paths
+   */
+  GeneralResourceLocator(const std::vector<std::filesystem::path>& paths,
+                         const std::vector<std::string>& environment_variables = { "TESSERACT_RESOURCE_PATH",
+                                                                                   "ROS_PACKAGE_PATH",
+                                                                                   "AMENT_PREFIX_PATH" });
+  GeneralResourceLocator(const GeneralResourceLocator&) = default;
+  GeneralResourceLocator& operator=(const GeneralResourceLocator&) = default;
+  GeneralResourceLocator(GeneralResourceLocator&&) = default;
+  GeneralResourceLocator& operator=(GeneralResourceLocator&&) = default;
+  ~GeneralResourceLocator() override = default;
+
+  std::shared_ptr<Resource> locateResource(const std::string& url) const override;
+
+  bool operator==(const GeneralResourceLocator& rhs) const;
+  bool operator!=(const GeneralResourceLocator& rhs) const;
+
+  /**
+   * @brief Add path to the resource locator
+   *
+   * @param path The path to add. Must be a directory, or a .conda package (see the class description)
+   * @return true Success
+   * @return false Directory does not exist, or the conda package can't be used
+   */
+  bool addPath(const std::filesystem::path& path);
+
+  /**
+   * @brief Load paths from an environment variable
+   *
+   * @param environment_variable The environment variable to load paths from
+   * @return true Success
+   * @return false Environment variable does not exist
+   */
+  bool loadEnvironmentVariable(const std::string& environment_variable);
+
+private:
+  std::unordered_map<std::string, std::string> package_paths_;
+
+  bool processToken(const std::string& token);
+  bool processCondaToken(const std::string& token);
+
+  template <class Archive>
+  friend void ::tesseract::common::serialize(Archive& ar, GeneralResourceLocator& obj);
+};
+
+/**  @brief Represents resource data available from a file or url */
+class Resource : public ResourceLocator
+{
+public:
+  using Ptr = std::shared_ptr<Resource>;
+  using ConstPtr = std::shared_ptr<const Resource>;
+
+  /**
+   * @brief Returns true if the located resource is a local file
+   *
+   * @return true if the resource is a local file, otherwise false
+   */
+  virtual bool isFile() const = 0;
+
+  /**
+   * @brief Get the original URL used to locate the file
+   *
+   * @return The URL of the resource
+   */
+  virtual std::string getUrl() const = 0;
+
+  /**
+   * @brief Get the file path of the resource. Only valid if isFile() is true, except for resources inside a
+   * conda package, which return the path inside the archive (e.g. /x/foo.conda/share/foo/a.urdf).
+   *
+   * @return The file path to the resource
+   */
+  virtual std::string getFilePath() const = 0;
+
+  /**
+   * @brief Get the resource as bytes. This function may block
+   *
+   * @return Resource bytes as a uint8_t vector
+   */
+  virtual std::vector<uint8_t> getResourceContents() const = 0;
+
+  /**
+   * @brief Get the resource as a std::istream. This function and the returned stream may block
+   *
+   * @return A std::istream shared pointer for the resource data
+   */
+  virtual std::shared_ptr<std::istream> getResourceContentStream() const = 0;
+
+  bool operator==(const Resource& rhs) const;
+  bool operator!=(const Resource& rhs) const;
+
+private:
+  template <class Archive>
+  friend void ::tesseract::common::serialize(Archive& ar, Resource& obj);
+};
+
+using SimpleResourceLocatorFn = std::function<std::string(const std::string&)>;
+
+/** @brief Resource implementation for a local file */
+class SimpleLocatedResource : public Resource
+{
+public:
+  using Ptr = std::shared_ptr<SimpleLocatedResource>;
+  using ConstPtr = std::shared_ptr<const SimpleLocatedResource>;
+
+  /** @brief This is for serialization do not use directly */
+  SimpleLocatedResource() = default;
+
+  /**
+   * @brief A generic resource
+   * @param url The url to the resource
+   * @param filename The file path to the resource
+   * @param parent The locator used to locate the resource
+   */
+  SimpleLocatedResource(std::string url, std::string filename, ResourceLocator::ConstPtr parent = nullptr);
+  ~SimpleLocatedResource() override = default;
+  SimpleLocatedResource(const SimpleLocatedResource&) = default;
+  SimpleLocatedResource& operator=(const SimpleLocatedResource&) = default;
+  SimpleLocatedResource(SimpleLocatedResource&&) = default;
+  SimpleLocatedResource& operator=(SimpleLocatedResource&&) = default;
+
+  bool isFile() const override final;
+
+  std::string getUrl() const override final;
+
+  std::string getFilePath() const override final;
+
+  std::vector<uint8_t> getResourceContents() const override final;
+
+  std::shared_ptr<std::istream> getResourceContentStream() const override final;
+
+  Resource::Ptr locateResource(const std::string& url) const override final;
+
+  bool operator==(const SimpleLocatedResource& rhs) const;
+  bool operator!=(const SimpleLocatedResource& rhs) const;
+
+private:
+  std::string url_;
+  std::string filename_;
+  ResourceLocator::ConstPtr parent_;
+
+  template <class Archive>
+  friend void ::tesseract::common::serialize(Archive& ar, SimpleLocatedResource& obj);
+};
+
+class BytesResource : public tesseract::common::Resource
+{
+public:
+  /** @brief This is for serialization do not use directly */
+  BytesResource() = default;
+
+  BytesResource(std::string url, std::vector<uint8_t> bytes, ResourceLocator::ConstPtr parent = nullptr);
+  BytesResource(std::string url, const uint8_t* bytes, size_t bytes_len, ResourceLocator::ConstPtr parent = nullptr);
+  ~BytesResource() override = default;
+  BytesResource(const BytesResource&) = default;
+  BytesResource& operator=(const BytesResource&) = default;
+  BytesResource(BytesResource&&) = default;
+  BytesResource& operator=(BytesResource&&) = default;
+
+  bool isFile() const override final;
+  std::string getUrl() const override final;
+  std::string getFilePath() const override final;
+  std::vector<uint8_t> getResourceContents() const override final;
+  std::shared_ptr<std::istream> getResourceContentStream() const override final;
+  Resource::Ptr locateResource(const std::string& url) const override final;
+
+  bool operator==(const BytesResource& rhs) const;
+  bool operator!=(const BytesResource& rhs) const;
+
+private:
+  std::string url_;
+  std::vector<uint8_t> bytes_;
+  ResourceLocator::ConstPtr parent_;
+
+  template <class Archive>
+  friend void ::tesseract::common::serialize(Archive& ar, BytesResource& obj);
+};
+
+}  // namespace tesseract::common
+
+#endif  // TESSERACT_COMMON_RESOURCE_LOCATOR_H

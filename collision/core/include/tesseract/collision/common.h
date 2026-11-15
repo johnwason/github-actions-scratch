@@ -1,0 +1,121 @@
+/**
+ * @file common.h
+ * @brief This is a collection of common methods
+ *
+ * @author Levi Armstrong
+ * @date Dec 18, 2017
+ *
+ * @copyright Copyright (c) 2017, Southwest Research Institute
+ *
+ * @par License
+ * Software License Agreement (Apache License)
+ * @par
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * @par
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+#ifndef TESSERACT_COLLISION_COMMON_H
+#define TESSERACT_COLLISION_COMMON_H
+
+#include <tesseract/common/macros.h>
+TESSERACT_COMMON_IGNORE_WARNINGS_PUSH
+#include <unordered_set>
+#include <vector>
+#include <Eigen/Geometry>
+TESSERACT_COMMON_IGNORE_WARNINGS_POP
+
+#include <tesseract/collision/types.h>
+#include <tesseract/common/contact_allowed_validator.h>
+#include <tesseract/common/types.h>
+
+namespace tesseract::collision
+{
+/**
+ * @brief Get a vector of possible collision object pairs
+ * @todo Should this also filter out links without geometry?
+ * @param active_links The active link names
+ * @param static_links The static link names
+ * @param validator The is contact allowed validator
+ * @return A vector of collision object pairs
+ */
+std::vector<tesseract::common::LinkIdPair>
+getCollisionObjectPairs(const std::vector<tesseract::common::LinkId>& active_links,
+                        const std::vector<tesseract::common::LinkId>& static_links,
+                        const std::shared_ptr<const tesseract::common::ContactAllowedValidator>& validator = nullptr);
+
+/**
+ * @brief This will check if a link is active provided a set. If the set is empty the link is considered active.
+ * @param active Set of active LinkIds
+ * @param id The LinkId to check if it is active.
+ */
+bool isLinkActive(const std::unordered_set<tesseract::common::LinkId>& active, const tesseract::common::LinkId& id);
+
+/**
+ * @brief Determine if contact is allowed between two objects.
+ * @param pair The LinkId pair
+ * @param validator The contact allowed validator
+ * @param verbose If true print debug information
+ * @return True if contact is allowed between the two object, otherwise false.
+ */
+bool isContactAllowed(const tesseract::common::LinkIdPair& pair,
+                      const std::shared_ptr<const tesseract::common::ContactAllowedValidator>& validator,
+                      bool verbose = false);
+
+/**
+ * @brief Determine if contact is allowed between two objects (two-id overload; resolves the pair only when a
+ * validator decision requires it, and logs in caller argument order).
+ * @param id1 The id of the first object
+ * @param id2 The id of the second object
+ * @param validator The contact allowed validator
+ * @param verbose If true print debug information
+ * @return True if contact is allowed between the two object, otherwise false.
+ */
+bool isContactAllowed(const tesseract::common::LinkId& id1,
+                      const tesseract::common::LinkId& id2,
+                      const std::shared_ptr<const tesseract::common::ContactAllowedValidator>& validator,
+                      bool verbose = false);
+
+/**
+ * @brief processResult Processes the ContactResult based on the information in the ContactTestData
+ * @param cdata Information used to process the results
+ * @param contact Contacts from the collision checkers that will be processed
+ * @param key Link pair used as a key to look up pair specific settings
+ * @param margin The collision margin already resolved for @p key
+ * @param found Specifies whether or not a collision has already been found
+ * @return Pointer to the ContactResult.
+ */
+ContactResult* processResult(ContactTestData& cdata,
+                             ContactResult& contact,
+                             const tesseract::common::LinkIdPair& key,
+                             double margin,
+                             bool found);
+
+/**
+ * @brief Apply scaling to the geometry coordinates.
+ * @details Given a scaling factor s, and center c, a given vertice v is transformed according to s (v - c) + c.
+ * @param vertices The vertices to scale
+ * @param center The point at which to scale the data about
+ * @param scale The scale factor to apply to the vertices.
+ */
+void scaleVertices(tesseract::common::VectorVector3d& vertices,
+                   const Eigen::Vector3d& center,
+                   const Eigen::Vector3d& scale);
+
+/**
+ * @brief Apply scaling to the geometry coordinates.
+ * @details Given a scaling factor s, and center c, a given vertice v is transformed according to s (v - c) + c.
+ * @param vertices The vertices to scale
+ * @param scale The scale factor to apply to the vertices.
+ */
+void scaleVertices(tesseract::common::VectorVector3d& vertices, const Eigen::Vector3d& scale);
+
+}  // namespace tesseract::collision
+
+#endif  // TESSERACT_COLLISION_COMMON_H

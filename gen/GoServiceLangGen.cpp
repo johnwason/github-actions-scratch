@@ -572,6 +572,26 @@ void GenerateStructure(GenContext& ctx, const RR_SHARED_PTR<ServiceEntryDefiniti
     w << "\treturn nil\n}\n\n";
 }
 
+// In pods, fixed multidimensional arrays (double[3,3]) are transmitted as
+// flat fixed length arrays (as in the C++/C# bindings).
+RR_SHARED_PTR<PropertyDefinition> pod_field(const RR_SHARED_PTR<PropertyDefinition>& p)
+{
+    if (p->Type->ArrayType != DataTypes_ArrayTypes_multidimarray)
+        return p;
+    RR_SHARED_PTR<PropertyDefinition> p2 = RR_MAKE_SHARED<PropertyDefinition>(p->ServiceEntry.lock());
+    p2->Name = p->Name;
+    p2->DocString = p->DocString;
+    p2->Type = RR_MAKE_SHARED<TypeDefinition>();
+    p->Type->CopyTo(*p2->Type);
+    p2->Type->ResolveNamedType_cache = p->Type->ResolveNamedType_cache;
+    p2->Type->ArrayType = DataTypes_ArrayTypes_array;
+    p2->Type->ArrayVarLength = false;
+    int32_t n = array_count(*p->Type);
+    p2->Type->ArrayLength.clear();
+    p2->Type->ArrayLength.push_back(n);
+    return p2;
+}
+
 // pack/unpack statements for a pod or namedarray field
 void GeneratePodFieldPack(GenContext& ctx, const RR_SHARED_PTR<PropertyDefinition>& p, const std::string& field,
                           std::ostream& w)
@@ -607,6 +627,7 @@ void GeneratePod(GenContext& ctx, const RR_SHARED_PTR<ServiceEntryDefinition>& e
         RR_SHARED_PTR<PropertyDefinition> p = RR_DYNAMIC_POINTER_CAST<PropertyDefinition>(m);
         if (!p)
             continue;
+        p = pod_field(p);
         w << doc_comment(p->DocString, "\t");
         w << "\t" << fields[p->Name] << " " << go_type(ctx, *p->Type, CtxPodField) << "\n";
     }
@@ -619,7 +640,7 @@ void GeneratePod(GenContext& ctx, const RR_SHARED_PTR<ServiceEntryDefinition>& e
     {
         RR_SHARED_PTR<PropertyDefinition> p = RR_DYNAMIC_POINTER_CAST<PropertyDefinition>(m);
         if (p)
-            GeneratePodFieldPack(ctx, p, fields[p->Name], w);
+            GeneratePodFieldPack(ctx, pod_field(p), fields[p->Name], w);
     }
     w << "\treturn b.Result()\n}\n\n";
     w << "// RRUnpackPod unpacks the pod fields.\n";
@@ -628,7 +649,7 @@ void GeneratePod(GenContext& ctx, const RR_SHARED_PTR<ServiceEntryDefinition>& e
     {
         RR_SHARED_PTR<PropertyDefinition> p = RR_DYNAMIC_POINTER_CAST<PropertyDefinition>(m);
         if (p)
-            GeneratePodFieldUnpack(ctx, p, fields[p->Name], w);
+            GeneratePodFieldUnpack(ctx, pod_field(p), fields[p->Name], w);
     }
     w << "\treturn nil\n}\n\n";
 }

@@ -79,3 +79,21 @@ func (c *ServerContext) CandidateConnectionURLs() ([]string, error) {
 		return o
 	})
 }
+
+// RequestObjectLock locks the object at servicepath for username (server side lock).
+func (c *ServerContext) RequestObjectLock(servicepath, username string) error {
+	n, err := c.nativeCtx()
+	if err != nil {
+		return err
+	}
+	return callVoid(func() { n.RequestObjectLock(servicepath, username) })
+}
+
+// ReleaseObjectLock releases an object lock.
+func (c *ServerContext) ReleaseObjectLock(servicepath, username string, override bool) error {
+	n, err := c.nativeCtx()
+	if err != nil {
+		return err
+	}
+	return callVoid(func() { n.ReleaseObjectLock(servicepath, username, override) })
+}

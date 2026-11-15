@@ -93,7 +93,12 @@ func errorFromInfo(h swig.HandlerErrorInfo) error {
 	if e.Name == "" {
 		e.Name = builtinErrorNames[code]
 	}
-	// TODO(phase 2): unpack h.GetParam_() into e.Param once varvalue packing exists.
+	if p := h.GetParam_(); p != nil && p.Swigcptr() != 0 {
+		if pe, err := fromNative(p); err == nil {
+			e.Param, _ = UnpackVarValue(pe)
+		}
+		swig.DeleteMessageElement(p)
+	}
 	return downcastError(e)
 }
 
@@ -137,6 +142,14 @@ func newErrorInfo(err error) swig.HandlerErrorInfo {
 	h.SetErrorname(name)
 	h.SetErrormessage(e.Message)
 	h.SetErrorsubname(e.SubName)
+	if e.Param != nil {
+		if pe, err := PackVarValue("errorparam", e.Param); err == nil {
+			if m, err := toNative(pe); err == nil {
+				h.SetParam_(m)
+				swig.DeleteMessageElement(m)
+			}
+		}
+	}
 	return h
 }
 

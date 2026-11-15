@@ -1,0 +1,110 @@
+From df2a59cae556a17412ef8a4b614a9b352a2be934 Mon Sep 17 00:00:00 2001
+From: John Wason <wason@wasontech.com>
+Date: Sun, 15 Nov 2026 10:46:12 -0500
+Subject: [PATCH 3/4] SWIG: let asynchronous service requests register
+ generators from any thread
+
+WrappedServiceSkelAsyncAdapter captures the client ServerEndpoint when it is
+created on the request thread, and WrappedServiceSkel::RegisterGeneratorServer
+gets an overload taking the adapter. A binding that completes a generator
+function request from another thread (the Go bindings run every service
+member on its own goroutine) can then register the returned generator for
+the right client; the existing overload reads the thread-local current
+endpoint. Binding code only; the C++ library ABI is unchanged.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ SWIG/RobotRaconteurWrapped.cpp | 27 ++++++++++++++++++++++++++-
+ SWIG/RobotRaconteurWrapped.h   |  8 ++++++++
+ SWIG/Service.i                 |  1 +
+ 3 files changed, 35 insertions(+), 1 deletion(-)
+
+diff --git a/SWIG/RobotRaconteurWrapped.cpp b/SWIG/RobotRaconteurWrapped.cpp
+index bdb286ba..9f8f0575 100644
+--- a/SWIG/RobotRaconteurWrapped.cpp
++++ b/SWIG/RobotRaconteurWrapped.cpp
+@@ -3353,6 +3353,20 @@ int32_t WrappedServiceSkel::RegisterGeneratorServer(const std::string& function_
+     }
+ }
+ 
++int32_t WrappedServiceSkel::RegisterGeneratorServer(
++    const std::string& function_name, WrappedGeneratorServerDirector* gen,
++    const boost::shared_ptr<WrappedServiceSkelAsyncAdapter>& async_adapter)
++{
++    if (!async_adapter || !async_adapter->GetEndpoint())
++        return RegisterGeneratorServer(function_name, gen);
++    boost::mutex::scoped_lock lock(generators_lock);
++    int32_t rr_index = get_new_generator_index();
++    generators.insert(std::make_pair(
++        rr_index, RR_MAKE_SHARED<WrappedGeneratorServer>(function_name, rr_index, shared_from_this(),
++                                                         async_adapter->GetEndpoint(), gen)));
++    return rr_index;
++}
++
+ bool WrappedServiceSkel::IsRequestNoLock(const RR_INTRUSIVE_PTR<RobotRaconteur::MessageEntry>& m)
+ {
+     std::map<std::string, std::set<MessageEntryType> >::iterator e = nolocks.find(m->MemberName.str().to_string());
+@@ -3374,7 +3388,18 @@ bool WrappedServiceSkel::IsRequestNoLock(const RR_INTRUSIVE_PTR<RobotRaconteur::
+ 
+ // Pod array memory skels
+ 
+-WrappedServiceSkelAsyncAdapter::WrappedServiceSkelAsyncAdapter() { is_async = false; }
++WrappedServiceSkelAsyncAdapter::WrappedServiceSkelAsyncAdapter()
++{
++    is_async = false;
++    try
++    {
++        endpoint = RobotRaconteur::ServerEndpoint::GetCurrentEndpoint();
++    }
++    catch (std::exception&)
++    {}
++}
++
++RR_SHARED_PTR<ServerEndpoint> WrappedServiceSkelAsyncAdapter::GetEndpoint() { return endpoint; }
+ 
+ void WrappedServiceSkelAsyncAdapter::SetHandler(
+     boost::function<void(const RR_INTRUSIVE_PTR<MessageElement>&, const RR_SHARED_PTR<RobotRaconteurException>&)>
+diff --git a/SWIG/RobotRaconteurWrapped.h b/SWIG/RobotRaconteurWrapped.h
+index 6567eac2..24278749 100644
+--- a/SWIG/RobotRaconteurWrapped.h
++++ b/SWIG/RobotRaconteurWrapped.h
+@@ -1394,6 +1394,10 @@ class WrappedServiceSkel : public virtual ServiceSkel
+     std::map<std::string, boost::shared_ptr<MemoryDefinition> > memorytypes;
+ 
+     int32_t RegisterGeneratorServer(const std::string& function_name, WrappedGeneratorServerDirector* gen);
++    // Registers a generator for the client of an asynchronous request
++    // (callable from any thread, unlike the overload above).
++    int32_t RegisterGeneratorServer(const std::string& function_name, WrappedGeneratorServerDirector* gen,
++                                    const boost::shared_ptr<WrappedServiceSkelAsyncAdapter>& async_adapter);
+ 
+     std::map<std::string, std::set<MessageEntryType> > nolocks;
+     RR_OVIRTUAL bool IsRequestNoLock(const RR_INTRUSIVE_PTR<RobotRaconteur::MessageEntry>& m) RR_OVERRIDE;
+@@ -1405,9 +1409,13 @@ class WrappedServiceSkelAsyncAdapter
+     boost::function<void(const RR_INTRUSIVE_PTR<MessageElement>&, const RR_SHARED_PTR<RobotRaconteurException>&)>
+         handler;
+     bool is_async;
++    // Client endpoint of the request, captured on the request thread so a
++    // request completed on another thread can still register generators.
++    RR_SHARED_PTR<ServerEndpoint> endpoint;
+ 
+   public:
+     WrappedServiceSkelAsyncAdapter();
++    RR_SHARED_PTR<ServerEndpoint> GetEndpoint();
+     void SetHandler(
+         boost::function<void(const RR_INTRUSIVE_PTR<MessageElement>&, const RR_SHARED_PTR<RobotRaconteurException>&)>
+             handler);
+diff --git a/SWIG/Service.i b/SWIG/Service.i
+index c474fb23..f0f1ea74 100644
+--- a/SWIG/Service.i
++++ b/SWIG/Service.i
+@@ -89,6 +89,7 @@ RR_KEEP_GIL()
+ 
+ 	boost::shared_ptr<RobotRaconteur::RobotRaconteurNode> RRGetNode();
+ 	virtual int32_t RegisterGeneratorServer(const std::string& function_name, WrappedGeneratorServerDirector* gen);
++	int32_t RegisterGeneratorServer(const std::string& function_name, WrappedGeneratorServerDirector* gen, const boost::shared_ptr<WrappedServiceSkelAsyncAdapter>& async_adapter);
+ 
+ 	virtual std::string GetServicePath();
+ 	virtual boost::shared_ptr<RobotRaconteur::ServerContext> GetContext();
+-- 
+2.43.0
+

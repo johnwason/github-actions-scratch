@@ -1,0 +1,35 @@
+# syntax=docker/dockerfile:1
+# Dev/build image for Robot Raconteur Go bindings (Linux x86_64).
+# Package downloads are cached with BuildKit/buildah cache mounts so rebuilds
+# do not re-download apt packages or the Go toolchain.
+FROM docker.io/library/ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN rm -f /etc/apt/apt.conf.d/docker-clean \
+ && echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
+
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update \
+ && apt-get install -y --no-install-recommends \
+      cmake ninja-build g++ ccache swig curl ca-certificates \
+      libboost-all-dev libssl-dev libdbus-1-dev libbluetooth-dev libusb-1.0-0-dev \
+      libgtest-dev git make python3 binutils file pkg-config gdb
+
+ARG GO_VERSION=1.27.4
+ARG GO_SHA256=7226736c2339719cda28fbf3a54d71aa63bcefe376e98cef00034268dab24840
+RUN --mount=type=cache,target=/var/cache/go-dl \
+    f=/var/cache/go-dl/go${GO_VERSION}.linux-amd64.tar.gz \
+ && if [ ! -f "$f" ]; then curl -fsSL -o "$f" https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz; fi \
+ && echo "${GO_SHA256}  $f" | sha256sum -c - \
+ && tar -C /usr/local -xzf "$f"
+
+ENV PATH=/usr/local/go/bin:/root/go/bin:$PATH \
+    GOPATH=/go \
+    GOCACHE=/cache/go-build \
+    GOMODCACHE=/cache/go-mod \
+    CCACHE_DIR=/cache/ccache \
+    GOFLAGS=-buildvcs=false
+
+WORKDIR /work/robotraconteur_go

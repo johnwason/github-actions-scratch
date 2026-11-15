@@ -1,0 +1,197 @@
+#!/usr/bin/env python3
+"""Post-process SWIG Go output for smart pointer support.
+
+SWIG Go has no shared_ptr support. go_shared_ptr.i makes every
+boost::shared_ptr<T> / boost::intrusive_ptr<T> cross the boundary as a handle
+holding a heap allocated shared_ptr<T>*, and SWIG emits a placeholder
+interface type for each (e.g. Boost_shared_ptr_Sl_RobotRaconteur_RRObject_Sg_).
+This script replaces each placeholder with type aliases to the real proxy
+types so smart pointers are usable as their class interfaces in Go.
+
+Class C++ names -> Go names come from SWIG's -xmlout of the same run.
+
+Upcasts: SWIG Go upcasts by reinterpreting the handle (SwigGetBase) and lets a
+derived proxy satisfy the base interface (SwigIsBase marker). For smart
+pointer handles that is only valid when the base subobject is at offset 0,
+which is not true for virtual bases (e.g. MessageElement : virtual RRValue).
+For every smart pointer class D with smart pointer ancestor A this script
+  * removes the SwigIsA marker from D, so D no longer implicitly satisfies A
+  * rewrites D.SwigGetA() to call a generated C++ function doing a real
+    shared_ptr<D> -> shared_ptr<A> conversion. The result is a NEW handle owned
+    by the caller (DeleteA must be called on it).
+The C++ functions are written to <upcasts.cxx> (compiled into the native
+library) and their cgo declarations to <upcasts.go>.
+
+usage: postprocess_go.py <module.go> <module.xml> <upcasts.go> <upcasts.cxx>
+"""
+import re
+import sys
+import xml.etree.ElementTree as ET
+
+
+def swig_mangle(cpp_name: str) -> str:
+    # Matches SWIG Go exportedName() of a SwigType for template/namespace names.
+    s = cpp_name.replace(" ", "")
+    s = s.replace("::", "_").replace("<", "_Sl_").replace(">", "_Sg_")
+    s = s.replace(",", "_Sc_").replace("*", "_Sp_").replace("&", "_Sr_")
+    s = s.replace("(", "_Sp_").replace(")", "_SP_")
+    return s
+
+
+def parse_classes(xml_path):
+    """Return {C++ qualified name: (Go name, [base names as written])}."""
+    tree = ET.parse(xml_path)
+    classes = {}
+    for cls in tree.iter("class"):
+        al = cls.find("attributelist")
+        if al is None:
+            continue
+        attrs = {a.get("name"): a.get("value") for a in al.findall("attribute")}
+        name = attrs.get("name")
+        sym = attrs.get("sym_name")
+        if not (name and sym):
+            continue
+        bases = [b.get("name") for bl in al.iter("baselist") for b in bl.iter("base")]
+        classes[name] = (sym, bases, "feature_smartptr" in attrs)
+    return classes
+
+
+def class_names(xml_path):
+    """Map C++ qualified class name -> Go proxy name."""
+    return {k: v[0] for k, v in parse_classes(xml_path).items()}
+
+
+def smart_classes(classes):
+    """C++ names of classes declared with %shared_ptr / %rr_intrusive_ptr."""
+    return {k for k, v in classes.items() if v[2]}
+
+
+def resolve_base(base, derived, classes):
+    if base in classes:
+        return base
+    ns = derived.split("::")[:-1]
+    while ns:
+        cand = "::".join(ns + [base])
+        if cand in classes:
+            return cand
+        ns.pop()
+    return None
+
+
+def ancestors(name, classes, seen=None):
+    out = []
+    for b in classes[name][1]:
+        rb = resolve_base(b, name, classes)
+        if rb is None or rb in out:
+            continue
+        out.append(rb)
+        for a in ancestors(rb, classes):
+            if a not in out:
+                out.append(a)
+    return out
+
+
+def fix_upcasts(src, classes, smart_cpp, upcasts_go, upcasts_cxx):
+    go_decls = []
+    cxx_defs = []
+    n = 0
+    for d in sorted(smart_cpp):
+        dgo = classes[d][0]
+        for a in ancestors(d, classes):
+            if a not in smart_cpp:
+                continue
+            ago = classes[a][0]
+            fn = f"rrgo_upcast_{dgo}_{ago}"
+            # remove SwigIsA marker from the interface and method set
+            src, c1 = re.subn(rf"(\ntype {dgo} interface \{{\n(?:\t[^\n]*\n)*?)\tSwigIs{ago}\(\)\n", r"\1", src)
+            if c1 != 1:
+                raise SystemExit(f"postprocess_go: SwigIs{ago} not found in interface {dgo}")
+            src, c2 = re.subn(rf"func \(p Swigcptr{dgo}\) SwigIs{ago}\(\) \{{\n\}}\n", "", src)
+            # rewrite SwigGetA
+            pat = rf"func \(p Swigcptr{dgo}\) SwigGet{ago}\(\) {ago} \{{\n\treturn Swigcptr{ago}\(getSwigcptr\(p\)\)\n\}}\n"
+            src, c3 = re.subn(pat, "", src)
+            if c3 != 1:
+                raise SystemExit(f"postprocess_go: SwigGet{ago} not found on {dgo}")
+            go_decls.append((dgo, ago, fn))
+            cxx_defs.append(
+                f'extern "C" uintptr_t {fn}(uintptr_t p)\n{{\n'
+                f'    boost::shared_ptr< {d} >* s = reinterpret_cast<boost::shared_ptr< {d} >*>(p);\n'
+                f'    if (!s || !*s) return 0;\n'
+                f'    return reinterpret_cast<uintptr_t>(new boost::shared_ptr< {a} >(*s));\n}}\n')
+            n += 1
+    with open(upcasts_cxx, "w") as f:
+        f.write("// Code generated by postprocess_go.py; DO NOT EDIT.\n")
+        f.write("#include <RobotRaconteur.h>\n#include \"RobotRaconteurWrapped.h\"\n#include <stdint.h>\n")
+        f.write("using namespace RobotRaconteur;\n\n")
+        f.write("\n".join(cxx_defs))
+    with open(upcasts_go, "w") as f:
+        f.write("// Code generated by postprocess_go.py; DO NOT EDIT.\n\n")
+        f.write("package robotraconteurswig\n\n/*\n#include <stdint.h>\n")
+        for _, _, fn in go_decls:
+            f.write(f"extern uintptr_t {fn}(uintptr_t p);\n")
+        f.write("*/\nimport \"C\"\n\n")
+        for dgo, ago, fn in go_decls:
+            f.write(f"// SwigGet{ago} returns a new {ago} handle (owned by the caller; call Delete{ago}).\n")
+            f.write(f"func (p Swigcptr{dgo}) SwigGet{ago}() {ago} {{\n")
+            f.write(f"\treturn Swigcptr{ago}(C.{fn}(C.uintptr_t(p)))\n}}\n\n")
+    return src, n
+
+
+PLACEHOLDER = re.compile(
+    r"type (Swigcptr(Boost_(?:shared|intrusive)_ptr_Sl_(\w+?)_Sg_)) uintptr\n"
+    r"type (\2) interface \{\n\tSwigcptr\(\) uintptr;\n\}\n"
+    r"func \(p \1\) Swigcptr\(\) uintptr \{\n\treturn uintptr\(p\)\n\}\n")
+
+
+def add_director_interfaces(src):
+    """Add exported <Class>Methods interfaces listing all methods of each
+    director class, so Go implementations can be checked at compile time
+    (SWIG only checks director methods dynamically)."""
+    classes = re.findall(r"^func NewDirector(\w+)\(v interface\{\}\)", src, flags=re.M)
+    out = ["\n// Director method sets (generated by postprocess_go.py).\n"]
+    for cls in sorted(set(classes), key=len, reverse=True):
+        sigs = []
+        for m in re.finditer(r"^type _swig_DirectorInterface" + re.escape(cls) + r"(\w+) interface \{\n\t([^\n]*)\n\}",
+                             src, flags=re.M):
+            method, sig = m.group(1), m.group(2)
+            if not sig.startswith(method + "("):
+                continue  # belongs to a class with a longer name
+            sigs.append(sig)
+        if sigs:
+            out.append(f"type {cls}Methods interface {{\n" + "".join(f"\t{x}\n" for x in sigs) + "}\n\n")
+    return src + "".join(out)
+
+
+def main():
+    go_path, xml_path, upcasts_go, upcasts_cxx = sys.argv[1:5]
+    src = open(go_path).read()
+    classes = parse_classes(xml_path)
+    mangled = {}
+    smart_cpp = smart_classes(classes)
+    for cpp, sym in class_names(xml_path).items():
+        mangled.setdefault(swig_mangle(cpp), sym)
+        # SWIG sometimes uses the unqualified name
+        mangled.setdefault(swig_mangle(cpp.split("::")[-1]), sym)
+    missing = []
+
+    def repl(m):
+        inner = m.group(3)
+        go = mangled.get(inner)
+        if go is None:
+            missing.append(m.group(2))
+            return m.group(0)
+        return (f"type {m.group(1)} = Swigcptr{go}\n"
+                f"type {m.group(2)} = {go}\n")
+
+    src, n = PLACEHOLDER.subn(repl, src)
+    if missing:
+        sys.stderr.write("postprocess_go: no class for smart pointer types:\n  " + "\n  ".join(missing) + "\n")
+        sys.exit(1)
+    src, nup = fix_upcasts(src, classes, smart_cpp, upcasts_go, upcasts_cxx)
+    src = add_director_interfaces(src)
+    open(go_path, "w").write(src)
+    print(f"postprocess_go: aliased {n} smart pointer types, rewrote {nup} upcasts")
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,46 @@
+From 676748aa7687447ed789b55534c5793f5aafe1f4 Mon Sep 17 00:00:00 2001
+From: John Wason <wason@wasontech.com>
+Date: Sun, 15 Nov 2026 09:44:03 -0500
+Subject: [PATCH 2/4] SWIG: AuthenticatedUser constructor; FileLogRecordHandler
+ derives from LogRecordHandler
+
+The constructor lets wrapped languages implement user authenticators that
+create users (previously only native authenticators could). Declaring the
+FileLogRecordHandler base lets it be passed to SetLogRecordHandler.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ SWIG/Logging.i | 2 +-
+ SWIG/Service.i | 3 +++
+ 2 files changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/SWIG/Logging.i b/SWIG/Logging.i
+index 6e81fa28..3e3f1dd0 100644
+--- a/SWIG/Logging.i
++++ b/SWIG/Logging.i
+@@ -69,7 +69,7 @@ namespace RobotRaconteur
+         //virtual ~LogRecordHandler() {}
+     };
+ 
+-    class FileLogRecordHandler
++    class FileLogRecordHandler : public LogRecordHandler
+     {
+     public:
+         void OpenFile(const std::string& filename, bool append = true);
+diff --git a/SWIG/Service.i b/SWIG/Service.i
+index 3d2ea05a..c474fb23 100644
+--- a/SWIG/Service.i
++++ b/SWIG/Service.i
+@@ -199,6 +199,9 @@ class AuthenticatedUser
+ {
+ public:
+ 
++    AuthenticatedUser(const std::string& username, const std::vector<std::string>& privileges,
++                      const std::vector<std::string>& properties, const boost::shared_ptr<RobotRaconteur::ServerContext>& context);
++
+     RR_MAKE_METHOD_PRIVATE(GetUsername)
+     const std::string GetUsername();
+ 
+-- 
+2.43.0
+

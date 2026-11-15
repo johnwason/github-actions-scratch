@@ -1,0 +1,81 @@
+From 2614bd6230d37c114cf8ebf4bcf8005e94768b74 Mon Sep 17 00:00:00 2001
+From: John Wason <wason@wasontech.com>
+Date: Sun, 15 Nov 2026 15:58:33 -0500
+Subject: [PATCH 6/9] LocalTransport (Windows): build with MinGW-w64
+
+- HandleToIStream/HandleToOStream/HandleToStream construct std::fstream from
+  a FILE*, which only MSVC's standard library supports. Nothing calls them, so
+  compile them only with MSVC.
+- The ConvertStringSecurityDescriptorToSecurityDescriptor declarations were a
+  workaround for old MinGW headers. Current MinGW-w64 sddl.h declares them
+  (with dllimport), and the redeclaration conflicts. Keep the workaround only
+  when sddl.h does not define SDDL_REVISION_1.
+- Lowercase sddl.h/fcntl.h includes.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ RobotRaconteurCore/src/LocalTransport_win.cpp       |  4 ++++
+ RobotRaconteurCore/src/LocalTransport_win_private.h | 11 +++++++----
+ 2 files changed, 11 insertions(+), 4 deletions(-)
+
+diff --git a/RobotRaconteurCore/src/LocalTransport_win.cpp b/RobotRaconteurCore/src/LocalTransport_win.cpp
+index 3a51a0e9..bfb7c3c6 100644
+--- a/RobotRaconteurCore/src/LocalTransport_win.cpp
++++ b/RobotRaconteurCore/src/LocalTransport_win.cpp
+@@ -268,6 +268,8 @@ boost::optional<std::wstring> GetSIDStringForName(std::wstring name)
+     return sid;
+ }
+ 
++#ifdef _MSC_VER
++// std::fstream(FILE*) is an MSVC extension
+ template <typename T>
+ void CloseAndDeleteStream(T* t)
+ {
+@@ -343,6 +345,8 @@ RR_SHARED_PTR<std::fstream> HandleToStream(HANDLE h)
+     return RR_SHARED_PTR<std::fstream>(f, &CloseAndDeleteStream<std::fstream>);
+ }
+ 
++#endif
++
+ // cspell:disable
+ bool SetWindowsSocketPermissions(const std::string& socket_fname, bool public_)
+ {
+diff --git a/RobotRaconteurCore/src/LocalTransport_win_private.h b/RobotRaconteurCore/src/LocalTransport_win_private.h
+index 2d048b91..8f47a2d4 100644
+--- a/RobotRaconteurCore/src/LocalTransport_win_private.h
++++ b/RobotRaconteurCore/src/LocalTransport_win_private.h
+@@ -19,14 +19,14 @@
+ #include <boost/filesystem.hpp>
+ 
+ #include <boost/system/windows_error.hpp>
+-#include <Sddl.h>
++#include <sddl.h>
+ #include <io.h>
+-#include <FCNTL.h>
++#include <fcntl.h>
+ 
+ #pragma once
+ 
+-// Workaround for missing definition in MinGW.
+-#ifdef __MINGW32__
++// Workaround for missing definition in old MinGW (current MinGW-w64 sddl.h declares these).
++#if defined(__MINGW32__) && !defined(SDDL_REVISION_1)
+ 
+ BOOL WINAPI ConvertStringSecurityDescriptorToSecurityDescriptorA(_In_ LPCSTR StringSecurityDescriptor,
+                                                                  _In_ DWORD StringSDRevision,
+@@ -61,9 +61,12 @@ bool IsPipeSameUserOrService(HANDLE pipe, bool allow_service);
+ BOOL GetNamedPipeServerProcessId(HANDLE pipe, PULONG pid, PBOOL available);
+ bool IsPipeUser(HANDLE pipe, const std::string& username);
+ 
++#ifdef _MSC_VER
++// std::fstream(FILE*) is an MSVC extension; these helpers are unused elsewhere.
+ RR_SHARED_PTR<std::ifstream> HandleToIStream(HANDLE h);
+ RR_SHARED_PTR<std::ofstream> HandleToOStream(HANDLE h);
+ RR_SHARED_PTR<std::fstream> HandleToStream(HANDLE h);
++#endif
+ 
+ bool SetWindowsSocketPermissions(const std::string& socket_fname, bool public_);
+ } // namespace LocalTransportUtil
+-- 
+2.43.0
+

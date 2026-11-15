@@ -1,0 +1,373 @@
+package robotraconteur
+
+import (
+	"context"
+	"fmt"
+	"math"
+	"sync"
+	"time"
+
+	swig "github.com/robotraconteur/robotraconteur_go/robotraconteur/internal/swig"
+)
+
+// Node is a Robot Raconteur node. Most programs use the process default node
+// (DefaultNode), normally initialized with ClientNodeSetup or ServerNodeSetup.
+type Node struct {
+	native swig.RobotRaconteurNode
+
+	mu         sync.Mutex
+	registered map[string]ServiceFactory
+	services   map[string]*ServerContext
+}
+
+func (n *Node) registeredService(name string) *ServerContext {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	return n.services[name]
+}
+
+var defaultNode struct {
+	once sync.Once
+	node *Node
+}
+
+// DefaultNode returns the process default node (RobotRaconteurNode::s()).
+func DefaultNode() *Node {
+	defaultNode.once.Do(func() {
+		n, err := call(func() swig.RobotRaconteurNode { return swig.RobotRaconteurNodeX_get_s() })
+		if err != nil || n == nil || n.Swigcptr() == 0 {
+			panic(fmt.Sprintf("robotraconteur: could not get default node: %v", err))
+		}
+		defaultNode.node = &Node{native: n, registered: map[string]ServiceFactory{}}
+	})
+	return defaultNode.node
+}
+
+// RegisterServiceType registers a generated service factory with the node.
+// Registering the same service twice is a no-op.
+func (n *Node) RegisterServiceType(f ServiceFactory) error {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	if _, ok := n.registered[f.ServiceName()]; ok {
+		return nil
+	}
+	err := callVoid(func() {
+		def := swig.NewServiceDefinition()
+		defer swig.DeleteServiceDefinition(def)
+		swig.SwigcptrServiceDefinition(def.Swigcptr()).FromString__SWIG_1(f.DefString())
+		if swig.Rrgo_error_pending() {
+			return
+		}
+		if !n.native.IsServiceTypeRegistered(def.GetName()) {
+			n.native.RegisterServiceType(def)
+		}
+	})
+	if err != nil {
+		return err
+	}
+	n.registered[f.ServiceName()] = f
+	return nil
+}
+
+// RegisterServiceTypes registers factories with the node, importing
+// services in dependency order. With no arguments, all factories added with
+// AddServiceFactory are registered.
+func (n *Node) RegisterServiceTypes(factories ...ServiceFactory) error {
+	if len(factories) == 0 {
+		factories = ServiceFactories()
+	}
+	pending := append([]ServiceFactory(nil), factories...)
+	for len(pending) > 0 {
+		var next []ServiceFactory
+		var lastErr error
+		for _, f := range pending {
+			if err := n.RegisterServiceType(f); err != nil {
+				// probably an import not yet registered; retry after the others
+				next = append(next, f)
+				lastErr = err
+			}
+		}
+		if len(next) == len(pending) {
+			return lastErr
+		}
+		pending = next
+	}
+	return nil
+}
+
+// ServiceType returns the registered factory for a service definition name.
+func (n *Node) ServiceType(name string) (ServiceFactory, error) {
+	n.mu.Lock()
+	f, ok := n.registered[name]
+	n.mu.Unlock()
+	if ok {
+		return f, nil
+	}
+	if f := lookupFactory(name); f != nil {
+		if err := n.RegisterServiceType(f); err != nil {
+			return nil, err
+		}
+		return f, nil
+	}
+	return nil, NewServiceNotFound(fmt.Sprintf("service type %s not registered", name))
+}
+
+// ConnectOption configures ConnectService.
+type ConnectOption func(*connectOptions)
+
+type connectOptions struct {
+	username    string
+	credentials map[string]any
+	objectType  string
+	listener    func(ClientServiceListenerEvent)
+}
+
+// WithCredentials sets the username and credentials used for authentication.
+func WithCredentials(username string, credentials map[string]any) ConnectOption {
+	return func(o *connectOptions) { o.username, o.credentials = username, credentials }
+}
+
+// WithObjectType sets the requested root object type (recommended).
+func WithObjectType(objectType string) ConnectOption {
+	return func(o *connectOptions) { o.objectType = objectType }
+}
+
+func (n *Node) packCredentials(cred map[string]any) (swig.MessageElementData, error) {
+	if cred == nil {
+		return nil, nil
+	}
+	e, err := PackMapString("credentials", cred, PackVarValue)
+	if err != nil {
+		return nil, err
+	}
+	m, err := toNative(e)
+	if err != nil {
+		return nil, err
+	}
+	defer swig.DeleteMessageElement(m)
+	return m.GetData(), nil
+}
+
+// ConnectService connects to a service and returns the root object
+// reference (a generated stub, e.g. experimental_reynard_the_robot.Reynard).
+// Without a ctx deadline the connection attempt times out after twice the
+// request timeout.
+func (n *Node) ConnectService(ctx context.Context, url string, opts ...ConnectOption) (any, error) {
+	return n.connectService(ctx, []string{url}, opts...)
+}
+
+// ConnectServiceURLs connects using a list of candidate URLs for the same service.
+func (n *Node) ConnectServiceURLs(ctx context.Context, urls []string, opts ...ConnectOption) (any, error) {
+	return n.connectService(ctx, urls, opts...)
+}
+
+func (n *Node) connectService(ctx context.Context, urls []string, opts ...ConnectOption) (any, error) {
+	var o connectOptions
+	for _, f := range opts {
+		f(&o)
+	}
+	if err := n.RegisterServiceTypes(); err != nil {
+		return nil, err
+	}
+	return await(ctx, func(done func(any, error)) error {
+		d, id := newAsyncStub(n, done)
+		t := ctxTimeoutMs(ctx, 2*n.RequestTimeout())
+		err := startNative(func() error {
+			cred, err := n.packCredentials(o.credentials)
+			if err != nil {
+				return err
+			}
+			if cred != nil {
+				defer swig.DeleteMessageElementData(cred)
+			}
+			urlv := swig.NewVectorstring()
+			defer swig.DeleteVectorstring(urlv)
+			for _, u := range urls {
+				urlv.Add(u)
+			}
+			var listener swig.ClientServiceListenerDirector
+			if o.listener != nil {
+				listener = newClientServiceListener(n, o.listener)
+			}
+			swig.SwigcptrRobotRaconteurNode(n.native.Swigcptr()).AsyncConnectService__SWIG_1(urlv, o.username, cred, listener, o.objectType, t, d, id)
+			return nil
+		})
+		if err != nil {
+			heapRemove(id)
+		}
+		return err
+	}, func(obj any) { _ = n.DisconnectService(obj) })
+}
+
+// stubFromNative converts a native stub into its Go client object, reusing
+// an existing Go stub if one was already created for it. Takes ownership of ws.
+func (n *Node) stubFromNative(ws swig.WrappedServiceStub) (any, error) {
+	if ws == nil || ws.Swigcptr() == 0 {
+		return nil, NewNullValue("null object reference")
+	}
+	if id := ws.GetObjectHeapID(); id != 0 {
+		if obj, ok := heapGet(int32(id)); ok {
+			swig.DeleteWrappedServiceStub(ws)
+			return obj, nil
+		}
+	}
+	var objType, serviceName string
+	err := callVoid(func() {
+		t := ws.GetRR_objecttype()
+		if t == nil || t.Swigcptr() == 0 {
+			return
+		}
+		defer swig.DeleteServiceEntryDefinition(t)
+		def := t.GetServiceDefinition()
+		defer swig.DeleteServiceDefinition(def)
+		serviceName = def.GetName()
+		objType = serviceName + "." + t.GetName()
+	})
+	if err != nil {
+		swig.DeleteWrappedServiceStub(ws)
+		return nil, err
+	}
+	f, err := n.ServiceType(serviceName)
+	if err != nil {
+		swig.DeleteWrappedServiceStub(ws)
+		return nil, err
+	}
+	base := &StubBase{node: n, inner: ws, objectType: objType}
+	addCleanup(base, ws, swig.DeleteWrappedServiceStub)
+	obj, err := f.CreateStub(objType, base)
+	if err != nil {
+		_ = ws // freed by the cleanup
+		return nil, err
+	}
+	return obj, nil
+}
+
+// StubHolder is implemented by all client object references (generated
+// stubs embed *StubBase).
+type StubHolder interface {
+	RRStubBase() *StubBase
+}
+
+func stubBaseOf(obj any) (*StubBase, error) {
+	h, ok := obj.(StubHolder)
+	if !ok || h.RRStubBase() == nil {
+		return nil, NewInvalidArgument(fmt.Sprintf("%T is not a Robot Raconteur object reference", obj))
+	}
+	return h.RRStubBase(), nil
+}
+
+// DisconnectService disconnects the client connection of obj. It waits for
+// the disconnect to complete.
+func (n *Node) DisconnectService(obj any) error {
+	b, err := stubBaseOf(obj)
+	if err != nil {
+		return err
+	}
+	_, err = await(context.Background(), func(done func(struct{}, error)) error {
+		d, id := newAsyncVoidNoErr(func() { done(struct{}{}, nil) })
+		err := startNative(func() error { n.native.AsyncDisconnectService(b.inner, d, id); return nil })
+		if err != nil {
+			heapRemove(id)
+		}
+		return err
+	}, nil)
+	return err
+}
+
+// RequestTimeout returns the default timeout for requests.
+func (n *Node) RequestTimeout() time.Duration {
+	return time.Duration(n.native.GetRequestTimeout()) * time.Millisecond
+}
+
+// SetRequestTimeout sets the default timeout for requests.
+func (n *Node) SetRequestTimeout(t time.Duration) {
+	n.native.SetRequestTimeout(uint32(t.Milliseconds()))
+}
+
+// TransportInactivityTimeout returns the transport inactivity timeout.
+func (n *Node) TransportInactivityTimeout() time.Duration {
+	return time.Duration(n.native.GetTransportInactivityTimeout()) * time.Millisecond
+}
+
+// SetTransportInactivityTimeout sets the transport inactivity timeout.
+func (n *Node) SetTransportInactivityTimeout(t time.Duration) {
+	n.native.SetTransportInactivityTimeout(uint32(t.Milliseconds()))
+}
+
+// EndpointInactivityTimeout returns the endpoint inactivity timeout.
+func (n *Node) EndpointInactivityTimeout() time.Duration {
+	return time.Duration(n.native.GetEndpointInactivityTimeout()) * time.Millisecond
+}
+
+// SetEndpointInactivityTimeout sets the endpoint inactivity timeout.
+func (n *Node) SetEndpointInactivityTimeout(t time.Duration) {
+	n.native.SetEndpointInactivityTimeout(uint32(t.Milliseconds()))
+}
+
+// MemoryMaxTransferSize returns the maximum memory transfer chunk size in bytes.
+func (n *Node) MemoryMaxTransferSize() uint32 { return n.native.GetMemoryMaxTransferSize() }
+
+// SetMemoryMaxTransferSize sets the maximum memory transfer chunk size in bytes.
+func (n *Node) SetMemoryMaxTransferSize(s uint32) { n.native.SetMemoryMaxTransferSize(s) }
+
+// NodeName returns the node name.
+func (n *Node) NodeName() string { return n.native.NodeName() }
+
+// SetNodeName sets the node name. Must be called before the node is used.
+func (n *Node) SetNodeName(name string) error {
+	return callVoid(func() { n.native.SetNodeName(name) })
+}
+
+// NodeID returns the node id.
+func (n *Node) NodeID() (NodeID, error) {
+	return call(func() NodeID {
+		id := n.native.NodeID()
+		defer swig.DeleteNodeID(id)
+		return nodeIDFromNative(id)
+	})
+}
+
+// ThreadPoolCount returns the size of the node's thread pool.
+func (n *Node) ThreadPoolCount() int { return int(n.native.GetThreadPoolCount()) }
+
+// SetThreadPoolCount sets the size of the node's thread pool.
+func (n *Node) SetThreadPoolCount(c int) error {
+	return callVoid(func() { n.native.SetThreadPoolCount(int32(c)) })
+}
+
+// NowUTC returns the current time from the node's clock.
+func (n *Node) NowUTC() time.Time {
+	return timeFromMicros(n.native.NowUTC())
+}
+
+// Shutdown shuts down the node. Normally done by closing the NodeSetup.
+func (n *Node) Shutdown() error {
+	return callVoid(func() { n.native.Shutdown() })
+}
+
+// ServicePath returns the service path of an object reference.
+func (n *Node) ServicePath(obj any) (string, error) {
+	b, err := stubBaseOf(obj)
+	if err != nil {
+		return "", err
+	}
+	return call(func() string { return n.native.GetObjectServicePath(b.inner) })
+}
+
+// ObjectType returns the fully qualified type of an object reference.
+func (n *Node) ObjectType(obj any) (string, error) {
+	b, err := stubBaseOf(obj)
+	if err != nil {
+		return "", err
+	}
+	return call(func() string { return n.native.GetObjectType(b.inner) })
+}
+
+// timeFromMicros converts microseconds since the Unix epoch. The native
+// not_a_date_time value (math.MinInt64) becomes the zero time.Time.
+func timeFromMicros(us int64) time.Time {
+	if us == math.MinInt64 {
+		return time.Time{}
+	}
+	return time.UnixMicro(us).UTC()
+}

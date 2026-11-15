@@ -1,0 +1,119 @@
+From 560a18ebaef7b0a3a74614f5f49e7ccdfb30460c Mon Sep 17 00:00:00 2001
+From: John Wason <wason@wasontech.com>
+Date: Sun, 15 Nov 2026 15:58:33 -0500
+Subject: [PATCH 7/9] TlsSchannelStreamAdapter: standard C++ for GCC/MinGW-w64
+
+- 'typedef typename X' with a non-dependent, unqualified class name is only
+  accepted by MSVC's permissive mode. Drop 'typename' (same type).
+- TlsSchannelAsyncStreamAdapter_ASIO_adapter::async_read_some and
+  async_write_some called members of TlsSchannelAsyncStreamAdapter while that
+  class was still incomplete. Define the two templates after the class.
+
+No change in behavior with MSVC.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ .../src/TlsSchannelStreamAdapter.h            | 70 +++++++++++--------
+ 1 file changed, 39 insertions(+), 31 deletions(-)
+
+diff --git a/RobotRaconteurCore/src/TlsSchannelStreamAdapter.h b/RobotRaconteurCore/src/TlsSchannelStreamAdapter.h
+index 95e6ca82..4fdda808 100644
+--- a/RobotRaconteurCore/src/TlsSchannelStreamAdapter.h
++++ b/RobotRaconteurCore/src/TlsSchannelStreamAdapter.h
+@@ -129,42 +129,17 @@ class TlsSchannelAsyncStreamAdapter_ASIO_adapter
+     TlsSchannelAsyncStreamAdapter_ASIO_adapter(TlsSchannelAsyncStreamAdapter& next_layer) : next_layer_(next_layer) {}
+ 
+     template <typename MutableBufferSequence, typename Handler>
+-    void async_read_some(const MutableBufferSequence& buffers, BOOST_ASIO_MOVE_ARG(Handler) handler)
+-    {
+-
+-        // TODO: Don't allocate here
+-        boost::shared_ptr<handler_wrapper<Handler> > handler2 = boost::make_shared<handler_wrapper<Handler> >(handler);
+-
+-        // TODO: use more than just first buffer
+-        mutable_buffers b;
+-        b.push_back(
+-            boost::asio::detail::buffer_sequence_adapter<boost::asio::mutable_buffer, MutableBufferSequence>::first(
+-                buffers));
+-        next_layer_.async_read_some(b, boost::bind(&handler_wrapper<Handler>::do_complete, handler2,
+-                                                   RR_BOOST_PLACEHOLDERS(_1), RR_BOOST_PLACEHOLDERS(_2)));
+-        return;
+-    }
++    void async_read_some(const MutableBufferSequence& buffers, BOOST_ASIO_MOVE_ARG(Handler) handler);
+ 
+     template <typename ConstBufferSequence, typename Handler>
+-    void async_write_some(const ConstBufferSequence& buffers, BOOST_ASIO_MOVE_ARG(Handler) handler)
+-    {
+-        // TODO: Don't allocate here
+-        boost::shared_ptr<handler_wrapper<Handler> > handler2 = boost::make_shared<handler_wrapper<Handler> >(handler);
+-        // TODO: use more than just first buffer
+-        const_buffers b;
+-        b.push_back(boost::asio::detail::buffer_sequence_adapter<boost::asio::const_buffer, ConstBufferSequence>::first(
+-            buffers));
+-        next_layer_.async_write_some(b, boost::bind(&handler_wrapper<Handler>::do_complete, handler2,
+-                                                    RR_BOOST_PLACEHOLDERS(_1), RR_BOOST_PLACEHOLDERS(_2)));
+-        return;
+-    }
++    void async_write_some(const ConstBufferSequence& buffers, BOOST_ASIO_MOVE_ARG(Handler) handler);
+ 
+     void close();
+ 
+     TlsSchannelAsyncStreamAdapter& lowest_layer() { return next_layer_; }
+ 
+-    typedef typename TlsSchannelAsyncStreamAdapter lowest_layer_type;
+-    typedef typename TlsSchannelAsyncStreamAdapter next_layer_type;
++    typedef TlsSchannelAsyncStreamAdapter lowest_layer_type;
++    typedef TlsSchannelAsyncStreamAdapter next_layer_type;
+     typedef typename RR_BOOST_ASIO_IO_CONTEXT::executor_type executor_type;
+ };
+ 
+@@ -311,11 +286,44 @@ class TlsSchannelAsyncStreamAdapter : public boost::enable_shared_from_this<TlsS
+ 
+     TlsSchannelAsyncStreamAdapter_ASIO_adapter& get_asio_adapter() { return asio_adapter; }
+ 
+-    typedef typename TlsSchannelAsyncStreamAdapter lowest_layer_type;
+-    typedef typename TlsSchannelAsyncStreamAdapter next_layer_type;
++    typedef TlsSchannelAsyncStreamAdapter lowest_layer_type;
++    typedef TlsSchannelAsyncStreamAdapter next_layer_type;
+     typedef typename RR_BOOST_ASIO_IO_CONTEXT::executor_type executor_type;
+ 
+     executor_type get_executor() { return _io_context.get_executor(); }
+ };
++
++// Defined after TlsSchannelAsyncStreamAdapter is complete
++template <typename MutableBufferSequence, typename Handler>
++inline void TlsSchannelAsyncStreamAdapter_ASIO_adapter::async_read_some(const MutableBufferSequence& buffers,
++                                                                        BOOST_ASIO_MOVE_ARG(Handler) handler)
++{
++    // TODO: Don't allocate here
++    boost::shared_ptr<handler_wrapper<Handler> > handler2 = boost::make_shared<handler_wrapper<Handler> >(handler);
++
++    // TODO: use more than just first buffer
++    mutable_buffers b;
++    b.push_back(
++        boost::asio::detail::buffer_sequence_adapter<boost::asio::mutable_buffer, MutableBufferSequence>::first(
++            buffers));
++    next_layer_.async_read_some(b, boost::bind(&handler_wrapper<Handler>::do_complete, handler2,
++                                               RR_BOOST_PLACEHOLDERS(_1), RR_BOOST_PLACEHOLDERS(_2)));
++    return;
++}
++
++template <typename ConstBufferSequence, typename Handler>
++inline void TlsSchannelAsyncStreamAdapter_ASIO_adapter::async_write_some(const ConstBufferSequence& buffers,
++                                                                         BOOST_ASIO_MOVE_ARG(Handler) handler)
++{
++    // TODO: Don't allocate here
++    boost::shared_ptr<handler_wrapper<Handler> > handler2 = boost::make_shared<handler_wrapper<Handler> >(handler);
++    // TODO: use more than just first buffer
++    const_buffers b;
++    b.push_back(boost::asio::detail::buffer_sequence_adapter<boost::asio::const_buffer, ConstBufferSequence>::first(
++        buffers));
++    next_layer_.async_write_some(b, boost::bind(&handler_wrapper<Handler>::do_complete, handler2,
++                                                RR_BOOST_PLACEHOLDERS(_1), RR_BOOST_PLACEHOLDERS(_2)));
++    return;
++}
+ } // namespace detail
+ } // namespace RobotRaconteur
+-- 
+2.43.0
+

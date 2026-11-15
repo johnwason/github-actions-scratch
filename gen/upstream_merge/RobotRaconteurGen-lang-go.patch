@@ -1,0 +1,86 @@
+--- a/RobotRaconteurGen/cmake/RobotRaconteurGenerateThunk.cmake
++++ b/RobotRaconteurGen/cmake/RobotRaconteurGenerateThunk.cmake
+@@ -69,6 +69,9 @@
+         elseif(RR_GEN_LANG STREQUAL "java")
+             string(REPLACE "." "/" f_service_name3 ${f_service_name})
+             list(APPEND THUNK_SRCS "${RR_GEN_OUTDIR}/${f_service_name3}/${f_service_name2}Factory.java")
++        elseif(RR_GEN_LANG STREQUAL "go")
++            string(TOLOWER "${f_service_name2}" f_service_name4)
++            list(APPEND THUNK_SRCS "${RR_GEN_OUTDIR}/${f_service_name4}/${f_service_name4}.go")
+         else()
+             message(FATAL_ERROR "Unknown RobotRaconteurGen language")
+         endif()
+--- a/RobotRaconteurGen/CMakeLists.txt
++++ b/RobotRaconteurGen/CMakeLists.txt
+@@ -17,12 +17,12 @@
+ endif()
+ 
+ set(RobotRaconteurGen_src
+-    CPPServiceLangGen.cpp CSharpServiceLangGen.cpp
++    CPPServiceLangGen.cpp CSharpServiceLangGen.cpp GoServiceLangGen.cpp
+     # VBNETServiceLangGen.cpp
+     JavaServiceLangGen.cpp RobotRaconteurGen.cpp StringTableGen.cpp)
+ 
+ set(RobotRaconteurGen_header
+-    CPPServiceLangGen.h CSharpServiceLangGen.h
++    CPPServiceLangGen.h CSharpServiceLangGen.h GoServiceLangGen.h
+     # VBNETServiceLangGen.h
+     JavaServiceLangGen.h StringTableGen.h)
+ 
+--- a/RobotRaconteurGen/RobotRaconteurGen.cpp
++++ b/RobotRaconteurGen/RobotRaconteurGen.cpp
+@@ -25,6 +25,7 @@
+ #include <RobotRaconteur.h>
+ #include "CPPServiceLangGen.h"
+ #include "CSharpServiceLangGen.h"
++#include "GoServiceLangGen.h"
+ #include "JavaServiceLangGen.h"
+ #include "StringTableGen.h"
+ #include <boost/algorithm/string.hpp>
+@@ -302,6 +303,7 @@
+     std::string master_header;
+     std::string out_file;
+     std::vector<std::string> cpp_extra_include;
++    GoServiceLangGen::Options go_options;
+ 
+     try
+     {
+@@ -321,7 +323,11 @@
+             "outfile", po::value(&out_file), "unified output file (csharp only)")(
+             "auto-import", po::bool_switch(&auto_import),
+             "automatically load imported robdef")("cpp-extra-include", po::value(&cpp_extra_include)->composing(),
+-                                                  "extra include files for C++ thunk headers")
++                                                  "extra include files for C++ thunk headers")(
++            "go-import-prefix", po::value(&go_options.import_prefix),
++            "Go import path prefix of generated service packages (go only)")(
++            "go-runtime-import", po::value(&go_options.runtime_import)->default_value(go_options.runtime_import),
++            "Go import path of the Robot Raconteur runtime (go only)")
+ 
+             ;
+ 
+@@ -730,6 +736,25 @@
+                 }
+                 catch (std::exception& ee)
+                 {
++                    std::cout << sources.at(i) << ": error: could not generate thunksource files "
++                              << std::string(ee.what()) << std::endl;
++                    return 1010;
++                }
++            }
++
++            return 0;
++        }
++
++        if (lang == "go")
++        {
++            for (size_t i = 0; i < sdefs.size(); i++)
++            {
++                try
++                {
++                    GoServiceLangGen::GenerateFiles(sdefs.at(i), sdefs_str.at(i), alldefs, go_options, output_dir);
++                }
++                catch (std::exception& ee)
++                {
+                     std::cout << sources.at(i) << ": error: could not generate thunksource files "
+                               << std::string(ee.what()) << std::endl;
+                     return 1010;

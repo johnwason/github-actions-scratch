@@ -1,0 +1,39 @@
+# syntax=docker/dockerfile:1
+# Cross-build image: Robot Raconteur core + Go bindings for Windows x86_64
+# with MinGW-w64 (posix thread model), from Linux. Layered on the dev image
+# (scripts/podman.sh image) so Go, SWIG, CMake and ccache are shared.
+# Boost has no MinGW package on Ubuntu; it is built once here from source.
+ARG BASE=localhost/rr-go-dev:latest
+FROM ${BASE}
+
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update \
+ && apt-get install -y --no-install-recommends g++-mingw-w64-x86-64-posix gcc-mingw-w64-x86-64-posix \
+      mingw-w64-x86-64-dev bzip2
+
+# Boost (same version as Ubuntu's libboost-all-dev) for MinGW, static, into /opt/mingw64
+ARG BOOST_VERSION=1.83.0
+ARG BOOST_SHA256=6478edfe2f3305127cffe8caf73ea0176c53769f4bf1585be237eb30798c3b8e
+RUN --mount=type=cache,target=/var/cache/boost-dl \
+    v=$(echo ${BOOST_VERSION} | tr . _) \
+ && f=/var/cache/boost-dl/boost_${v}.tar.bz2 \
+ && if [ ! -f "$f" ]; then curl -fsSL -o "$f" https://archives.boost.io/release/${BOOST_VERSION}/source/boost_${v}.tar.bz2; fi \
+ && echo "${BOOST_SHA256}  $f" | sha256sum -c - \
+ && mkdir -p /tmp/boost && tar -C /tmp/boost --strip-components=1 -xjf "$f" \
+ && cd /tmp/boost \
+ && echo "using gcc : mingw : x86_64-w64-mingw32-g++-posix ;" > user-config.jam \
+ && ./bootstrap.sh --with-libraries=date_time,filesystem,system,regex,chrono,atomic,thread,random,program_options >/dev/null \
+ && ./b2 -q -j2 --user-config=user-config.jam toolset=gcc-mingw target-os=windows threadapi=win32 \
+      address-model=64 architecture=x86 variant=release link=static runtime-link=shared threading=multi \
+      --layout=system --prefix=/opt/mingw64 install >/tmp/boost-b2.log 2>&1 \
+      || (tail -50 /tmp/boost-b2.log; exit 1) \
+ && cd / && rm -rf /tmp/boost /tmp/boost-b2.log
+
+COPY mingw-toolchain.cmake /opt/mingw64/toolchain.cmake
+
+# GoogleTest for MinGW (the upstream C++ test programs use it), from the
+# sources that libgtest-dev installs in the base image
+RUN cmake -S /usr/src/googletest -B /tmp/gtest -G Ninja -DCMAKE_TOOLCHAIN_FILE=/opt/mingw64/toolchain.cmake \
+      -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/opt/mingw64 -DBUILD_GMOCK=OFF -Dgtest_disable_pthreads=OFF >/dev/null \
+ && cmake --build /tmp/gtest -j2 >/dev/null && cmake --install /tmp/gtest >/dev/null && rm -rf /tmp/gtest

@@ -1,0 +1,154 @@
+From 2aff5d1df770dfa891d4d80592ae564fa761acd9 Mon Sep 17 00:00:00 2001
+From: John Wason <wason@wasontech.com>
+Date: Sun, 15 Nov 2026 15:58:33 -0500
+Subject: [PATCH 5/9] Use lowercase Windows SDK header names
+
+MinGW-w64 installs the Windows SDK headers in lowercase (winsock2.h,
+windows.h, shlobj.h, ...). On a case-sensitive file system, which is what a
+Linux cross-build uses, the mixed-case includes are not found. MSVC is
+case-insensitive, so lowercase names work for both toolchains.
+
+All changes are inside ROBOTRACONTEUR_WINDOWS blocks or Windows-only sources.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ RobotRaconteurCore/src/AutoResetEvent.cpp                     | 2 +-
+ RobotRaconteurCore/src/HardwareTransport.cpp                  | 2 +-
+ RobotRaconteurCore/src/HardwareTransport_win_private.h        | 4 ++--
+ RobotRaconteurCore/src/LocalTransport.cpp                     | 2 +-
+ RobotRaconteurCore/src/NodeDirectories.cpp                    | 4 ++--
+ RobotRaconteurCore/src/Security.cpp                           | 4 ++--
+ RobotRaconteurCore/src/TcpTransport.cpp                       | 4 ++--
+ RobotRaconteurCore/src/TlsSchannelStreamAdapter.cpp           | 2 +-
+ RobotRaconteurCore/src/boost_asio_win_unix_sockets_backport.h | 2 +-
+ 9 files changed, 13 insertions(+), 13 deletions(-)
+
+diff --git a/RobotRaconteurCore/src/AutoResetEvent.cpp b/RobotRaconteurCore/src/AutoResetEvent.cpp
+index 6e8b43b2..d01cb1aa 100644
+--- a/RobotRaconteurCore/src/AutoResetEvent.cpp
++++ b/RobotRaconteurCore/src/AutoResetEvent.cpp
+@@ -19,7 +19,7 @@
+ #include "RobotRaconteur/AutoResetEvent.h"
+ 
+ #ifdef ROBOTRACONTEUR_WINDOWS
+-#include <Windows.h>
++#include <windows.h>
+ #endif
+ 
+ namespace RobotRaconteur
+diff --git a/RobotRaconteurCore/src/HardwareTransport.cpp b/RobotRaconteurCore/src/HardwareTransport.cpp
+index 1b94b920..77b241cc 100644
+--- a/RobotRaconteurCore/src/HardwareTransport.cpp
++++ b/RobotRaconteurCore/src/HardwareTransport.cpp
+@@ -24,7 +24,7 @@
+ #include <boost/algorithm/string.hpp>
+ 
+ #ifdef ROBOTRACONTEUR_WINDOWS
+-#include <Shlobj.h>
++#include <shlobj.h>
+ #else
+ #include <unistd.h>
+ #include <sys/file.h>
+diff --git a/RobotRaconteurCore/src/HardwareTransport_win_private.h b/RobotRaconteurCore/src/HardwareTransport_win_private.h
+index 4e7d2cef..953b844b 100644
+--- a/RobotRaconteurCore/src/HardwareTransport_win_private.h
++++ b/RobotRaconteurCore/src/HardwareTransport_win_private.h
+@@ -19,9 +19,9 @@
+ #include "HardwareTransport_bluetoothcommon_private.h"
+ #include "HardwareTransport_discoverycommon_private.h"
+ 
+-#include <Ws2bth.h>
++#include <ws2bth.h>
+ #include <windows.h>
+-#include <Devpropdef.h>
++#include <devpropdef.h>
+ #pragma once
+ 
+ // Begin SetupApi dynamic loading
+diff --git a/RobotRaconteurCore/src/LocalTransport.cpp b/RobotRaconteurCore/src/LocalTransport.cpp
+index 095aaf2e..56ef98ff 100644
+--- a/RobotRaconteurCore/src/LocalTransport.cpp
++++ b/RobotRaconteurCore/src/LocalTransport.cpp
+@@ -32,7 +32,7 @@
+ #include <boost/assign/list_of.hpp>
+ 
+ #ifdef ROBOTRACONTEUR_WINDOWS
+-#include <Shlobj.h>
++#include <shlobj.h>
+ #else
+ #include <unistd.h>
+ #include <sys/file.h>
+diff --git a/RobotRaconteurCore/src/NodeDirectories.cpp b/RobotRaconteurCore/src/NodeDirectories.cpp
+index d06d2618..2872a560 100644
+--- a/RobotRaconteurCore/src/NodeDirectories.cpp
++++ b/RobotRaconteurCore/src/NodeDirectories.cpp
+@@ -2,8 +2,8 @@
+ 
+ #ifdef ROBOTRACONTEUR_WINDOWS
+ #define WIN32_LEAN_AND_MEAN
+-#include <Windows.h>
+-#include <Shlobj.h>
++#include <windows.h>
++#include <shlobj.h>
+ #else
+ #include <pwd.h>
+ #include <unistd.h>
+diff --git a/RobotRaconteurCore/src/Security.cpp b/RobotRaconteurCore/src/Security.cpp
+index 9e10ef6b..9f8d08de 100644
+--- a/RobotRaconteurCore/src/Security.cpp
++++ b/RobotRaconteurCore/src/Security.cpp
+@@ -32,8 +32,8 @@
+ #include <string>
+ 
+ #ifdef ROBOTRACONTEUR_WINDOWS
+-#include <Windows.h>
+-#include <WinCrypt.h>
++#include <windows.h>
++#include <wincrypt.h>
+ #else
+ 
+ #include <openssl/conf.h>
+diff --git a/RobotRaconteurCore/src/TcpTransport.cpp b/RobotRaconteurCore/src/TcpTransport.cpp
+index de3d6f05..a2c80a28 100644
+--- a/RobotRaconteurCore/src/TcpTransport.cpp
++++ b/RobotRaconteurCore/src/TcpTransport.cpp
+@@ -27,8 +27,8 @@
+ #include <set>
+ 
+ #ifdef ROBOTRACONTEUR_WINDOWS
+-#include <IPHlpApi.h>
+-#include <Shlobj.h>
++#include <iphlpapi.h>
++#include <shlobj.h>
+ #define SHUT_RDWR SD_BOTH
+ #undef SendMessage
+ #else
+diff --git a/RobotRaconteurCore/src/TlsSchannelStreamAdapter.cpp b/RobotRaconteurCore/src/TlsSchannelStreamAdapter.cpp
+index 14fa8b53..a999790d 100644
+--- a/RobotRaconteurCore/src/TlsSchannelStreamAdapter.cpp
++++ b/RobotRaconteurCore/src/TlsSchannelStreamAdapter.cpp
+@@ -22,7 +22,7 @@
+ #include <boost/asio.hpp>
+ #include <boost/bind/protect.hpp>
+ #include <boost/shared_array.hpp>
+-#include <WinInet.h>
++#include <wininet.h>
+ #include <boost/algorithm/string.hpp>
+ 
+ #include "RobotRaconteurNodeRootCA.h"
+diff --git a/RobotRaconteurCore/src/boost_asio_win_unix_sockets_backport.h b/RobotRaconteurCore/src/boost_asio_win_unix_sockets_backport.h
+index e10b827b..65d247d0 100644
+--- a/RobotRaconteurCore/src/boost_asio_win_unix_sockets_backport.h
++++ b/RobotRaconteurCore/src/boost_asio_win_unix_sockets_backport.h
+@@ -6,7 +6,7 @@
+ #define BOOST_ASIO_HAS_LOCAL_SOCKETS 1
+ 
+ #ifdef _WIN32
+-#include <WinSock2.h>
++#include <winsock2.h>
+ 
+ #ifdef IO_REPARSE_TAG_AF_UNIX
+ #include <afunix.h>
+-- 
+2.43.0
+

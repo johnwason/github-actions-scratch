@@ -1,0 +1,92 @@
+name: Code Quality
+
+on:
+  push:
+    branches:
+      - master
+      - 'dev**'
+  pull_request:
+  schedule:
+    - cron: '0 5 * * *'
+
+# Supersede in-progress pull-request runs; queue everything else so two runs on one ref never race.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  ci:
+    name: ${{ matrix.job_type }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        job_type: [clang-tidy, codecov]
+        include:
+          - job_type: clang-tidy
+            env:
+              TARGET_CMAKE_ARGS: "-DCMAKE_BUILD_TYPE=Debug -DTESSERACT_ENABLE_CLANG_TIDY=ON -DTESSERACT_ENABLE_TESTING=ON -DTESSERACT_ENABLE_BENCHMARKING=ON -DTESSERACT_ENABLE_RUN_BENCHMARKING=OFF -DCLANG_TIDY_NAMES=clang-tidy-17"
+          - job_type: codecov
+            env:
+              TARGET_CMAKE_ARGS: "-DCMAKE_BUILD_TYPE=Debug -DTESSERACT_ENABLE_CODE_COVERAGE=ON -DTESSERACT_WARNINGS_AS_ERRORS=OFF"
+    container:
+      image: ubuntu:22.04
+      env:
+        DEBIAN_FRONTEND: noninteractive
+        TZ: Etc/UTC
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          path: target_ws/src
+
+      - name: Install Depends
+        shell: bash
+        run: |
+          apt_update() {
+            for attempt in 1 2 3; do
+              if apt-get -o Acquire::Retries=3 -o APT::Update::Error-Mode=any update; then
+                return 0
+              fi
+              if [ "$attempt" -lt 3 ]; then
+                sleep $((attempt * 10))
+              fi
+            done
+            return 1
+          }
+          apt_update
+          apt-get -o Acquire::Retries=3 upgrade -y
+          apt-get -o Acquire::Retries=3 install -y wget liboctomap-dev
+          echo "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-17 main" | tee /etc/apt/sources.list.d/llvm-toolchain.list
+          echo "deb-src http://apt.llvm.org/jammy/ llvm-toolchain-jammy-17 main" | tee -a /etc/apt/sources.list.d/llvm-toolchain.list
+          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | tee /etc/apt/trusted.gpg.d/llvm.asc
+          apt_update
+          apt-get -o Acquire::Retries=3 install -y clang-tidy-17 libomp-17-dev
+
+      - name: Build and Tests
+        uses: tesseract-robotics/colcon-action@v16
+        with:
+          ccache-prefix: ${{ matrix.job_type }}
+          vcs-file: dependencies_jammy.repos
+          run-tests: false
+          rosdep-install-args: -iry --skip-keys=libomp-dev --skip-keys=libcereal-dev
+          upstream-args: --cmake-args -DCMAKE_BUILD_TYPE=Release
+          target-path: target_ws/src
+          target-args: --cmake-args ${{ matrix.env.TARGET_CMAKE_ARGS }}
+
+      - name: Upload CodeCov Results
+        if: matrix.job_type == 'codecov'
+        shell: bash
+        run: |
+          source $GITHUB_WORKSPACE/target_ws/install/setup.bash
+          cd $GITHUB_WORKSPACE/target_ws
+          colcon build --cmake-target ccov-all --packages-select tesseract
+          bash <(curl -s https://codecov.io/bash) -t 758610a6-d851-4185-a01a-5b9465889b62 -s $GITHUB_WORKSPACE/target_ws/build -f *all-merged.info
+
+      - name: Upload coverage artifacts
+        if: matrix.job_type == 'codecov'
+        uses: actions/upload-artifact@v7
+        with:
+          name: codecov-raw-info
+          path: ${{ github.workspace }}/target_ws/build/**/all-merged.info
+          retention-days: 7

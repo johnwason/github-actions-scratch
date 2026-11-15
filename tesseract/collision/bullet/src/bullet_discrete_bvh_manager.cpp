@@ -1,0 +1,419 @@
+/**
+ * @file bullet_discrete_bvh_manager.cpp
+ * @brief Tesseract ROS Bullet Discrete BVH Manager implementation.
+ *
+ * @author Levi Armstrong
+ * @date Dec 18, 2017
+ *
+ * @copyright Copyright (c) 2017, Southwest Research Institute
+ *
+ * @par License
+ * Software License Agreement (BSD-2-Clause)
+ * @par
+ * All rights reserved.
+ * @par
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * @par
+ *  * Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ *  * Redistributions in binary form must reproduce the above
+ *    copyright notice, this list of conditions and the following
+ *    disclaimer in the documentation and/or other materials provided
+ *    with the distribution.
+ * @par
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+ * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ */
+
+#include <tesseract/collision/bullet/bullet_discrete_bvh_manager.h>
+#include <tesseract/common/contact_allowed_validator.h>
+#include <tesseract/common/utils.h>
+
+#include <algorithm>
+#include <cassert>
+#include <unordered_set>
+
+extern btScalar gDbvtMargin;  // NOLINT
+
+using namespace tesseract::collision::bullet_internal;
+
+namespace tesseract::collision
+{
+static const CollisionShapesConst EMPTY_COLLISION_SHAPES_CONST;
+static const tesseract::common::VectorIsometry3d EMPTY_COLLISION_SHAPES_TRANSFORMS;
+
+BulletDiscreteBVHManager::BulletDiscreteBVHManager(std::string name, TesseractCollisionConfigurationInfo config_info)
+  : name_(std::move(name)), config_info_(std::move(config_info)), coll_config_(config_info_)
+{
+  // Bullet adds a margin of 5cm to which is an extern variable, so we set it to zero.
+  gDbvtMargin = 0;
+
+  dispatcher_ = std::make_unique<btCollisionDispatcher>(&coll_config_);
+
+  dispatcher_->registerCollisionCreateFunc(
+      BOX_SHAPE_PROXYTYPE,
+      BOX_SHAPE_PROXYTYPE,
+      coll_config_.getCollisionAlgorithmCreateFunc(CONVEX_SHAPE_PROXYTYPE, CONVEX_SHAPE_PROXYTYPE));
+
+  dispatcher_->setDispatcherFlags(dispatcher_->getDispatcherFlags() &
+                                  ~btCollisionDispatcher::CD_USE_RELATIVE_CONTACT_BREAKING_THRESHOLD);
+
+  broadphase_ = std::make_unique<btDbvtBroadphase>();
+  broadphase_->getOverlappingPairCache()->setOverlapFilterCallback(&broadphase_overlap_cb_);
+
+  contact_test_data_.collision_margin_data = CollisionMarginData(0);
+}
+
+BulletDiscreteBVHManager::~BulletDiscreteBVHManager()
+{
+  // clean up remaining objects
+  for (auto& co : link2cow_)
+    removeCollisionObjectFromBroadphase(co.second, broadphase_, dispatcher_);
+}
+
+std::string BulletDiscreteBVHManager::getName() const { return name_; }
+
+DiscreteContactManager::UPtr BulletDiscreteBVHManager::clone() const
+{
+  auto manager = std::make_unique<BulletDiscreteBVHManager>(name_, config_info_.clone());
+
+  for (const auto& id : collision_objects_)
+  {
+    const auto& orig = link2cow_.at(id);
+    COW::Ptr new_cow = orig->clone();
+
+    assert(new_cow->getCollisionShape());
+    assert(new_cow->getCollisionShape()->getShapeType() != CUSTOM_CONVEX_SHAPE_TYPE);
+
+    new_cow->setWorldTransform(orig->getWorldTransform());
+    auto margin =
+        static_cast<btScalar>(contact_test_data_.collision_margin_data.getMaxCollisionMargin(new_cow->getLinkId()));
+    new_cow->setContactProcessingThreshold(margin);
+
+    manager->addCollisionObject(new_cow);
+  }
+
+  manager->setActiveCollisionObjects(active_);
+  manager->setCollisionMarginData(contact_test_data_.collision_margin_data);
+  manager->setContactAllowedValidator(contact_test_data_.validator);
+
+  return manager;
+}
+
+bool BulletDiscreteBVHManager::addCollisionObject(const tesseract::common::LinkId& id,
+                                                  const int& mask_id,
+                                                  const CollisionShapesConst& shapes,
+                                                  const tesseract::common::VectorIsometry3d& shape_poses,
+                                                  bool enabled)
+{
+  if (link2cow_.find(id) != link2cow_.end())
+    removeCollisionObject(id);
+
+  COW::Ptr new_cow = createCollisionObject(id, mask_id, shapes, shape_poses, enabled);
+  if (new_cow != nullptr)
+  {
+    auto margin =
+        static_cast<btScalar>(contact_test_data_.collision_margin_data.getMaxCollisionMargin(new_cow->getLinkId()));
+    new_cow->setContactProcessingThreshold(margin);
+    addCollisionObject(new_cow);
+    return true;
+  }
+
+  return false;
+}
+
+const CollisionShapesConst&
+BulletDiscreteBVHManager::getCollisionObjectGeometries(const tesseract::common::LinkId& id) const
+{
+  auto cow = link2cow_.find(id);
+  return (cow != link2cow_.end()) ? cow->second->getCollisionGeometries() : EMPTY_COLLISION_SHAPES_CONST;
+}
+
+const tesseract::common::VectorIsometry3d&
+BulletDiscreteBVHManager::getCollisionObjectGeometriesTransforms(const tesseract::common::LinkId& id) const
+{
+  auto cow = link2cow_.find(id);
+  return (cow != link2cow_.end()) ? cow->second->getCollisionGeometriesTransforms() : EMPTY_COLLISION_SHAPES_TRANSFORMS;
+}
+
+bool BulletDiscreteBVHManager::hasCollisionObject(const tesseract::common::LinkId& id) const
+{
+  return (link2cow_.find(id) != link2cow_.end());
+}
+
+bool BulletDiscreteBVHManager::removeCollisionObject(const tesseract::common::LinkId& id)
+{
+  auto it = link2cow_.find(id);  // Levi TODO: Should these check be removed?
+  if (it != link2cow_.end())
+  {
+    collision_objects_.erase(std::find(collision_objects_.begin(), collision_objects_.end(), id));
+    removeCollisionObjectFromBroadphase(it->second, broadphase_, dispatcher_);
+    link2cow_.erase(it);
+    active_.erase(id);
+    return true;
+  }
+
+  return false;
+}
+
+bool BulletDiscreteBVHManager::removeCollisionObjects(const std::vector<tesseract::common::LinkId>& ids)
+{
+  std::vector<COW::Ptr> cows;
+  cows.reserve(ids.size());
+  std::unordered_set<tesseract::common::LinkId> removed;
+  removed.reserve(ids.size());
+
+  bool success{ true };
+  for (const auto& id : ids)
+  {
+    auto it = link2cow_.find(id);
+    if (it == link2cow_.end())
+    {
+      success = false;
+      continue;
+    }
+
+    // Copy the pointer before erasing the map entry; the broadphase removal below still reads the wrapper.
+    cows.push_back(it->second);
+    removed.insert(id);
+    link2cow_.erase(it);
+    active_.erase(id);
+  }
+
+  if (removed.empty())
+    return success;
+
+  removeCollisionObjectsFromBroadphase(cows, broadphase_, dispatcher_);
+
+  // One pass over collision_objects_, preserving the order of the survivors.
+  collision_objects_.erase(
+      std::remove_if(collision_objects_.begin(),
+                     collision_objects_.end(),
+                     [&removed](const tesseract::common::LinkId& id) { return removed.find(id) != removed.end(); }),
+      collision_objects_.end());
+
+  return success;
+}
+
+bool BulletDiscreteBVHManager::enableCollisionObject(const tesseract::common::LinkId& id)
+{
+  auto it = link2cow_.find(id);  // Levi TODO: Should these check be removed?
+  if (it != link2cow_.end())
+  {
+    it->second->m_enabled = true;
+
+    // Need to clean the proxy from broadphase cache so BroadPhaseFilter gets called again.
+    // The BroadPhaseFilter only gets called once, so if you change when two objects can be in collision, like filters
+    // this must be called or contacts between shapes will be missed.
+    broadphase_->getOverlappingPairCache()->cleanProxyFromPairs(it->second->getBroadphaseHandle(), dispatcher_.get());
+    return true;
+  }
+  return false;
+}
+
+bool BulletDiscreteBVHManager::disableCollisionObject(const tesseract::common::LinkId& id)
+{
+  auto it = link2cow_.find(id);  // Levi TODO: Should these check be removed?
+  if (it != link2cow_.end())
+  {
+    it->second->m_enabled = false;
+
+    // Need to clean the proxy from broadphase cache so BroadPhaseFilter gets called again.
+    // The BroadPhaseFilter only gets called once, so if you change when two objects can be in collision, like filters
+    // this must be called or contacts between shapes will be missed.
+    broadphase_->getOverlappingPairCache()->cleanProxyFromPairs(it->second->getBroadphaseHandle(), dispatcher_.get());
+    return true;
+  }
+  return false;
+}
+
+bool BulletDiscreteBVHManager::setCollisionObjectsEnabled(
+    const std::unordered_map<tesseract::common::LinkId, bool>& enabled)
+{
+  bool success{ true };
+  std::vector<COW::Ptr> changed;
+  changed.reserve(enabled.size());
+  for (const auto& entry : enabled)
+  {
+    auto it = link2cow_.find(entry.first);
+    if (it == link2cow_.end())
+    {
+      success = false;
+      continue;
+    }
+
+    it->second->m_enabled = entry.second;
+    changed.push_back(it->second);
+  }
+
+  // One pass over the pair array for the whole batch, so BroadPhaseFilter is consulted again for every
+  // object whose enabled state changed.
+  cleanCollisionObjectsFromPairs(changed, broadphase_, dispatcher_);
+
+  return success;
+}
+
+bool BulletDiscreteBVHManager::isCollisionObjectEnabled(const tesseract::common::LinkId& id) const
+{
+  auto it = link2cow_.find(id);
+  if (it != link2cow_.end())
+    return it->second->m_enabled;
+
+  return false;
+}
+
+void BulletDiscreteBVHManager::setCollisionObjectsTransform(const tesseract::common::LinkId& id,
+                                                            const Eigen::Isometry3d& pose)
+{
+  // TODO: Find a way to remove this check. Need to store information in Tesseract EnvState indicating transforms with
+  // geometry
+  auto it = link2cow_.find(id);
+  if (it != link2cow_.end())
+  {
+    COW::Ptr& cow = it->second;
+
+    // Note: If the transform has not changed do not update to prevent unnecessary broadphase AABB updates
+    if (tesseract::common::almostEqualRelativeAndAbs(convertBtToEigen(cow->getWorldTransform()), pose))
+      return;
+
+    cow->setWorldTransform(convertEigenToBt(pose));
+
+    // Update Collision Object Broadphase AABB
+    updateBroadphaseAABB(cow, broadphase_, dispatcher_);
+  }
+}
+
+Eigen::Isometry3d BulletDiscreteBVHManager::getCollisionObjectsTransform(const tesseract::common::LinkId& id) const
+{
+  return convertBtToEigen(link2cow_.at(id)->getWorldTransform());
+}
+
+void BulletDiscreteBVHManager::setCollisionObjectsTransform(const tesseract::common::LinkIdTransformMap& transforms)
+{
+  for (const auto& transform : transforms)
+    setCollisionObjectsTransform(transform.first, transform.second);
+}
+
+const std::vector<tesseract::common::LinkId>& BulletDiscreteBVHManager::getCollisionObjects() const
+{
+  return collision_objects_;
+}
+
+void BulletDiscreteBVHManager::setActiveCollisionObjects(const std::unordered_set<tesseract::common::LinkId>& ids)
+{
+  active_ = ids;
+
+  // Now need to update the broadphase with correct aabb
+  for (auto& co : link2cow_)
+  {
+    COW::Ptr& cow = co.second;
+    updateCollisionObjectFilters(active_, cow, broadphase_, dispatcher_);
+    refreshBroadphaseProxy(cow, broadphase_, dispatcher_);
+  }
+}
+
+const std::unordered_set<tesseract::common::LinkId>& BulletDiscreteBVHManager::getActiveCollisionObjects() const
+{
+  return active_;
+}
+
+void BulletDiscreteBVHManager::setCollisionMarginData(CollisionMarginData collision_margin_data)
+{
+  contact_test_data_.collision_margin_data = std::move(collision_margin_data);
+  onCollisionMarginDataChanged();
+}
+
+const CollisionMarginData& BulletDiscreteBVHManager::getCollisionMarginData() const
+{
+  return contact_test_data_.collision_margin_data;
+}
+
+void BulletDiscreteBVHManager::setCollisionMarginPairData(const CollisionMarginPairData& pair_margin_data,
+                                                          CollisionMarginPairOverrideType override_type)
+{
+  contact_test_data_.collision_margin_data.apply(pair_margin_data, override_type);
+  onCollisionMarginDataChanged();
+}
+
+void BulletDiscreteBVHManager::setDefaultCollisionMargin(double default_collision_margin)
+{
+  contact_test_data_.collision_margin_data.setDefaultCollisionMargin(default_collision_margin);
+  onCollisionMarginDataChanged();
+}
+
+void BulletDiscreteBVHManager::setCollisionMarginPair(const tesseract::common::LinkId& id1,
+                                                      const tesseract::common::LinkId& id2,
+                                                      double collision_margin)
+{
+  contact_test_data_.collision_margin_data.setCollisionMargin(id1, id2, collision_margin);
+  onCollisionMarginDataChanged();
+}
+
+void BulletDiscreteBVHManager::incrementCollisionMargin(double increment)
+{
+  contact_test_data_.collision_margin_data.incrementMargins(increment);
+  onCollisionMarginDataChanged();
+}
+
+void BulletDiscreteBVHManager::setContactAllowedValidator(
+    std::shared_ptr<const tesseract::common::ContactAllowedValidator> validator)
+{
+  contact_test_data_.validator = std::move(validator);
+}
+std::shared_ptr<const tesseract::common::ContactAllowedValidator>
+BulletDiscreteBVHManager::getContactAllowedValidator() const
+{
+  return contact_test_data_.validator;
+}
+void BulletDiscreteBVHManager::contactTest(ContactResultMap& collisions, const ContactRequest& request)
+{
+  contact_test_data_.res = &collisions;
+  contact_test_data_.req = request;
+  contact_test_data_.done = false;
+
+  btOverlappingPairCache* pairCache = broadphase_->getOverlappingPairCache();
+
+  broadphase_->calculateOverlappingPairs(dispatcher_.get());
+
+  DiscreteBroadphaseContactResultCallback cc(contact_test_data_);
+
+  TesseractCollisionPairCallback collisionCallback(dispatch_info_, dispatcher_.get(), cc);
+
+  pairCache->processAllOverlappingPairs(&collisionCallback, dispatcher_.get());
+}
+
+void BulletDiscreteBVHManager::addCollisionObject(const COW::Ptr& cow)
+{
+  cow->setUserPointer(&contact_test_data_);
+  link2cow_[cow->getLinkId()] = cow;
+  collision_objects_.push_back(cow->getLinkId());
+
+  // Add collision object to broadphase
+  addCollisionObjectToBroadphase(cow, broadphase_, dispatcher_);
+}
+
+void BulletDiscreteBVHManager::onCollisionMarginDataChanged()
+{
+  for (auto& co : link2cow_)
+  {
+    COW::Ptr& cow = co.second;
+    auto margin =
+        static_cast<btScalar>(contact_test_data_.collision_margin_data.getMaxCollisionMargin(cow->getLinkId()));
+    cow->setContactProcessingThreshold(margin);
+    assert(cow->getBroadphaseHandle() != nullptr);
+    updateBroadphaseAABB(cow, broadphase_, dispatcher_);
+  }
+}
+}  // namespace tesseract::collision

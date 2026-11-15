@@ -1,0 +1,392 @@
+#include <tesseract/common/macros.h>
+TESSERACT_COMMON_IGNORE_WARNINGS_PUSH
+#include <gtest/gtest.h>
+#include <Eigen/Geometry>
+#include <octomap/OcTree.h>
+TESSERACT_COMMON_IGNORE_WARNINGS_POP
+
+#include <tesseract/geometry/geometries.h>
+#include <tesseract/geometry/impl/signed_distance_field_utils.h>
+#include <tesseract/urdf/geometry.h>
+#include <tesseract/common/resource_locator.h>
+#include "tesseract_urdf_common_unit.h"
+
+namespace
+{
+std::vector<std::uint8_t> makeTestSignedDistanceFieldVDB()
+{
+  const tesseract::geometry::SignedDistanceFunction sphere = [](const Eigen::Vector3d& point) {
+    return point.norm() - 0.5;
+  };
+  const auto sdf = tesseract::geometry::createDiscreteSignedDistanceField(
+      sphere, Eigen::Vector3d(-1, -1, -1), Eigen::Vector3d(1, 1, 1), Eigen::Vector3i(4, 4, 4));
+  return tesseract::geometry::writeSignedDistanceFieldVDB(*sdf);
+}
+
+class TestResourceLocator final : public tesseract::common::ResourceLocator
+{
+public:
+  TestResourceLocator(tesseract::common::GeneralResourceLocator fallback, std::vector<std::uint8_t> data)
+    : fallback_(std::move(fallback)), data_(std::move(data))
+  {
+  }
+
+  tesseract::common::Resource::Ptr locateResource(const std::string& url) const override
+  {
+    if (url == "memory://sphere.vdb")
+      return std::make_shared<tesseract::common::BytesResource>(url, data_);
+    return fallback_.locateResource(url);
+  }
+
+private:
+  tesseract::common::GeneralResourceLocator fallback_;
+  std::vector<std::uint8_t> data_;
+};
+}  // namespace
+
+TEST(TesseractURDFUnit, parse_geometry)  // NOLINT
+{
+  const bool global_make_convex = false;
+  const auto parse_geometry_fn = [&](const tinyxml2::XMLElement* xml_element,
+                                     const tesseract::common::ResourceLocator& locator,
+                                     const bool visual) {
+    return tesseract::urdf::parseGeometry(xml_element, locator, visual, global_make_convex);
+  };
+
+  tesseract::common::GeneralResourceLocator package_resource_locator;
+  TestResourceLocator resource_locator(package_resource_locator, makeTestSignedDistanceFieldVDB());
+  {
+    std::string str = R"(<geometry extra="0 0 0">
+                           <box size="1 1 1" />
+                         </geometry>)";
+    tesseract::geometry::Geometry::Ptr elem;
+    EXPECT_TRUE(runTest<tesseract::geometry::Geometry::Ptr>(
+        elem, parse_geometry_fn, str, tesseract::urdf::GEOMETRY_ELEMENT_NAME.data(), resource_locator, true));
+    EXPECT_TRUE(elem->getType() == tesseract::geometry::GeometryType::BOX);
+  }
+
+  {
+    std::string str = R"(<geometry extra="0 0 0">
+                           <sphere radius="1" />
+                         </geometry>)";
+    tesseract::geometry::Geometry::Ptr elem;
+    EXPECT_TRUE(runTest<tesseract::geometry::Geometry::Ptr>(
+        elem, parse_geometry_fn, str, tesseract::urdf::GEOMETRY_ELEMENT_NAME.data(), resource_locator, true));
+    EXPECT_TRUE(elem->getType() == tesseract::geometry::GeometryType::SPHERE);
+  }
+
+  {
+    std::string str = R"(<geometry extra="0 0 0">
+                           <cylinder radius="1" length="1" />
+                         </geometry>)";
+    tesseract::geometry::Geometry::Ptr elem;
+    EXPECT_TRUE(runTest<tesseract::geometry::Geometry::Ptr>(
+        elem, parse_geometry_fn, str, tesseract::urdf::GEOMETRY_ELEMENT_NAME.data(), resource_locator, true));
+    EXPECT_TRUE(elem->getType() == tesseract::geometry::GeometryType::CYLINDER);
+  }
+
+  {
+    std::string str = R"(<geometry extra="0 0 0">
+                           <tesseract:cone radius="1" length="1" />
+                         </geometry>)";
+    tesseract::geometry::Geometry::Ptr elem;
+    EXPECT_TRUE(runTest<tesseract::geometry::Geometry::Ptr>(
+        elem, parse_geometry_fn, str, tesseract::urdf::GEOMETRY_ELEMENT_NAME.data(), resource_locator, true));
+    EXPECT_TRUE(elem->getType() == tesseract::geometry::GeometryType::CONE);
+  }
+
+  {
+    std::string str = R"(<geometry extra="0 0 0">
+                           <tesseract:capsule radius="1" length="1" />
+                         </geometry>)";
+    tesseract::geometry::Geometry::Ptr elem;
+    EXPECT_TRUE(runTest<tesseract::geometry::Geometry::Ptr>(
+        elem, parse_geometry_fn, str, tesseract::urdf::GEOMETRY_ELEMENT_NAME.data(), resource_locator, true));
+    EXPECT_TRUE(elem->getType() == tesseract::geometry::GeometryType::CAPSULE);
+  }
+
+  {
+    std::string str = R"(<geometry extra="0 0 0">
+                           <tesseract:octomap shape_type="box" extra="0 0 0">
+                             <tesseract:octree filename="package://tesseract/support/meshes/box_2m.bt" extra="0 0 0"/>
+                           </tesseract:octomap>
+                         </geometry>)";
+    tesseract::geometry::Geometry::Ptr elem;
+    EXPECT_TRUE(runTest<tesseract::geometry::Geometry::Ptr>(
+        elem, parse_geometry_fn, str, tesseract::urdf::GEOMETRY_ELEMENT_NAME.data(), resource_locator, true));
+    EXPECT_TRUE(elem->getType() == tesseract::geometry::GeometryType::OCTREE);
+  }
+
+  {
+    std::string str = R"(<geometry extra="0 0 0">
+                           <mesh filename="package://tesseract/support/meshes/box_2m.ply" scale="1 2 1" extra="0 0 0"/>
+                         </geometry>)";
+    tesseract::geometry::Geometry::Ptr elem;
+    EXPECT_TRUE(runTest<tesseract::geometry::Geometry::Ptr>(
+        elem, parse_geometry_fn, str, tesseract::urdf::GEOMETRY_ELEMENT_NAME.data(), resource_locator, true));
+    EXPECT_TRUE(elem->getType() == tesseract::geometry::GeometryType::MESH);
+  }
+
+  {
+    std::string str = R"(<geometry extra="0 0 0">
+                           <tesseract:signed_distance_field filename="memory://sphere.vdb" extra="0 0 0"/>
+                         </geometry>)";
+    tesseract::geometry::Geometry::Ptr elem;
+    EXPECT_TRUE(runTest<tesseract::geometry::Geometry::Ptr>(
+        elem, parse_geometry_fn, str, tesseract::urdf::GEOMETRY_ELEMENT_NAME.data(), resource_locator, true));
+    EXPECT_TRUE(elem->getType() == tesseract::geometry::GeometryType::SIGNED_DISTANCE_FIELD);
+  }
+
+  {
+    std::string str = R"(<geometry>
+                           <unknown_type extra="0 0 0"/>
+                         </geometry>)";
+    tesseract::geometry::Geometry::Ptr elem;
+    EXPECT_FALSE(runTest<tesseract::geometry::Geometry::Ptr>(
+        elem, parse_geometry_fn, str, tesseract::urdf::GEOMETRY_ELEMENT_NAME.data(), resource_locator, true));
+    EXPECT_TRUE(elem == nullptr);
+  }
+
+  {
+    std::string str = R"(<geometry>
+                         </geometry>)";
+    tesseract::geometry::Geometry::Ptr elem;
+    EXPECT_FALSE(runTest<tesseract::geometry::Geometry::Ptr>(
+        elem, parse_geometry_fn, str, tesseract::urdf::GEOMETRY_ELEMENT_NAME.data(), resource_locator, true));
+    EXPECT_TRUE(elem == nullptr);
+  }
+
+  {
+    std::string str = R"(<geometry>
+                           <box size="1 1 a" />
+                         </geometry>)";
+    tesseract::geometry::Geometry::Ptr elem;
+    EXPECT_FALSE(runTest<tesseract::geometry::Geometry::Ptr>(
+        elem, parse_geometry_fn, str, tesseract::urdf::GEOMETRY_ELEMENT_NAME.data(), resource_locator, true));
+    EXPECT_TRUE(elem == nullptr);
+  }
+
+  {
+    std::string str = R"(<geometry extra="0 0 0">
+                           <sphere />
+                         </geometry>)";
+    tesseract::geometry::Geometry::Ptr elem;
+    EXPECT_FALSE(runTest<tesseract::geometry::Geometry::Ptr>(
+        elem, parse_geometry_fn, str, tesseract::urdf::GEOMETRY_ELEMENT_NAME.data(), resource_locator, true));
+    EXPECT_TRUE(elem == nullptr);
+  }
+
+  {
+    std::string str = R"(<geometry extra="0 0 0">
+                           <cylinder />
+                         </geometry>)";
+    tesseract::geometry::Geometry::Ptr elem;
+    EXPECT_FALSE(runTest<tesseract::geometry::Geometry::Ptr>(
+        elem, parse_geometry_fn, str, tesseract::urdf::GEOMETRY_ELEMENT_NAME.data(), resource_locator, true));
+    EXPECT_TRUE(elem == nullptr);
+  }
+
+  {
+    std::string str = R"(<geometry extra="0 0 0">
+                           <tesseract:cone />
+                         </geometry>)";
+    tesseract::geometry::Geometry::Ptr elem;
+    EXPECT_FALSE(runTest<tesseract::geometry::Geometry::Ptr>(
+        elem, parse_geometry_fn, str, tesseract::urdf::GEOMETRY_ELEMENT_NAME.data(), resource_locator, true));
+    EXPECT_TRUE(elem == nullptr);
+  }
+
+  {
+    std::string str = R"(<geometry extra="0 0 0">
+                           <tesseract:capsule />
+                         </geometry>)";
+    tesseract::geometry::Geometry::Ptr elem;
+    EXPECT_FALSE(runTest<tesseract::geometry::Geometry::Ptr>(
+        elem, parse_geometry_fn, str, tesseract::urdf::GEOMETRY_ELEMENT_NAME.data(), resource_locator, true));
+    EXPECT_TRUE(elem == nullptr);
+  }
+
+  {
+    std::string str = R"(<geometry extra="0 0 0">
+                           <tesseract:octomap shape_type="box" extra="0 0 0">
+                             <tesseract:octree />
+                           </tesseract:octomap>
+                         </geometry>)";
+    tesseract::geometry::Geometry::Ptr elem;
+    EXPECT_FALSE(runTest<tesseract::geometry::Geometry::Ptr>(
+        elem, parse_geometry_fn, str, tesseract::urdf::GEOMETRY_ELEMENT_NAME.data(), resource_locator, true));
+    EXPECT_TRUE(elem == nullptr);
+  }
+
+  {
+    std::string str = R"(<geometry extra="0 0 0">
+                           <mesh />
+                         </geometry>)";
+    tesseract::geometry::Geometry::Ptr elem;
+    EXPECT_FALSE(runTest<tesseract::geometry::Geometry::Ptr>(
+        elem, parse_geometry_fn, str, tesseract::urdf::GEOMETRY_ELEMENT_NAME.data(), resource_locator, true));
+    EXPECT_TRUE(elem == nullptr);
+  }
+
+  {  // signed distance field with no filename -> parse throws -> dispatch rethrows
+    std::string str = R"(<geometry extra="0 0 0">
+                           <tesseract:signed_distance_field />
+                         </geometry>)";
+    tesseract::geometry::Geometry::Ptr elem;
+    EXPECT_FALSE(runTest<tesseract::geometry::Geometry::Ptr>(
+        elem, parse_geometry_fn, str, tesseract::urdf::GEOMETRY_ELEMENT_NAME.data(), resource_locator, true));
+    EXPECT_TRUE(elem == nullptr);
+  }
+}
+
+TEST(TesseractURDFUnit, write_geometry)  // NOLINT
+{
+  // The catch clause for many of the subtypes is not triggered by these tests.  Triggering them would require sending
+  // a nullptr to the write function - for now.  These could be expanded in the future to have more failure modes, and
+  // already having the catch blocks in place seems wise.
+
+  {  // trigger check for nullptr input
+    tesseract::geometry::Geometry::Ptr geometry = nullptr;
+    std::string text;
+    EXPECT_EQ(1,
+              writeTest<tesseract::geometry::Geometry::Ptr>(
+                  geometry, &tesseract::urdf::writeGeometry, text, tesseract::common::getTempPath(), std::string("")));
+    EXPECT_EQ(text, "");
+  }
+
+  {  // sphere
+    tesseract::geometry::Geometry::Ptr geometry = std::make_shared<tesseract::geometry::Sphere>(1.0);
+    std::string text;
+    EXPECT_EQ(0,
+              writeTest<tesseract::geometry::Geometry::Ptr>(
+                  geometry, &tesseract::urdf::writeGeometry, text, tesseract::common::getTempPath(), std::string("")));
+    EXPECT_NE(text, "");
+  }
+
+  {  // cylinder
+    tesseract::geometry::Geometry::Ptr geometry = std::make_shared<tesseract::geometry::Cylinder>(1.0, 1.414);
+    std::string text;
+    EXPECT_EQ(0,
+              writeTest<tesseract::geometry::Geometry::Ptr>(
+                  geometry, &tesseract::urdf::writeGeometry, text, tesseract::common::getTempPath(), std::string("")));
+    EXPECT_NE(text, "");
+  }
+
+  {  // capsule
+    tesseract::geometry::Geometry::Ptr geometry = std::make_shared<tesseract::geometry::Capsule>(1.0, 1.57);
+    std::string text;
+    EXPECT_EQ(0,
+              writeTest<tesseract::geometry::Geometry::Ptr>(
+                  geometry, &tesseract::urdf::writeGeometry, text, tesseract::common::getTempPath(), std::string("")));
+    EXPECT_NE(text, "");
+  }
+
+  {  // cone
+    tesseract::geometry::Geometry::Ptr geometry = std::make_shared<tesseract::geometry::Cone>(1.0, 2.3);
+    std::string text;
+    EXPECT_EQ(0,
+              writeTest<tesseract::geometry::Geometry::Ptr>(
+                  geometry, &tesseract::urdf::writeGeometry, text, tesseract::common::getTempPath(), std::string("")));
+    EXPECT_NE(text, "");
+  }
+
+  {  // box
+    tesseract::geometry::Geometry::Ptr geometry = std::make_shared<tesseract::geometry::Box>(1.0, 2.0, 3.0);
+    std::string text;
+    EXPECT_EQ(0,
+              writeTest<tesseract::geometry::Geometry::Ptr>(
+                  geometry, &tesseract::urdf::writeGeometry, text, tesseract::common::getTempPath(), std::string("")));
+    EXPECT_NE(text, "");
+  }
+
+  {  // plane
+    tesseract::geometry::Geometry::Ptr geometry = std::make_shared<tesseract::geometry::Plane>(1.0, 1.1, 1.2, 1.3);
+    std::string text;
+    EXPECT_EQ(1,
+              writeTest<tesseract::geometry::Geometry::Ptr>(
+                  geometry, &tesseract::urdf::writeGeometry, text, tesseract::common::getTempPath(), std::string("")));
+    EXPECT_EQ(text, "");
+  }
+
+  {  // mesh
+    tesseract::common::VectorVector3d vertices = { Eigen::Vector3d(0, 0, 0),
+                                                   Eigen::Vector3d(1, 0, 0),
+                                                   Eigen::Vector3d(0, 1, 0) };
+    Eigen::VectorXi indices(4);
+    indices << 3, 0, 1, 2;
+    tesseract::geometry::Geometry::Ptr geometry = std::make_shared<tesseract::geometry::Mesh>(
+        std::make_shared<tesseract::common::VectorVector3d>(vertices), std::make_shared<Eigen::VectorXi>(indices));
+
+    std::string text;
+    EXPECT_EQ(
+        0,
+        writeTest<tesseract::geometry::Geometry::Ptr>(
+            geometry, &tesseract::urdf::writeGeometry, text, tesseract::common::getTempPath(), std::string("geom0")));
+    EXPECT_NE(text, "");
+  }
+
+  {  // convex mesh
+    tesseract::common::VectorVector3d vertices = { Eigen::Vector3d(0, 0, 0),
+                                                   Eigen::Vector3d(1, 0, 0),
+                                                   Eigen::Vector3d(0, 1, 0) };
+    Eigen::VectorXi indices(4);
+    indices << 3, 0, 1, 2;
+    tesseract::geometry::Geometry::Ptr geometry = std::make_shared<tesseract::geometry::ConvexMesh>(
+        std::make_shared<tesseract::common::VectorVector3d>(vertices), std::make_shared<Eigen::VectorXi>(indices));
+
+    std::string text;
+    EXPECT_EQ(0,
+              writeTest<tesseract::geometry::Geometry::Ptr>(geometry,
+                                                            &tesseract::urdf::writeGeometry,
+                                                            text,
+                                                            tesseract::common::getTempPath(),
+                                                            std::string("geom_convex")));
+    EXPECT_NE(text.find(R"(tesseract:make_convex="true")"), std::string::npos) << text;
+  }
+
+  {  // signed distance field
+    const tesseract::geometry::SignedDistanceFunction sphere = [](const Eigen::Vector3d& p) { return p.norm() - 0.5; };
+    tesseract::geometry::Geometry::Ptr geometry = tesseract::geometry::createDiscreteSignedDistanceField(
+        sphere, Eigen::Vector3d(-1, -1, -1), Eigen::Vector3d(1, 1, 1), Eigen::Vector3i(4, 4, 4));
+    std::string text;
+    EXPECT_EQ(0,
+              writeTest<tesseract::geometry::Geometry::Ptr>(geometry,
+                                                            &tesseract::urdf::writeGeometry,
+                                                            text,
+                                                            tesseract::common::getTempPath(),
+                                                            std::string("geom_sdf")));
+    EXPECT_NE(text, "");
+  }
+
+  {  // signed distance field failed-to-write
+    const tesseract::geometry::SignedDistanceFunction sphere = [](const Eigen::Vector3d& p) { return p.norm() - 0.5; };
+    tesseract::geometry::Geometry::Ptr geometry = tesseract::geometry::createDiscreteSignedDistanceField(
+        sphere, Eigen::Vector3d(-1, -1, -1), Eigen::Vector3d(1, 1, 1), Eigen::Vector3i(4, 4, 4));
+    std::string text;
+    EXPECT_EQ(1,
+              writeTest<tesseract::geometry::Geometry::Ptr>(
+                  geometry, &tesseract::urdf::writeGeometry, text, std::string("/tmp/nonexistant/"), std::string("")));
+    EXPECT_EQ(text, "");
+  }
+
+  {  // octree
+    tesseract::geometry::Geometry::Ptr geometry = std::make_shared<tesseract::geometry::Octree>(
+        std::make_shared<octomap::OcTree>(1.0), tesseract::geometry::OctreeSubType::BOX);
+    std::string text;
+    EXPECT_EQ(
+        0,
+        writeTest<tesseract::geometry::Geometry::Ptr>(
+            geometry, &tesseract::urdf::writeGeometry, text, tesseract::common::getTempPath(), std::string("geom3")));
+    EXPECT_NE(text, "");
+  }
+
+  {  // octree failed-to-write
+    tesseract::geometry::Geometry::Ptr geometry = std::make_shared<tesseract::geometry::Octree>(
+        std::make_shared<octomap::OcTree>(1.0), tesseract::geometry::OctreeSubType::BOX);
+    std::string text;
+    EXPECT_EQ(1,
+              writeTest<tesseract::geometry::Geometry::Ptr>(
+                  geometry, &tesseract::urdf::writeGeometry, text, std::string("/tmp/nonexistant/"), std::string("")));
+    EXPECT_EQ(text, "");
+  }
+}

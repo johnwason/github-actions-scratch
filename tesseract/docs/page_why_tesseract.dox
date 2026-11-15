@@ -1,0 +1,185 @@
+/** @page why_tesseract Why Tesseract
+
+@brief Industrial motion planning that treats the trajectory as part of the process.
+
+Most tools stop once the robot moves from A to B without crashing.
+In production, that isn’t enough.
+
+In real cells, motion planning directly affects:
+
+- Weld quality, edge finish, and surface coverage
+- Cycle time and throughput
+- Scrap, rework, and downtime
+- Safety and traceability
+
+The <b>Tesseract Robotics Framework</b> is built specifically for that world.
+
+Tesseract is a modern, optimization-centric motion planning framework designed for
+welding, cutting, grinding, deburring, painting, inspection, and other process-driven
+applications—where the shape, timing, and quality of the trajectory are part of the recipe,
+not an afterthought.
+
+Tesseract supports standard robot description formats (URDF, SRDF), works with your favorite
+collision libraries (Bullet, FCL), and integrates cleanly with ROS 1 and ROS 2 without requiring them.
+
+Tesseract is intended to be used in place of MoveIt for industrial applications.
+
+
+@section why_hero Industrial Motion Planning, Done Right
+
+Tesseract is a modern, optimization-first robotics framework that replaces MoveIt for
+industrial applications—delivering higher-quality trajectories, better process control,
+and cleaner integration across your stack.
+
+Key highlights:
+
+- <b>Process-first</b>: Built for welding, cutting, grinding, painting, and inspection—
+  not just point-to-point moves.
+- <b>Optimization-native</b>: Plans that bake in collisions, smoothness, and dynamics
+  from the start.
+- <b>Industry-ready</b>: ROS-agnostic core with clean C++ and Python APIs for real
+  products and production cells.
+
+
+@section why_process_first Process-First, Not Just Point-to-Point
+
+Tesseract is designed around complete robotic processes:
+
+- Multi-pass welds and weave patterns
+- Surface-following paths for grinding and finishing
+- Complex inspection and coating trajectories
+- Structured approach, engage, and retract motions
+
+Instead of “plan one move,” you design full workflows that are:
+
+- Repeatable
+- Auditable
+- Easy to evolve as your process changes
+
+
+@section why_optimization Optimization at the Core
+
+Tesseract does not just find any collision-free path and smooth it later.
+
+It:
+
+- Treats collisions, smoothness, joint limits, and process constraints as <b>first-class</b>
+- Uses trajectory optimization to solve for all of them <b>at once</b>
+- Produces trajectories that are easier to validate, certify, and trust in production
+
+You tell Tesseract what “good” looks like; it solves for trajectories that match your definition
+of quality, safety, and performance.
+
+
+@section why_environment Built for Real Workcells
+
+Modern industrial cells are more than a robot and a table.
+
+Tesseract models:
+
+- Robots, fixtures, positioners, and parts in a single <b>scene graph</b>
+- Environment updates as a <b>command history</b>, so every change is traceable and replayable
+- State in a way that is cheap to clone, making parallel and distributed planning straightforward
+
+This enables:
+
+- Easier debugging when “it planned differently this time”
+- Clean synchronization between online systems (controllers) and offline tools (simulators, planners)
+- Confidence that what you validate offline is what runs online in production cells
+
+
+@section why_collision Contact-Aware Collision Checking
+
+Tesseract’s collision stack does more than report “in collision” or “not in collision”.
+
+It provides:
+
+- Distances to obstacles
+- Closest points and contact normals
+- Data that optimization algorithms use to actively shape safer, smoother trajectories
+
+This is critical when operating near tooling, fixtures, or other robots, and when
+you need every millimeter of clearance.
+
+
+@section why_integration ROS-Agnostic, Industry-Ready
+
+Tesseract’s core is a clean C++ and Python library, with ROS 1 and ROS 2 integrations on top,
+not baked in.
+
+You can:
+
+- Embed Tesseract directly into controllers, simulators, and proprietary systems
+- Use it from Python for scripting and rapid iteration
+- Add ROS interfaces where they add value, without being locked into any single stack
+
+The result is a single planning core that can live everywhere in your architecture:
+design, simulation, offline programming, and runtime.
+
+
+@section why_capabilities Key Capabilities
+
+Tesseract provides a complete toolkit for industrial robotics:
+
+<b>Robot Modeling</b>
+- Load and parse standard URDF (Unified Robot Description Format) files
+- Extend with SRDF (Semantic Robot Description Format) for semantic information
+- Build kinematic structures programmatically
+- Support for fixed bases, mobile manipulators, and multi-robot systems
+
+<b>Collision & Distance Checking</b>
+- Efficient discrete and continuous collision detection
+- Distance queries with closest points and contact normals
+- Configurable collision margins for safety buffers
+- Allowed collision matrices to skip expected contacts
+
+<b>Trajectory Planning & Optimization</b>
+- Sampling-based planning (RRT, PRM) adapted for process-driven tasks
+- Trajectory optimization that handles collisions, smoothness, and constraints
+- Support for Cartesian paths, joint-space planning, and hybrid approaches
+- Ability to layer multiple objectives and constraints
+
+<b>Geometry & Shapes</b>
+- Primitive shapes (Box, Sphere, Cylinder, Cone, Capsule, Plane)
+- Mesh support (standard, SDF meshes, convex hulls)
+- Octree representation for volumetric data
+- Automatic convex hull computation
+
+
+@section why_getting_started Getting Started
+
+New to Tesseract? Here's a learning path:
+
+1. <b>Understand Robot Structure</b>: Start with \ref load_urdf_example to load a robot description
+2. <b>Add Semantics</b>: Follow \ref parse_srdf_example to configure collision rules
+3. <b>Explore Manual Construction</b>: See \ref build_scene_graph_example to understand kinematic graphs programmatically
+4. <b>Work with Geometry</b>: Try \ref create_geometries_example to create and manipulate shapes
+5. <b>Perform Collision Checking</b>: Complete \ref box_box_example to query distances and contacts
+
+Visit \ref tesseract_examples for the full library of examples and code snippets.
+
+
+@section why_developers For Different Roles
+
+<b>Motion Planning Engineers</b>
+- Use Tesseract's optimization-first planning to design high-quality trajectories
+- Leverage scene graphs and command history for reproducibility and debugging
+- Integrate with custom cost functions and constraints
+
+<b>C++ Developers</b>
+- Build motion planning into control systems and simulators
+- Use clean C++ APIs for trajectory generation and validation
+- Combine with your existing libraries and frameworks
+
+<b>Python Users</b>
+- Rapid prototyping and scripting
+- Load, validate, and test robot programs offline
+- Integrate with data processing pipelines
+
+<b>ROS Users</b>
+- Use existing ROS integrations with ROS 1 or ROS 2
+- Override with Tesseract's core when you need production-grade planning
+- Mix-and-match tools from your favorite ecosystem
+
+*/
+

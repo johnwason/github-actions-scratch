@@ -1,0 +1,78 @@
+name: Package-Debian-Build
+
+on:
+  push:
+    tags:
+      - '*'
+
+  # allow manually starting this workflow
+  workflow_dispatch:
+
+# Supersede in-progress pull-request runs; queue everything else so two runs on one ref never race.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  Debian:
+    name: ${{ matrix.distro }}
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:${{ matrix.distro }}
+      env:
+        DEBIAN_FRONTEND: noninteractive
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distro: jammy
+            vcs_file: dependencies_jammy.repos
+            rosdep_skip_keys: libcereal-dev
+          - distro: noble
+            vcs_file: dependencies.repos
+            rosdep_skip_keys: cereal
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          path: target_ws/src
+
+      - name: Install Depends
+        shell: bash
+        run: |
+          apt update
+          apt upgrade -y
+          apt install -y liboctomap-dev
+
+      - name: Build and test
+        uses: tesseract-robotics/colcon-action@v16
+        with:
+          ccache-enabled: false
+          vcs-file: ${{ matrix.vcs_file }}
+          rosdep-install-args: -iry --skip-keys ${{ matrix.rosdep_skip_keys }}
+          upstream-args: --cmake-args -DCMAKE_BUILD_TYPE=Release
+          target-path: target_ws/src
+          target-args: --cmake-args -DCMAKE_BUILD_TYPE=Release -DTESSERACT_PACKAGE=ON
+          run-tests: false
+
+      - name: Create artifacts directory
+        run: |
+          mkdir $GITHUB_WORKSPACE/artifacts
+
+      - name: Package Tesseract
+        working-directory: target_ws/build/tesseract
+        shell: bash
+        run: |
+          cpack --config CPackConfig.cmake
+          cp ./*.deb $GITHUB_WORKSPACE/artifacts
+          cp ./*.tar.xz $GITHUB_WORKSPACE/artifacts
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: debian_package_${{ matrix.distro }}
+          path: ${{ github.workspace }}/artifacts/*.deb
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: archive_package_${{ matrix.distro }}
+          path: ${{ github.workspace }}/artifacts/*.tar.xz

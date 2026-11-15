@@ -63,6 +63,54 @@ func RunSubscriptions(t *testing.T, n *rr.Node, baseURL, nodeName string) {
 			t.Errorf("unexpected broadcast packet %v", v)
 		}
 	})
+	t.Run("SubObject", func(t *testing.T) {
+		ctx := t.Context()
+		sub, err := n.SubscribeService([]string{url})
+		must(t, err)
+		defer sub.Close()
+
+		so1, err := sub.SubscribeSubObject("*.o1", "")
+		must(t, err)
+		c1, err := so1.DefaultClientWait(within(t, 10*time.Second))
+		must(t, err)
+		if _, ok := c1.(ts1.Sub1); !ok {
+			t.Fatalf("*.o1: unexpected type %T", c1)
+		}
+
+		so2, err := sub.SubscribeSubObject("*.o2[32]", "")
+		must(t, err)
+		c2, err := so2.DefaultClientWait(within(t, 10*time.Second))
+		must(t, err)
+		eq(t, "*.o2[32].i_ind", getc(t, "o2 i_ind", c2.(ts1.Sub1).Get_i_ind), int32(32))
+
+		so4, err := sub.SubscribeSubObject("*.o4[key]", "")
+		must(t, err)
+		c4, err := so4.DefaultClientWait(within(t, 10*time.Second))
+		must(t, err)
+		eq(t, "*.o4[key].s_ind", getc(t, "o4 s_ind", c4.(ts1.Sub1).Get_s_ind), "key")
+
+		so3, err := sub.SubscribeSubObject("*.o1.o2_1.o3_1[x]", "")
+		must(t, err)
+		c3, err := so3.DefaultClientWait(within(t, 10*time.Second))
+		must(t, err)
+		eq(t, "*.o1.o2_1.o3_1[x].ind", getc(t, "o3 ind", c3.(ts1.Sub3).Get_ind), "x")
+		v, err := c3.(ts1.Sub3).Add(ctx, 1)
+		expectNoErr(t, "o3 add", err)
+		eq(t, "o3 add", v, 43.0)
+
+		if _, err := so1.DefaultClient(); err != nil {
+			t.Errorf("DefaultClient after wait: %v", err)
+		}
+		// objectType is a hint passed to the service; the core returns the
+		// object's actual type
+		typed, err := sub.SubscribeSubObject("*.o1", "com.robotraconteur.testing.TestService1.sub1")
+		must(t, err)
+		tc, err := typed.DefaultClientWait(within(t, 10*time.Second))
+		must(t, err)
+		if _, ok := tc.(ts1.Sub1); !ok {
+			t.Errorf("typed *.o1: unexpected type %T", tc)
+		}
+	})
 	t.Run("ByType", func(t *testing.T) {
 		filter := &rr.ServiceSubscriptionFilter{
 			Predicate:        func(i rr.ServiceInfo2) bool { return i.NodeName == nodeName && i.Name == "RobotRaconteurTestService" },

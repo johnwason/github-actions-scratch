@@ -139,8 +139,14 @@ state, ts, err := c.Get_state().PeekInValue(ctx)
 
 Wires, pipes, memories, object locks (`Node.RequestObjectLock`, `WithMonitorLock`),
 subscriptions (`Node.SubscribeService`, `SubscribeServiceByType`,
-`SubscribeServiceInfo2`, and wire/pipe subscriptions) and local-transport
-discovery are supported.
+`SubscribeServiceInfo2`, wire/pipe subscriptions and
+`ServiceSubscription.SubscribeSubObject` for objref targets such as
+`"*.o1.o2_1"`) and local-transport discovery are supported.
+
+Transports come from `NodeSetup` (`TCPTransport`, `LocalTransport`,
+`IntraTransport`, `HardwareTransport`). For a node configured by hand, use
+`rr.NewTCPTransport(node)` (and `NewLocalTransport`, `NewIntraTransport`,
+`NewHardwareTransport`) followed by `Node.RegisterTransport`.
 
 ## Service
 

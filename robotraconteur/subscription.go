@@ -638,6 +638,61 @@ func (s *PipeSubscription[T]) ReceivePacketWait(ctx context.Context) (T, error) 
 // Close closes the pipe subscription.
 func (s *PipeSubscription[T]) Close() error { return callVoid(func() { s.native.Close() }) }
 
+// ---------------------------------------------------------------- sub object subscription
+
+// SubObjectSubscription follows a sub object (objref target) of the services
+// of a subscription. The client is the sub object of the subscription's
+// default client, retrieved again after reconnects.
+type SubObjectSubscription struct {
+	node   *Node
+	native swig.WrappedSubObjectSubscription
+}
+
+// SubscribeSubObject subscribes to the object at servicePath relative to the
+// root object ("*" can stand for the service name, e.g. "*.o1"); objectType
+// optionally requests a type. The subscription is closed with s.
+func (s *ServiceSubscription) SubscribeSubObject(servicePath, objectType string) (*SubObjectSubscription, error) {
+	n, err := call(func() swig.WrappedSubObjectSubscription {
+		return s.nat().SubscribeSubObject__SWIG_0(servicePath, objectType)
+	})
+	if err != nil {
+		return nil, err
+	}
+	if n == nil || n.Swigcptr() == 0 {
+		return nil, NewNullValue("null sub object subscription")
+	}
+	so := &SubObjectSubscription{node: s.node, native: n}
+	addCleanup(so, n, swig.DeleteWrappedSubObjectSubscription)
+	s.addChild(so)
+	return so, nil
+}
+
+// DefaultClient returns the sub object of the default client, or an error
+// if no client is connected.
+func (s *SubObjectSubscription) DefaultClient() (any, error) {
+	st, err := call(func() swig.WrappedServiceStub { return s.native.GetDefaultClient() })
+	if err != nil {
+		return nil, err
+	}
+	return s.node.stubFromNative(st)
+}
+
+// DefaultClientWait waits for a connected client and returns its sub object.
+func (s *SubObjectSubscription) DefaultClientWait(ctx context.Context) (any, error) {
+	return await(ctx, func(done func(any, error)) error {
+		d, id := newAsyncStub(s.node, done)
+		t := ctxTimeoutMs(ctx, -1)
+		err := startNative(func() error { s.native.AsyncGetDefaultClient(t, d, id); return nil })
+		if err != nil {
+			heapRemove(id)
+		}
+		return err
+	}, nil)
+}
+
+// Close closes the subscription.
+func (s *SubObjectSubscription) Close() error { return callVoid(func() { s.native.Close() }) }
+
 // ---------------------------------------------------------------- service info subscription
 
 // ServiceInfo2Subscription tracks services found by discovery without connecting.

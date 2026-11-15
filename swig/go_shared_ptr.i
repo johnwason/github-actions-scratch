@@ -117,6 +117,12 @@ template<class T> struct SWIG_intrusive_deleter {
 %define %rr_intrusive_ptr(TYPE...)
 %shared_ptr(TYPE)
 %feature("novaluewrapper") boost::intrusive_ptr< TYPE >;
+// member variables of intrusive_ptr type: getters return const& (new handle)
+%naturalvar boost::intrusive_ptr< TYPE >;
+%typemap(out, fragment="SWIG_intrusive_deleter") boost::intrusive_ptr< TYPE > *
+%{ if ($1 && *$1) { intrusive_ptr_add_ref($1->get());
+     *(boost::shared_ptr< TYPE >**)&$result = new boost::shared_ptr< TYPE >($1->get(), SWIG_intrusive_deleter< TYPE >()); }
+   else { *(boost::shared_ptr< TYPE >**)&$result = 0; } %}
 %template() boost::intrusive_ptr< TYPE >;
 
 

@@ -84,3 +84,8 @@ add_custom_command(
     COMMENT "Generating Go error types"
     VERBATIM)
 add_custom_target(rrgo_errors ALL DEPENDS "${CMAKE_SOURCE_DIR}/robotraconteur/errors_gen.go")
+
+# RobotRaconteurGenGo: Go thunk source generator (sibling of RobotRaconteurGen)
+find_package(Boost REQUIRED COMPONENTS program_options filesystem)
+add_executable(RobotRaconteurGenGo gen/main.cpp gen/GoServiceLangGen.cpp gen/GoServiceLangGen.h)
+target_link_libraries(RobotRaconteurGenGo RobotRaconteurCore Boost::program_options Boost::filesystem)

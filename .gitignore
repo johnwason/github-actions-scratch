@@ -5,3 +5,4 @@ robotraconteur/internal/swig/cgo_flags_*.go
 robotraconteur/internal/swig/upcasts_gen.go
 robotraconteur/errors_gen.go
 robotraconteur/constants_gen.go
+test/gen/

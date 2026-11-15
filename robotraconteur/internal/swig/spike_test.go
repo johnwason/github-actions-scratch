@@ -20,7 +20,7 @@ import (
 // ---- minimal error plumbing (prototype of the runtime package's helper) ----
 
 type rrError struct {
-	Code    uint
+	Code    uint32
 	Name    string
 	Message string
 }
@@ -57,13 +57,13 @@ func callVoid(f func()) error {
 
 type objHeap struct {
 	mu   sync.Mutex
-	next int
-	objs map[int]any
+	next int32
+	objs map[int32]any
 }
 
-var heap = &objHeap{objs: map[int]any{}}
+var heap = &objHeap{objs: map[int32]any{}}
 
-func (h *objHeap) add(o any) int {
+func (h *objHeap) add(o any) int32 {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.next++
@@ -71,9 +71,9 @@ func (h *objHeap) add(o any) int {
 	return h.next
 }
 
-type heapSupport struct{ deleted chan int }
+type heapSupport struct{ deleted chan int32 }
 
-func (s *heapSupport) DeleteObject_i(id int) {
+func (s *heapSupport) DeleteObject_i(id int32) {
 	heap.mu.Lock()
 	o := heap.objs[id]
 	delete(heap.objs, id)
@@ -90,7 +90,7 @@ func (s *heapSupport) DeleteObject_i(id int) {
 }
 
 var heapSupportDirector RRNativeObjectHeapSupport
-var heapDeleted = make(chan int, 16)
+var heapDeleted = make(chan int32, 16)
 
 func init() {
 	heapSupportDirector = NewDirectorRRNativeObjectHeapSupport(&heapSupport{deleted: heapDeleted})
@@ -100,24 +100,24 @@ func init() {
 // ---- tests ----
 
 func TestErrorFromCpp(t *testing.T) {
-	v, err := call(func() int { return ReturnOrThrow(21) })
+	v, err := call(func() int32 { return ReturnOrThrow(21) })
 	if err != nil || v != 42 {
 		t.Fatalf("ReturnOrThrow(21) = %v, %v", v, err)
 	}
-	_, err = call(func() int { return ReturnOrThrow(-1) })
+	_, err = call(func() int32 { return ReturnOrThrow(-1) })
 	var rerr *rrError
 	if !errors.As(err, &rerr) || rerr.Name != "RobotRaconteur.InvalidArgument" || rerr.Message != "negative" {
 		t.Fatalf("expected InvalidArgument error, got %#v", err)
 	}
-	if rerr.Code != uint(MessageErrorType_InvalidArgument) {
+	if rerr.Code != uint32(MessageErrorType_InvalidArgument) {
 		t.Fatalf("code = %d", rerr.Code)
 	}
-	err = callVoid(func() { ThrowError(uint(MessageErrorType_ConnectionError), "RobotRaconteur.ConnectionError", "boom") })
-	if !errors.As(err, &rerr) || rerr.Code != uint(MessageErrorType_ConnectionError) || rerr.Message != "boom" {
+	err = callVoid(func() { ThrowError(uint32(MessageErrorType_ConnectionError), "RobotRaconteur.ConnectionError", "boom") })
+	if !errors.As(err, &rerr) || rerr.Code != uint32(MessageErrorType_ConnectionError) || rerr.Message != "boom" {
 		t.Fatalf("expected ConnectionError, got %#v", err)
 	}
 	err = callVoid(func() { ThrowStd("std boom") })
-	if !errors.As(err, &rerr) || rerr.Code != uint(MessageErrorType_UnknownError) || rerr.Message != "std boom" {
+	if !errors.As(err, &rerr) || rerr.Code != uint32(MessageErrorType_UnknownError) || rerr.Message != "std boom" {
 		t.Fatalf("expected UnknownError, got %#v", err)
 	}
 	// String returning function with error returns zero value
@@ -144,12 +144,12 @@ func TestErrorsDoNotCrossGoroutines(t *testing.T) {
 				if (i+g)%3 == 0 {
 					arg = -1
 				}
-				v, err := call(func() int { return ReturnOrThrow(arg) })
+				v, err := call(func() int32 { return ReturnOrThrow(int32(arg)) })
 				if arg < 0 && err == nil {
 					fail <- "missing error"
 					return
 				}
-				if arg >= 0 && (err != nil || v != arg*2) {
+				if arg >= 0 && (err != nil || int(v) != arg*2) {
 					fail <- fmt.Sprintf("unexpected %v %v", v, err)
 					return
 				}
@@ -172,7 +172,7 @@ type voidDirector struct {
 func (d *voidDirector) Handler(e HandlerErrorInfo) {
 	defer func() {
 		if r := recover(); r != nil {
-			reportDirectorError(&rrError{Code: uint(MessageErrorType_UnknownError), Name: "RobotRaconteur.UnknownError", Message: fmt.Sprint(r)})
+			reportDirectorError(&rrError{Code: uint32(MessageErrorType_UnknownError), Name: "RobotRaconteur.UnknownError", Message: fmt.Sprint(r)})
 		}
 	}()
 	if d.panic {
@@ -183,7 +183,7 @@ func (d *voidDirector) Handler(e HandlerErrorInfo) {
 	}
 }
 
-func newErrorInfo(code uint, name, msg string) HandlerErrorInfo {
+func newErrorInfo(code uint32, name, msg string) HandlerErrorInfo {
 	h := NewHandlerErrorInfo()
 	h.SetError_code(code)
 	h.SetErrorname(name)
@@ -194,7 +194,7 @@ func newErrorInfo(code uint, name, msg string) HandlerErrorInfo {
 func reportDirectorError(err error) {
 	var rerr *rrError
 	if !errors.As(err, &rerr) {
-		rerr = &rrError{Code: uint(MessageErrorType_UnknownError), Name: "RobotRaconteur.UnknownError", Message: err.Error()}
+		rerr = &rrError{Code: uint32(MessageErrorType_UnknownError), Name: "RobotRaconteur.UnknownError", Message: err.Error()}
 	}
 	info := newErrorInfo(rerr.Code, rerr.Name, rerr.Message)
 	defer DeleteHandlerErrorInfo(info)
@@ -207,7 +207,7 @@ func TestDirectorErrorToCpp(t *testing.T) {
 		want string
 	}{
 		{&voidDirector{}, ""},
-		{&voidDirector{err: &rrError{Code: uint(MessageErrorType_InvalidOperation), Name: "RobotRaconteur.InvalidOperation", Message: "bad op"}}, "RobotRaconteur.InvalidOperation: bad op"},
+		{&voidDirector{err: &rrError{Code: uint32(MessageErrorType_InvalidOperation), Name: "RobotRaconteur.InvalidOperation", Message: "bad op"}}, "RobotRaconteur.InvalidOperation: bad op"},
 		{&voidDirector{err: errors.New("plain go error")}, "RobotRaconteur.UnknownError: plain go error"},
 		{&voidDirector{panic: true}, "RobotRaconteur.UnknownError: go panic in director"},
 	} {

@@ -129,7 +129,7 @@ func newErrorInfo(err error) swig.HandlerErrorInfo {
 		return h
 	}
 	e := AsError(err)
-	h.SetError_code(uint(e.Code))
+	h.SetError_code(uint32(e.Code))
 	name := e.Name
 	if name == "" {
 		name = builtinErrorNames[e.Code]

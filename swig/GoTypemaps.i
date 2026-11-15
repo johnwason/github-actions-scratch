@@ -3,6 +3,15 @@
 // (time.Time, time.Duration, typed enums) happen in the robotraconteur
 // package; at this level values cross as plain integers/strings.
 
+// Fixed width integers keep their width in Go (SWIG Go maps int/unsigned int
+// to Go int/uint by default).
+%typemap(gotype) int32_t, const int32_t & "int32"
+%typemap(gotype) uint32_t, const uint32_t & "uint32"
+%typemap(gotype) int16_t, const int16_t & "int16"
+%typemap(gotype) uint16_t, const uint16_t & "uint16"
+%typemap(gotype) int8_t, const int8_t & "int8"
+%typemap(gotype) uint8_t, const uint8_t & "uint8"
+
 // boost::posix_time::ptime <-> int64 microseconds since the Unix epoch (UTC).
 // Special values (not_a_date_time, +/- infinity) map to math.MinInt64/MaxInt64.
 %{

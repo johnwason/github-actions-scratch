@@ -24,7 +24,7 @@ func TestErrorCodesMatchNative(t *testing.T) {
 
 func TestNativeErrorRoundTrip(t *testing.T) {
 	for code, name := range builtinErrorNames {
-		err := callVoid(func() { swig.ThrowError(uint(code), name, "msg "+name) })
+		err := callVoid(func() { swig.ThrowError(uint32(code), name, "msg "+name) })
 		var rerr *Error
 		if !errors.As(err, &rerr) {
 			t.Fatalf("%s: got %v", name, err)
@@ -36,7 +36,7 @@ func TestNativeErrorRoundTrip(t *testing.T) {
 			t.Errorf("%s: errors.Is failed", name)
 		}
 	}
-	err := callVoid(func() { swig.ThrowError(uint(CodeRemoteError), "my.service.MyError", "remote") })
+	err := callVoid(func() { swig.ThrowError(uint32(CodeRemoteError), "my.service.MyError", "remote") })
 	if !errors.Is(err, ErrRemoteError) || !errors.Is(err, NewRemoteError("my.service.MyError", "")) ||
 		errors.Is(err, NewRemoteError("my.service.Other", "")) {
 		t.Errorf("remote error matching: %v", err)
@@ -44,10 +44,10 @@ func TestNativeErrorRoundTrip(t *testing.T) {
 	if !errors.Is(callVoid(func() { swig.ThrowStd("x") }), ErrUnknownError) {
 		t.Error("std::exception should be UnknownError")
 	}
-	if v, err := call(func() int { return swig.ReturnOrThrow(4) }); err != nil || v != 8 {
+	if v, err := call(func() int32 { return swig.ReturnOrThrow(4) }); err != nil || v != 8 {
 		t.Errorf("ReturnOrThrow = %v, %v", v, err)
 	}
-	if _, err := call(func() int { return swig.ReturnOrThrow(-4) }); !errors.Is(err, ErrInvalidArgument) {
+	if _, err := call(func() int32 { return swig.ReturnOrThrow(-4) }); !errors.Is(err, ErrInvalidArgument) {
 		t.Errorf("expected InvalidArgument, got %v", err)
 	}
 }

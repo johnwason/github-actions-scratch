@@ -114,5 +114,15 @@ func (n *Node) SetLogRecordHandler(f func(LogRecord)) error {
 
 // OpenLogFile writes log records to a file instead of stderr.
 func (n *Node) OpenLogFile(filename string, append bool) error {
-	return callVoid(func() { swig.SetFileLogRecordHandler(n.native, filename, append) })
+	return callVoid(func() {
+		h := swig.NewFileLogRecordHandler()
+		defer swig.DeleteFileLogRecordHandler(h)
+		h.OpenFile(filename, append)
+		if swig.Rrgo_error_pending() {
+			return
+		}
+		lh := h.SwigGetLogRecordHandler()
+		defer swig.DeleteLogRecordHandler(lh)
+		n.native.SetLogRecordHandler(lh)
+	})
 }

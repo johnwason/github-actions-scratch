@@ -16,11 +16,7 @@ PKGS=${*:-./...}
 # reached through uintptr by design; it is never Go heap memory.
 (cd build/go && ctest --output-on-failure)
 go vet -unsafeptr=false $PKGS
-if [ $# -eq 0 ]; then
-  # test/interop and test/crosscheck each run C++ test programs against a
-  # node; run them one package at a time so they do not interfere.
-  go test -count=1 -timeout 600s $(go list ./... | grep -vE '/test/(interop|crosscheck)$')
-  go test -count=1 -timeout 600s -p 1 ./test/interop ./test/crosscheck
-else
-  go test -count=1 -timeout 600s $PKGS
-fi
+# test/interop and test/crosscheck run concurrently with C++ test programs on
+# the local transport; this also guards against the connector deadlock fixed
+# in core (gen/upstream_merge/README.md).
+go test -count=1 -timeout 600s $PKGS

@@ -93,7 +93,6 @@ using namespace std;
 %include "RobotRaconteurNode.i"
 %include "NodeSetup.i"
 %include "BroadcastDownsampler.i"
-%include "LoggingGo.i"
 
 %include "RRGoTestSupport.i"
 

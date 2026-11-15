@@ -58,32 +58,38 @@ added only by files in `swig/`:
   file provides `%shared_ptr` and `%rr_intrusive_ptr`.
 - **`TimerGo.i`, `TimeSpecGo.i`**: ports of `TimerNET.i` and `TimeSpecNET.i`,
   without the C# modifiers.
-- **`LoggingGo.i`**: `rrgo::SetFileLogRecordHandler`. A helper is needed
-  because `SWIG/Logging.i` declares `FileLogRecordHandler` without its
-  `LogRecordHandler` base.
 - **`GoTypemaps.i`, `GoExceptionTypemaps.i`, `rrgo_support.h`**: typemaps,
   and the C++ exception to Go `error` plumbing (a thread-local pending error).
 - **`RRGoTestSupport.i`**: error-path test hooks only. Drop it or keep it
   behind a test option.
 
-## 3. Suggested upstream core changes
+## 3. Required upstream core changes
 
-- **`SWIG/Logging.i`**: declare `class FileLogRecordHandler : public LogRecordHandler`. This also fixes the C# and Java bindings, and makes `LoggingGo.i` unnecessary.
-- **`SWIG/ServiceSecurity.i`**: expose an `AuthenticatedUser` constructor, or a factory, to allow user authenticators written in Go (and other director languages).
-- **MinGW/cgo**: Windows support requires `RobotRaconteurCore` to build with a cgo-compatible toolchain (MinGW-w64), or a C-ABI shim around an MSVC-built core.
-- **Connector self-deadlock (core bug, affects every language).** `RobotRaconteurNode_connector::connect`
-  (`RobotRaconteurNode_connector.cpp:420-428`) holds `active_lock` while it calls
+The bindings are built against upstream `7cd1610c` plus the patches in
+`core-patches/`. They are applied on branch `rr-go-core-fixes` of the CI repository,
+which CI checks out:
+
+- **`0001`: connector self-deadlock (core bug, affects every language).**
+  `RobotRaconteurNode_connector::connect2` held `active_lock` while it called
   `Transport::AsyncCreateTransportConnection`. `LocalTransport` connects synchronously. If
-  `ASIOStreamBaseTransport::AsyncAttachStream` then throws, its outer `catch`
-  (`ASIOStreamBaseTransport.cpp:171`) calls the handler synchronously with
-  `InvokeHandlerWithException`. The handler reaches `connected_transport` → `handle_error`, which locks
-  `active_lock` again on the same thread, and the thread blocks forever. Node shutdown then hangs in
-  `ThreadPool::Shutdown` joining that thread.
+  `ASIOStreamBaseTransport::AsyncAttachStream` throws, the handler is invoked synchronously
+  (`ASIOStreamBaseTransport.cpp:171`), and `connected_transport` → `handle_error` locks
+  `active_lock` again on the same thread. Node shutdown then hangs in `ThreadPool::Shutdown`.
 
-  It was seen when a client connects over `rr+local` to a node that is shutting down: two test
-  processes discovering each other through the local transport hit it in about half of the runs.
-  Either change fixes it:
-  - `PostHandlerWithException` in that `catch`;
-  - releasing `active_lock` before calling `AsyncCreateTransportConnection`.
+  It shows up when a client connects over `rr+local` to a node that is shutting down: two test
+  processes discovering each other hung in about half of the runs. The patch registers the
+  attempt and releases the lock before calling the transport. `scripts/debug_hang.sh`
+  reproduces the bug (0 hangs in 12 runs with the patch).
+- **`0002`: SWIG.**
+  - Declares the `AuthenticatedUser` constructor in `Service.i`, so wrapped languages can implement
+    user authenticators. Go uses it for `rr.UserAuthenticatorFunc`.
+  - Declares `FileLogRecordHandler : public LogRecordHandler` in `Logging.i`, so it can be passed
+    to `SetLogRecordHandler`.
 
-  The tests in this repository run the C++ interop packages one at a time to avoid it.
+The Go bindings need `0002` to build: they use `NewAuthenticatedUser` and the
+`FileLogRecordHandler` upcast.
+
+Still open:
+
+- **MinGW/cgo**: Windows support requires `RobotRaconteurCore` to build with a cgo-compatible toolchain
+  (MinGW-w64), or a C-ABI shim around an MSVC-built core.

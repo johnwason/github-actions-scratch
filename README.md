@@ -26,8 +26,12 @@ programs through cgo.
 ## Building
 
 Everything builds inside the podman dev image (Ubuntu 24.04, SWIG 4.2,
-Go 1.27). The upstream `robotraconteur` checkout is expected next to this
-directory and is mounted read-only.
+Go 1.27). The `robotraconteur` checkout is expected next to this directory
+and is mounted read-only. It must be upstream `7cd1610c` with the patches in
+[gen/upstream_merge/core-patches](gen/upstream_merge/core-patches) applied
+(`git am`). The patches fix a connector deadlock and add the SWIG
+declarations the bindings use; see
+[gen/upstream_merge/README.md](gen/upstream_merge/README.md).
 
 ```sh
 scripts/podman.sh image          # build the dev image (once)
@@ -119,7 +123,7 @@ Other service-side features:
 
 - **Readonly wires and pipes.** These get broadcasters in the `DefaultImpl` (`StateBroadcaster`). `rr.NewBroadcastDownsampler` adds per-client downsampling.
 - **Async implementations.** An object that implements the generated `Async<Object>` interface is served through the native async adapter.
-- **Security.** Pass `rr.WithSecurityPolicy(&rr.ServiceSecurityPolicy{Authenticator: rr.NewPasswordFileUserAuthenticator(data), Policies: ...})` to `RegisterService`. `rr.CurrentServerContext` returns the server context.
+- **Security.** Pass `rr.WithSecurityPolicy(&rr.ServiceSecurityPolicy{Authenticator: rr.NewPasswordFileUserAuthenticator(data), Policies: ...})` to `RegisterService`. Authenticators can also be Go functions (`rr.UserAuthenticatorFunc`) that return an `*rr.AuthenticatedUser` or an error. Service members can call `rr.CurrentAuthenticatedUser` and `rr.CurrentServerContext`.
 
 ## Errors
 
@@ -168,4 +172,3 @@ test programs they skip.
 ## Not yet supported
 
 - Windows and macOS. The runtime is OS-neutral, but the core and toolchain setup for cgo is Linux-only for now.
-- Custom (Go) user authenticators. `AuthenticatedUser` cannot be constructed through SWIG.

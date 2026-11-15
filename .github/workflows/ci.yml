@@ -5,9 +5,11 @@ on:
   workflow_dispatch:
 
 env:
-  # Upstream Robot Raconteur commit the bindings are developed against
-  RR_REPO: robotraconteur/robotraconteur
-  RR_REF: 7cd1610c519613f241b25453754fb118b270cdaf
+  # Upstream core plus the fixes in gen/upstream_merge/core-patches (branch
+  # rr-go-core-fixes of this repository; its tip commit carries [skip ci] so the
+  # upstream workflows do not run on it).
+  RR_REPO: johnwason/github-actions-scratch
+  RR_REF: 15906db63d9770024c90e803929941dd92026209
 
 jobs:
   linux:

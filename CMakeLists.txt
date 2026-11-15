@@ -64,14 +64,16 @@ set_source_files_properties("${RRGO_WRAP_CXX}" PROPERTIES COMPILE_OPTIONS "-g0")
 rrgo_collect_link_flags(RRGO_LINK_FLAGS RobotRaconteurGoNative)
 string(JOIN "\n" RRGO_LDFLAGS_LINES ${RRGO_LINK_FLAGS})
 file(GENERATE OUTPUT "${CMAKE_BINARY_DIR}/cgo_link_libs.txt" CONTENT "${RRGO_LDFLAGS_LINES}\n")
-add_custom_command(
-    OUTPUT "${RRGO_GO_PKG_DIR}/cgo_flags_linux.go"
+# Runs on every build (cheap; the file is only rewritten when it changes) so the
+# library fingerprint in it tracks rebuilt native archives.
+add_custom_target(
+    rrgo_cgo_flags ALL
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/cmake/gen_cgo_flags.py" "${CMAKE_BINARY_DIR}/cgo_link_libs.txt"
             "${RRGO_GO_PKG_DIR}/cgo_flags_linux.go" linux
-    DEPENDS "${CMAKE_BINARY_DIR}/cgo_link_libs.txt" "${CMAKE_SOURCE_DIR}/cmake/gen_cgo_flags.py"
+    BYPRODUCTS "${RRGO_GO_PKG_DIR}/cgo_flags_linux.go"
     COMMENT "Generating cgo link flags"
     VERBATIM)
-add_custom_target(rrgo_cgo_flags ALL DEPENDS "${RRGO_GO_PKG_DIR}/cgo_flags_linux.go" RobotRaconteurGoNative)
+add_dependencies(rrgo_cgo_flags RobotRaconteurGoNative)
 
 # Go error codes/types from the upstream core headers
 add_custom_command(

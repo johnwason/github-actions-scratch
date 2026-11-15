@@ -28,12 +28,12 @@ func (a *Asynctestroot) AsyncSetD1(v float64, _ time.Duration, h func(error)) {
 	}
 	go h(rr.NewInvalidArgument(""))
 }
-func (a *Asynctestroot) AsyncGetS1(_ time.Duration, h func(string, error))       { h("", notImpl()) }
-func (a *Asynctestroot) AsyncSetS1(string, time.Duration, func(error))           {}
-func (a *Asynctestroot) AsyncGetD2(_ time.Duration, h func([]float64, error))    { h(nil, notImpl()) }
-func (a *Asynctestroot) AsyncSetD2(_ []float64, _ time.Duration, h func(error))  { h(notImpl()) }
-func (a *Asynctestroot) AsyncGetS2(_ time.Duration, h func([]string, error))     { h(nil, notImpl()) }
-func (a *Asynctestroot) AsyncSetS2(_ []string, _ time.Duration, h func(error))   { h(notImpl()) }
+func (a *Asynctestroot) AsyncGetS1(_ time.Duration, h func(string, error))      { h("", notImpl()) }
+func (a *Asynctestroot) AsyncSetS1(string, time.Duration, func(error))          {}
+func (a *Asynctestroot) AsyncGetD2(_ time.Duration, h func([]float64, error))   { h(nil, notImpl()) }
+func (a *Asynctestroot) AsyncSetD2(_ []float64, _ time.Duration, h func(error)) { h(notImpl()) }
+func (a *Asynctestroot) AsyncGetS2(_ time.Duration, h func([]string, error))    { h(nil, notImpl()) }
+func (a *Asynctestroot) AsyncSetS2(_ []string, _ time.Duration, h func(error))  { h(notImpl()) }
 func (a *Asynctestroot) AsyncGetS3(_ time.Duration, h func(*ts5.Teststruct4, error)) {
 	h(nil, notImpl())
 }

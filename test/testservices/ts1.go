@@ -61,23 +61,27 @@ func (t *Testroot) Shutdown() {
 
 // ---- numeric properties
 
-func (t *Testroot) GetD1() (float64, error)        { return 12.345, nil }
-func (t *Testroot) SetD1(v float64) error           { return check("d1", v, 3.456) }
-func (t *Testroot) GetD2() ([]float64, error)       { return vec[float64]("ts1.d2.to_client"), nil }
-func (t *Testroot) SetD2(v []float64) error         { return check("d2", v, vec[float64]("ts1.d2.to_service")) }
-func (t *Testroot) GetD3() ([]float64, error)       { return vec[float64]("ts1.d3.to_client"), nil }
-func (t *Testroot) SetD3(v []float64) error         { return check("d3", v, vec[float64]("ts1.d3.to_service")) }
-func (t *Testroot) GetD4() ([]float64, error)       { return vec[float64]("ts1.d4.to_client"), nil }
-func (t *Testroot) SetD4(v []float64) error         { return check("d4", v, vec[float64]("ts1.d4.to_service")) }
-func (t *Testroot) GetD5() (*rr.MultiDimArray[float64], error) { return mdaVec("ts1.d5.to_client"), nil }
+func (t *Testroot) GetD1() (float64, error)   { return 12.345, nil }
+func (t *Testroot) SetD1(v float64) error     { return check("d1", v, 3.456) }
+func (t *Testroot) GetD2() ([]float64, error) { return vec[float64]("ts1.d2.to_client"), nil }
+func (t *Testroot) SetD2(v []float64) error   { return check("d2", v, vec[float64]("ts1.d2.to_service")) }
+func (t *Testroot) GetD3() ([]float64, error) { return vec[float64]("ts1.d3.to_client"), nil }
+func (t *Testroot) SetD3(v []float64) error   { return check("d3", v, vec[float64]("ts1.d3.to_service")) }
+func (t *Testroot) GetD4() ([]float64, error) { return vec[float64]("ts1.d4.to_client"), nil }
+func (t *Testroot) SetD4(v []float64) error   { return check("d4", v, vec[float64]("ts1.d4.to_service")) }
+func (t *Testroot) GetD5() (*rr.MultiDimArray[float64], error) {
+	return mdaVec("ts1.d5.to_client"), nil
+}
 func (t *Testroot) SetD5(v *rr.MultiDimArray[float64]) error {
 	return check("d5", v, mdaVec("ts1.d5.to_service"))
 }
-func (t *Testroot) GetD6() (*rr.MultiDimArray[float64], error) { return mdaVec("ts1.d6.to_client"), nil }
+func (t *Testroot) GetD6() (*rr.MultiDimArray[float64], error) {
+	return mdaVec("ts1.d6.to_client"), nil
+}
 func (t *Testroot) SetD6(v *rr.MultiDimArray[float64]) error {
 	return check("d6", v, mdaVec("ts1.d6.to_service"))
 }
-func (t *Testroot) GetS1() (float32, error)  { return 7.8573, nil }
+func (t *Testroot) GetS1() (float32, error)   { return 7.8573, nil }
 func (t *Testroot) SetS1(v float32) error     { return check("s1", v, float32(3847.9283)) }
 func (t *Testroot) GetS2() ([]float32, error) { return vec[float32]("ts1.s2.to_client"), nil }
 func (t *Testroot) SetS2(v []float32) error   { return check("s2", v, vec[float32]("ts1.s2.to_service")) }
@@ -88,25 +92,33 @@ func (t *Testroot) SetI8_2(v []int8) error    { return check("i8_2", v, vec[int8
 func (t *Testroot) GetU8_1() (uint8, error)   { return 222, nil }
 func (t *Testroot) SetU8_1(v uint8) error     { return check("u8_1", v, uint8(232)) }
 func (t *Testroot) GetU8_2() ([]uint8, error) { return vec[uint8]("ts1.u8_2.to_client"), nil }
-func (t *Testroot) SetU8_2(v []uint8) error   { return check("u8_2", v, vec[uint8]("ts1.u8_2.to_service")) }
+func (t *Testroot) SetU8_2(v []uint8) error {
+	return check("u8_2", v, vec[uint8]("ts1.u8_2.to_service"))
+}
 func (t *Testroot) GetU8_3() (*rr.MultiDimArray[uint8], error) {
 	return &rr.MultiDimArray[uint8]{Dims: vec[uint32]("ts1.u8_3.to_client.dims"), Array: vec[uint8]("ts1.u8_3.to_client")}, nil
 }
 func (t *Testroot) SetU8_3(v *rr.MultiDimArray[uint8]) error {
 	return check("u8_3", v, &rr.MultiDimArray[uint8]{Dims: vec[uint32]("ts1.u8_3.to_service.dims"), Array: vec[uint8]("ts1.u8_3.to_service")})
 }
-func (t *Testroot) GetI16_1() (int16, error)    { return -13428, nil }
-func (t *Testroot) SetI16_1(v int16) error      { return check("i16_1", v, int16(2387)) }
-func (t *Testroot) GetI16_2() ([]int16, error)  { return vec[int16]("ts1.i16_2.to_client"), nil }
-func (t *Testroot) SetI16_2(v []int16) error    { return check("i16_2", v, vec[int16]("ts1.i16_2.to_service")) }
+func (t *Testroot) GetI16_1() (int16, error)   { return -13428, nil }
+func (t *Testroot) SetI16_1(v int16) error     { return check("i16_1", v, int16(2387)) }
+func (t *Testroot) GetI16_2() ([]int16, error) { return vec[int16]("ts1.i16_2.to_client"), nil }
+func (t *Testroot) SetI16_2(v []int16) error {
+	return check("i16_2", v, vec[int16]("ts1.i16_2.to_service"))
+}
 func (t *Testroot) GetU16_1() (uint16, error)   { return 60981, nil }
 func (t *Testroot) SetU16_1(v uint16) error     { return check("u16_1", v, uint16(54732)) }
 func (t *Testroot) GetU16_2() ([]uint16, error) { return vec[uint16]("ts1.u16_2.to_client"), nil }
-func (t *Testroot) SetU16_2(v []uint16) error   { return check("u16_2", v, vec[uint16]("ts1.u16_2.to_service")) }
-func (t *Testroot) GetI32_1() (int32, error)    { return 898734, nil }
-func (t *Testroot) SetI32_1(v int32) error      { return check("i32_1", v, int32(-9837284)) }
-func (t *Testroot) GetI32_2() ([]int32, error)  { return vec[int32]("ts1.i32_2.to_client"), nil }
-func (t *Testroot) SetI32_2(v []int32) error    { return check("i32_2", v, vec[int32]("ts1.i32_2.to_service")) }
+func (t *Testroot) SetU16_2(v []uint16) error {
+	return check("u16_2", v, vec[uint16]("ts1.u16_2.to_service"))
+}
+func (t *Testroot) GetI32_1() (int32, error)   { return 898734, nil }
+func (t *Testroot) SetI32_1(v int32) error     { return check("i32_1", v, int32(-9837284)) }
+func (t *Testroot) GetI32_2() ([]int32, error) { return vec[int32]("ts1.i32_2.to_client"), nil }
+func (t *Testroot) SetI32_2(v []int32) error {
+	return check("i32_2", v, vec[int32]("ts1.i32_2.to_service"))
+}
 func (t *Testroot) GetI32_huge() ([]int32, error) {
 	o := make([]int32, 2621440)
 	for i := range o {
@@ -128,17 +140,23 @@ func (t *Testroot) SetI32_huge(v []int32) error {
 func (t *Testroot) GetU32_1() (uint32, error)   { return 547919123, nil }
 func (t *Testroot) SetU32_1(v uint32) error     { return check("u32_1", v, uint32(1550099195)) }
 func (t *Testroot) GetU32_2() ([]uint32, error) { return vec[uint32]("ts1.u32_2.to_client"), nil }
-func (t *Testroot) SetU32_2(v []uint32) error   { return check("u32_2", v, vec[uint32]("ts1.u32_2.to_service")) }
-func (t *Testroot) GetI64_1() (int64, error)    { return -1357833931563696072, nil }
-func (t *Testroot) SetI64_1(v int64) error      { return check("i64_1", v, int64(8621740821050813024)) }
-func (t *Testroot) GetI64_2() ([]int64, error)  { return vec[int64]("ts1.i64_2.to_client"), nil }
-func (t *Testroot) SetI64_2(v []int64) error    { return check("i64_2", v, vec[int64]("ts1.i64_2.to_service")) }
+func (t *Testroot) SetU32_2(v []uint32) error {
+	return check("u32_2", v, vec[uint32]("ts1.u32_2.to_service"))
+}
+func (t *Testroot) GetI64_1() (int64, error)   { return -1357833931563696072, nil }
+func (t *Testroot) SetI64_1(v int64) error     { return check("i64_1", v, int64(8621740821050813024)) }
+func (t *Testroot) GetI64_2() ([]int64, error) { return vec[int64]("ts1.i64_2.to_client"), nil }
+func (t *Testroot) SetI64_2(v []int64) error {
+	return check("i64_2", v, vec[int64]("ts1.i64_2.to_service"))
+}
 func (t *Testroot) GetU64_1() (uint64, error)   { return 13389861970863644378, nil }
 func (t *Testroot) SetU64_1(v uint64) error     { return check("u64_1", v, uint64(1465640522145789825)) }
 func (t *Testroot) GetU64_2() ([]uint64, error) { return vec[uint64]("ts1.u64_2.to_client"), nil }
-func (t *Testroot) SetU64_2(v []uint64) error   { return check("u64_2", v, vec[uint64]("ts1.u64_2.to_service")) }
-func (t *Testroot) GetStr1() (string, error)    { return "Hello Client!", nil }
-func (t *Testroot) SetStr1(v string) error      { return check("str1", v, "Hello Server!") }
+func (t *Testroot) SetU64_2(v []uint64) error {
+	return check("u64_2", v, vec[uint64]("ts1.u64_2.to_service"))
+}
+func (t *Testroot) GetStr1() (string, error) { return "Hello Client!", nil }
+func (t *Testroot) SetStr1(v string) error   { return check("str1", v, "Hello Server!") }
 
 // ---- structures
 
@@ -181,7 +199,9 @@ func (t *Testroot) SetStruct1(s *ts1.Teststruct1) error {
 }
 
 func (t *Testroot) GetStruct2() (*ts1.Teststruct2, error) { return ts2s("ts1.struct2.to_client"), nil }
-func (t *Testroot) SetStruct2(v *ts1.Teststruct2) error   { return check("struct2", v, ts2s("ts1.struct2.to_service")) }
+func (t *Testroot) SetStruct2(v *ts1.Teststruct2) error {
+	return check("struct2", v, ts2s("ts1.struct2.to_service"))
+}
 
 // ---- maps
 
@@ -221,7 +241,9 @@ func (t *Testroot) GetIs_d6() (map[string]*rr.MultiDimArray[float64], error) {
 func (t *Testroot) SetIs_d6(v map[string]*rr.MultiDimArray[float64]) error {
 	return check("is_d6", v, map[string]*rr.MultiDimArray[float64]{"testval2": mdaVec("ts1.is_d6.to_service")})
 }
-func (t *Testroot) GetIs_str1() (map[int32]string, error) { return map[int32]string{23: "Hello server"}, nil }
+func (t *Testroot) GetIs_str1() (map[int32]string, error) {
+	return map[int32]string{23: "Hello server"}, nil
+}
 func (t *Testroot) SetIs_str1(v map[int32]string) error {
 	return check("is_str1", v, map[int32]string{24: "Hello client"})
 }
@@ -265,7 +287,9 @@ func (t *Testroot) SetList_d5(v []*rr.MultiDimArray[float64]) error {
 	return check("list_d5", v, []*rr.MultiDimArray[float64]{mdaVec("ts1.is_d5.to_service")})
 }
 func (t *Testroot) GetList_str1() ([]string, error) { return []string{"Hello server"}, nil }
-func (t *Testroot) SetList_str1(v []string) error   { return check("list_str1", v, []string{"Hello client"}) }
+func (t *Testroot) SetList_str1(v []string) error {
+	return check("list_str1", v, []string{"Hello client"})
+}
 func (t *Testroot) GetList_struct1() ([]*ts1.Teststruct2, error) {
 	return []*ts1.Teststruct2{ts2s("ts1.is_struct1.to_client")}, nil
 }
@@ -305,7 +329,9 @@ func (t *Testroot) SetVar2(v map[int32]any) error {
 	return nil
 }
 func (t *Testroot) GetVar_num() (any, error) { return vec[int32]("ts1.var_num.to_client"), nil }
-func (t *Testroot) SetVar_num(v any) error   { return check("var_num", v, vec[int32]("ts1.var_num.to_service")) }
+func (t *Testroot) SetVar_num(v any) error {
+	return check("var_num", v, vec[int32]("ts1.var_num.to_service"))
+}
 func (t *Testroot) GetVar_str() (any, error) { return "Hello Client!", nil }
 func (t *Testroot) SetVar_str(v any) error   { return check("var_str", v, "Hello Server!") }
 func (t *Testroot) GetVar_struct() (any, error) {
@@ -318,7 +344,9 @@ func (t *Testroot) GetVar_vector() (any, error) { return map[int32]any{10: "Hell
 func (t *Testroot) SetVar_vector(v any) error {
 	return check("var_vector", v, map[int32]any{11: "Hello Server!"})
 }
-func (t *Testroot) GetVar_dictionary() (any, error) { return map[string]any{"test1": "Hello Client!"}, nil }
+func (t *Testroot) GetVar_dictionary() (any, error) {
+	return map[string]any{"test1": "Hello Client!"}, nil
+}
 func (t *Testroot) SetVar_dictionary(v any) error {
 	return check("var_dictionary", v, map[string]any{"test2": "Hello Server!"})
 }
@@ -331,8 +359,12 @@ func (t *Testroot) SetVar_multidimarray(v any) error {
 	return check("var_multidimarray", v, mdaVec("ts1.var_multidimarray.to_service"))
 }
 
-func (t *Testroot) GetErrtest() (float64, error) { return 0, rr.NewRemoteError("std::runtime_error", "This is a test") }
-func (t *Testroot) SetErrtest(float64) error     { return rr.NewRemoteError("std::runtime_error", "This is a test") }
+func (t *Testroot) GetErrtest() (float64, error) {
+	return 0, rr.NewRemoteError("std::runtime_error", "This is a test")
+}
+func (t *Testroot) SetErrtest(float64) error {
+	return rr.NewRemoteError("std::runtime_error", "This is a test")
+}
 func (t *Testroot) GetNulltest() (*ts1.Teststruct1, error) { return nil, nil }
 func (t *Testroot) SetNulltest(v *ts1.Teststruct1) error {
 	if v != nil {
@@ -677,8 +709,8 @@ type sub3Impl struct {
 	ind string
 }
 
-func (s *sub3Impl) GetInd() (string, error)       { return s.ind, nil }
-func (s *sub3Impl) SetInd(string) error           { return nil }
+func (s *sub3Impl) GetInd() (string, error)        { return s.ind, nil }
+func (s *sub3Impl) SetInd(string) error            { return nil }
 func (s *sub3Impl) Add(d float64) (float64, error) { return d + 42, nil }
 
 // TestService2SubObj implements com.robotraconteur.testing.TestService2.subobj.

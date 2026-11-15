@@ -341,13 +341,17 @@ func (c *WireConnection[T]) OutValueValid() bool { return c.native.GetOutValueVa
 // WaitInValueValid waits for the in value to become valid.
 func (c *WireConnection[T]) WaitInValueValid(timeout time.Duration) (bool, error) {
 	t := timeoutMs(timeout)
-	return call(func() bool { return swig.SwigcptrWrappedWireConnection(c.native.Swigcptr()).WaitInValueValid__SWIG_0(t) })
+	return call(func() bool {
+		return swig.SwigcptrWrappedWireConnection(c.native.Swigcptr()).WaitInValueValid__SWIG_0(t)
+	})
 }
 
 // WaitOutValueValid waits for the out value to become valid.
 func (c *WireConnection[T]) WaitOutValueValid(timeout time.Duration) (bool, error) {
 	t := timeoutMs(timeout)
-	return call(func() bool { return swig.SwigcptrWrappedWireConnection(c.native.Swigcptr()).WaitOutValueValid__SWIG_0(t) })
+	return call(func() bool {
+		return swig.SwigcptrWrappedWireConnection(c.native.Swigcptr()).WaitOutValueValid__SWIG_0(t)
+	})
 }
 
 // LastValueReceivedTime returns the timestamp of the last received value.
@@ -379,7 +383,9 @@ func (c *WireConnection[T]) InValueLifespan() time.Duration {
 }
 
 // SetInValueLifespan sets the lifespan of in values.
-func (c *WireConnection[T]) SetInValueLifespan(t time.Duration) { c.native.SetInValueLifespan(timeoutMs(t)) }
+func (c *WireConnection[T]) SetInValueLifespan(t time.Duration) {
+	c.native.SetInValueLifespan(timeoutMs(t))
+}
 
 // OutValueLifespan returns the lifespan of out values.
 func (c *WireConnection[T]) OutValueLifespan() time.Duration {
@@ -387,7 +393,9 @@ func (c *WireConnection[T]) OutValueLifespan() time.Duration {
 }
 
 // SetOutValueLifespan sets the lifespan of out values.
-func (c *WireConnection[T]) SetOutValueLifespan(t time.Duration) { c.native.SetOutValueLifespan(timeoutMs(t)) }
+func (c *WireConnection[T]) SetOutValueLifespan(t time.Duration) {
+	c.native.SetOutValueLifespan(timeoutMs(t))
+}
 
 func lifespan(ms int32) time.Duration {
 	if ms < 0 {

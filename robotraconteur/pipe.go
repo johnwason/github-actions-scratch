@@ -188,7 +188,9 @@ func (e *PipeEndpoint[T]) IgnoreReceived() bool { return e.native.GetIgnoreRecei
 func (e *PipeEndpoint[T]) SetIgnoreReceived(v bool) { e.native.SetIgnoreReceived(v) }
 
 // PacketReceivedEvent is fired when a packet is received.
-func (e *PipeEndpoint[T]) PacketReceivedEvent() *Event[func(*PipeEndpoint[T])] { return &e.packetReceived }
+func (e *PipeEndpoint[T]) PacketReceivedEvent() *Event[func(*PipeEndpoint[T])] {
+	return &e.packetReceived
+}
 
 // PacketAckReceivedEvent is fired when a packet ack is received.
 func (e *PipeEndpoint[T]) PacketAckReceivedEvent() *Event[func(*PipeEndpoint[T], uint32)] {

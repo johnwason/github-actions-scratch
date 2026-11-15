@@ -266,7 +266,9 @@ func (t *Testroot3) SetWriteme(int32) error              { return nil }
 func (t *Testroot3) Readmem() rr.ArrayMemory[float64]    { return nil }
 func (t *Testroot3) GetO4() (ts3.Obj4, error)            { return &obj4Impl{}, nil }
 
-func (t *Testroot3) GetTestenum1_prop() (ts3.Testenum1, error) { return ts3.Testenum1_anothervalue, nil }
+func (t *Testroot3) GetTestenum1_prop() (ts3.Testenum1, error) {
+	return ts3.Testenum1_anothervalue, nil
+}
 func (t *Testroot3) SetTestenum1_prop(v ts3.Testenum1) error {
 	return check("testenum1_prop", v, ts3.Testenum1_hexval1)
 }
@@ -280,7 +282,9 @@ func (t *Testroot3) Testpod1_func1(s ts3.Testpod1) error {
 }
 func (t *Testroot3) Testpod1_func2() (ts3.Testpod1, error) { return FillTestpod1(95836295), nil }
 
-func (t *Testroot3) GetTeststruct3_prop() (*ts3.Teststruct3, error) { return FillTeststruct3(16483675), nil }
+func (t *Testroot3) GetTeststruct3_prop() (*ts3.Teststruct3, error) {
+	return FillTeststruct3(16483675), nil
+}
 func (t *Testroot3) SetTeststruct3_prop(v *ts3.Teststruct3) error {
 	want := FillTeststruct3(858362)
 	if v == nil {
@@ -357,7 +361,9 @@ func (t *Testroot3) Gen_func5() (rr.Generator1[*ts1.Teststruct2, *ts1.Teststruct
 	return nil, nil
 }
 
-func (t *Testroot3) GetTestnamedarray1() (ts3.Vector3, error) { return FillTransform(74637).Translation, nil }
+func (t *Testroot3) GetTestnamedarray1() (ts3.Vector3, error) {
+	return FillTransform(74637).Translation, nil
+}
 func (t *Testroot3) SetTestnamedarray1(v ts3.Vector3) error {
 	return check("testnamedarray1", v, FillTransform(3956378).Translation)
 }
@@ -365,7 +371,9 @@ func (t *Testroot3) GetTestnamedarray2() (ts3.Transform, error) { return FillTra
 func (t *Testroot3) SetTestnamedarray2(v ts3.Transform) error {
 	return check("testnamedarray2", v, FillTransform(827635))
 }
-func (t *Testroot3) GetTestnamedarray3() ([]ts3.Transform, error) { return FillTransformArray(8, 837512), nil }
+func (t *Testroot3) GetTestnamedarray3() ([]ts3.Transform, error) {
+	return FillTransformArray(8, 837512), nil
+}
 func (t *Testroot3) SetTestnamedarray3(v []ts3.Transform) error {
 	return check("testnamedarray3", v, FillTransformArray(6, 19274))
 }
@@ -388,7 +396,9 @@ func (t *Testroot3) GetC1() (complex128, error) { return complex(5.708705e+01, -
 func (t *Testroot3) SetC1(v complex128) error {
 	return check("c1", v, complex(5.708705e+01, -2.328294e-03))
 }
-func (t *Testroot3) GetC2() ([]complex128, error) { return cdoubles(vec[float64]("ts3.c2.to_client")), nil }
+func (t *Testroot3) GetC2() ([]complex128, error) {
+	return cdoubles(vec[float64]("ts3.c2.to_client")), nil
+}
 func (t *Testroot3) SetC2(v []complex128) error {
 	return check("c2", v, cdoubles(vec[float64]("ts3.c2.to_service")))
 }
@@ -404,11 +414,15 @@ func (t *Testroot3) GetC5() ([][]complex128, error) {
 func (t *Testroot3) SetC5(v [][]complex128) error {
 	return check("c5", v, [][]complex128{cdoubles(vec[float64]("ts3.c5.to_service"))})
 }
-func (t *Testroot3) GetC7() (complex64, error) { return complex64(complex(-5.527021e-18, -9.848457e+03)), nil }
+func (t *Testroot3) GetC7() (complex64, error) {
+	return complex64(complex(-5.527021e-18, -9.848457e+03)), nil
+}
 func (t *Testroot3) SetC7(v complex64) error {
 	return check("c7", v, complex64(complex(9.303345e-12, -3.865684e-05)))
 }
-func (t *Testroot3) GetC8() ([]complex64, error) { return csingles(vec[float32]("ts3.c8.to_client")), nil }
+func (t *Testroot3) GetC8() ([]complex64, error) {
+	return csingles(vec[float32]("ts3.c8.to_client")), nil
+}
 func (t *Testroot3) SetC8(v []complex64) error {
 	return check("c8", v, csingles(vec[float32]("ts3.c8.to_service")))
 }

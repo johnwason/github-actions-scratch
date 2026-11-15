@@ -110,7 +110,9 @@ func (t *TCPTransport) SetRequireTLS(v bool) { t.native.SetRequireTls(v) }
 // IsTransportConnectionSecure reports whether the connection of a client
 // endpoint (service side) uses TLS.
 func (t *TCPTransport) IsTransportConnectionSecure(endpoint uint32) (bool, error) {
-	return call(func() bool { return swig.SwigcptrTcpTransport(t.native.Swigcptr()).IsTransportConnectionSecure__SWIG_0(endpoint) })
+	return call(func() bool {
+		return swig.SwigcptrTcpTransport(t.native.Swigcptr()).IsTransportConnectionSecure__SWIG_0(endpoint)
+	})
 }
 
 // Close closes the transport.

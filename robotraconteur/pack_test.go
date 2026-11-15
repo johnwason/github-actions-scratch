@@ -99,9 +99,9 @@ func (p *testPod) RRUnpackPod(elems []*Element) error {
 
 type testVec3 struct{ X, Y, Z float64 }
 
-func (testVec3) RRType() string        { return "experimental.gotest.vec3" }
-func (testVec3) RRElementCount() int   { return 3 }
-func (v testVec3) RRToArray(d []float64) { d[0], d[1], d[2] = v.X, v.Y, v.Z }
+func (testVec3) RRType() string             { return "experimental.gotest.vec3" }
+func (testVec3) RRElementCount() int        { return 3 }
+func (v testVec3) RRToArray(d []float64)    { d[0], d[1], d[2] = v.X, v.Y, v.Z }
 func (v *testVec3) RRFromArray(s []float64) { v.X, v.Y, v.Z = s[0], s[1], s[2] }
 
 func init() {
@@ -178,10 +178,10 @@ func TestPackMultiDimArray(t *testing.T) {
 func TestPackStructurePodNamedArray(t *testing.T) {
 	s := &testStruct{
 		D: 1.5, A: []int32{1, 2, 3}, S: "abc",
-		M: map[string]float64{"x": 1, "y": 2},
-		L: []*testStruct{{D: 2, A: []int32{}, S: "child", P: testPod{A: 1}}},
-		V: []float64{4, 5},
-		P: testPod{A: -3, B: [3]float32{1, 2, 3}, E: 2},
+		M:  map[string]float64{"x": 1, "y": 2},
+		L:  []*testStruct{{D: 2, A: []int32{}, S: "child", P: testPod{A: 1}}},
+		V:  []float64{4, 5},
+		P:  testPod{A: -3, B: [3]float32{1, 2, 3}, E: 2},
 		NA: testVec3{1, 2, 3},
 	}
 	e, err := PackStructure("s", s)

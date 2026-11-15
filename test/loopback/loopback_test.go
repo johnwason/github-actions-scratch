@@ -19,13 +19,16 @@ const port = 22231
 
 type testroot struct {
 	ts1.TestrootDefaultImpl
-	o1      *sub1
-	cbDone  chan error
-	pipeRx  chan []float64
-	wireRx  chan []float64
-	m1      *rr.SliceArrayMemory[float64]
-	once    sync.Once
+	o1     *sub1
+	cbDone chan error
+	pipeRx chan []float64
+	wireRx chan []float64
+	m1     *rr.SliceArrayMemory[float64]
+	once   sync.Once
+	bwire  *rr.Wire[float64]
 }
+
+func (t *testroot) SetBroadcastwire(w *rr.Wire[float64]) { t.bwire = w }
 
 func (t *testroot) Func3(d1, d2 float64) (float64, error) { return d1 + d2, nil }
 func (t *testroot) Func_errtest() error {
@@ -38,7 +41,7 @@ func (t *testroot) Func1() error {
 	}
 	return nil
 }
-func (t *testroot) GetO1() (ts1.Sub1, error) { return t.o1, nil }
+func (t *testroot) GetO1() (ts1.Sub1, error)    { return t.o1, nil }
 func (t *testroot) M1() rr.ArrayMemory[float64] { return t.m1 }
 func (t *testroot) Test_callbacks() error {
 	ep, err := rr.CurrentEndpoint()
@@ -101,7 +104,7 @@ func TestMain(m *testing.M) {
 	node = setup.Node
 	root := &testroot{o1: &sub1{}, cbDone: make(chan error, 1), m1: rr.NewArrayMemory(make([]float64, 100))}
 	root.SetD1(1.5)
-	if _, err := node.RegisterService("go_test", "com.robotraconteur.testing.TestService1.testroot", root); err != nil {
+	if testCtx, err = node.RegisterService("go_test", "com.robotraconteur.testing.TestService1.testroot", root); err != nil {
 		fmt.Println("register:", err)
 		os.Exit(1)
 	}
@@ -111,7 +114,10 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-var testRoot *testroot
+var (
+	testRoot *testroot
+	testCtx  *rr.ServerContext
+)
 
 func connect(t *testing.T) ts1.Testroot {
 	t.Helper()

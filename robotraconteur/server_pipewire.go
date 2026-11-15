@@ -88,7 +88,9 @@ func (b *PipeBroadcaster[T]) SendPacket(v T) error {
 }
 
 // ActivePipeEndpointCount returns the number of connected endpoints.
-func (b *PipeBroadcaster[T]) ActivePipeEndpointCount() int { return int(b.native.GetActivePipeEndpointCount()) }
+func (b *PipeBroadcaster[T]) ActivePipeEndpointCount() int {
+	return int(b.native.GetActivePipeEndpointCount())
+}
 
 // MaxBacklog returns the maximum backlog.
 func (b *PipeBroadcaster[T]) MaxBacklog() int32 { return b.native.GetMaxBacklog() }
@@ -96,7 +98,9 @@ func (b *PipeBroadcaster[T]) MaxBacklog() int32 { return b.native.GetMaxBacklog(
 // SetMaxBacklog sets the maximum backlog.
 func (b *PipeBroadcaster[T]) SetMaxBacklog(n int32) { b.native.SetMaxBacklog(n) }
 
-type pipePredicate struct{ f func(endpoint uint32, index int32) bool }
+type pipePredicate struct {
+	f func(endpoint uint32, index int32) bool
+}
 
 func (p *pipePredicate) Predicate(ep uint32, index int32) bool {
 	defer recoverDirector()
@@ -306,10 +310,14 @@ func (b *WireBroadcaster[T]) ActiveWireConnectionCount() int {
 }
 
 // OutValueLifespan returns the lifespan of the out value.
-func (b *WireBroadcaster[T]) OutValueLifespan() time.Duration { return lifespan(b.native.GetOutValueLifespan()) }
+func (b *WireBroadcaster[T]) OutValueLifespan() time.Duration {
+	return lifespan(b.native.GetOutValueLifespan())
+}
 
 // SetOutValueLifespan sets the lifespan of the out value.
-func (b *WireBroadcaster[T]) SetOutValueLifespan(t time.Duration) { b.native.SetOutValueLifespan(timeoutMs(t)) }
+func (b *WireBroadcaster[T]) SetOutValueLifespan(t time.Duration) {
+	b.native.SetOutValueLifespan(timeoutMs(t))
+}
 
 type wirePredicate struct{ f func(endpoint uint32) bool }
 
@@ -398,16 +406,20 @@ func (r *WireUnicastReceiver[T]) InValueChanged() *Event[func(value T, ts TimeSp
 }
 
 // InValueLifespan returns the lifespan of the in value.
-func (r *WireUnicastReceiver[T]) InValueLifespan() time.Duration { return lifespan(r.native.GetInValueLifespan()) }
+func (r *WireUnicastReceiver[T]) InValueLifespan() time.Duration {
+	return lifespan(r.native.GetInValueLifespan())
+}
 
 // SetInValueLifespan sets the lifespan of the in value.
-func (r *WireUnicastReceiver[T]) SetInValueLifespan(t time.Duration) { r.native.SetInValueLifespan(timeoutMs(t)) }
+func (r *WireUnicastReceiver[T]) SetInValueLifespan(t time.Duration) {
+	r.native.SetInValueLifespan(timeoutMs(t))
+}
 
 var (
-	_ swig.WrappedPipeServerConnectDirectorMethods       = (*pipeServerConnect[int32])(nil)
+	_ swig.WrappedPipeServerConnectDirectorMethods        = (*pipeServerConnect[int32])(nil)
 	_ swig.WrappedPipeBroadcasterPredicateDirectorMethods = (*pipePredicate)(nil)
-	_ swig.WrappedWireServerConnectDirectorMethods       = (*wireServerConnect[int32])(nil)
-	_ swig.WrappedWireServerPeekValueDirectorMethods     = (*wirePeek[int32])(nil)
-	_ swig.WrappedWireServerPokeValueDirectorMethods     = (*wirePoke[int32])(nil)
+	_ swig.WrappedWireServerConnectDirectorMethods        = (*wireServerConnect[int32])(nil)
+	_ swig.WrappedWireServerPeekValueDirectorMethods      = (*wirePeek[int32])(nil)
+	_ swig.WrappedWireServerPokeValueDirectorMethods      = (*wirePoke[int32])(nil)
 	_ swig.WrappedWireBroadcasterPredicateDirectorMethods = (*wirePredicate)(nil)
 )

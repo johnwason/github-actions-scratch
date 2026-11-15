@@ -612,11 +612,11 @@ func UnpackList[T any](e *Element, unpack UnpackFunc[T]) ([]T, error) {
 // typeInfo describes a registered structure, pod or namedarray type so it can
 // be packed/unpacked as a varvalue.
 type typeInfo struct {
-	kind            DataType // DataTypeStructure, DataTypePod or DataTypeNamedArray
-	newStructure    func() Structure
-	packValue       func(v any) (*NestedList, bool, error) // value, []value or multidim
-	unpackArray     func(l *NestedList) (any, error)
-	unpackMultiDim  func(l *NestedList) (any, error)
+	kind           DataType // DataTypeStructure, DataTypePod or DataTypeNamedArray
+	newStructure   func() Structure
+	packValue      func(v any) (*NestedList, bool, error) // value, []value or multidim
+	unpackArray    func(l *NestedList) (any, error)
+	unpackMultiDim func(l *NestedList) (any, error)
 }
 
 var typeRegistry = map[string]*typeInfo{}

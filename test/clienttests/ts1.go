@@ -194,8 +194,8 @@ func TestProperties(t *testing.T, r ts1.Testroot) {
 		Vec3:  map[int32]string{10: "Hello Server!", 11: "Hello Server, again", 46372: "Test string!", 46373: "Test string again"},
 		Dict4: map[string]string{"cteststring1": "Hello Server!", "cteststring2": "Hello Server, again"},
 		List5: []string{"Hello Server!", "Hello Server, again"}, Struct1: t2("ts1.struct1.struct1_mydat.to_service"),
-		Dstruct2: map[string]*ts1.Teststruct2{"ctest1": t2("ts1.struct1.dstruct2_1.to_service"), "anothertest": t2("ts1.struct1.dstruct2_2.to_service")},
-		Lstruct3: []*ts1.Teststruct2{t2("ts1.struct1.dstruct2_1.to_service"), t2("ts1.struct1.dstruct2_2.to_service")},
+		Dstruct2:      map[string]*ts1.Teststruct2{"ctest1": t2("ts1.struct1.dstruct2_1.to_service"), "anothertest": t2("ts1.struct1.dstruct2_2.to_service")},
+		Lstruct3:      []*ts1.Teststruct2{t2("ts1.struct1.dstruct2_1.to_service"), t2("ts1.struct1.dstruct2_2.to_service")},
 		Multidimarray: mda("ts1.struct1.multidimarray.to_service"), Var3: v("ts1.struct1.var3.to_service"),
 	}))
 	eq(t, "struct2", get(t, "struct2", r.GetStruct2), t2("ts1.struct2.to_client"))

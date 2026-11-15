@@ -515,7 +515,9 @@ func (s *WireSubscription[T]) InValue() (T, TimeSpec, error) {
 // WaitInValueValid waits for a value.
 func (s *WireSubscription[T]) WaitInValueValid(timeout time.Duration) (bool, error) {
 	t := timeoutMs(timeout)
-	return call(func() bool { return swig.SwigcptrWrappedWireSubscription(s.native.Swigcptr()).WaitInValueValid__SWIG_0(t) })
+	return call(func() bool {
+		return swig.SwigcptrWrappedWireSubscription(s.native.Swigcptr()).WaitInValueValid__SWIG_0(t)
+	})
 }
 
 // ActiveWireConnectionCount returns the number of connected wires.
@@ -524,10 +526,14 @@ func (s *WireSubscription[T]) ActiveWireConnectionCount() int {
 }
 
 // InValueLifespan returns the lifespan of received values.
-func (s *WireSubscription[T]) InValueLifespan() time.Duration { return lifespan(s.native.GetInValueLifespan()) }
+func (s *WireSubscription[T]) InValueLifespan() time.Duration {
+	return lifespan(s.native.GetInValueLifespan())
+}
 
 // SetInValueLifespan sets the lifespan of received values.
-func (s *WireSubscription[T]) SetInValueLifespan(t time.Duration) { s.native.SetInValueLifespan(timeoutMs(t)) }
+func (s *WireSubscription[T]) SetInValueLifespan(t time.Duration) {
+	s.native.SetInValueLifespan(timeoutMs(t))
+}
 
 // Close closes the wire subscription.
 func (s *WireSubscription[T]) Close() error { return callVoid(func() { s.native.Close() }) }
@@ -584,7 +590,9 @@ func SubscribePipeCodec[T any](s *ServiceSubscription, member, servicePath strin
 }
 
 // PipePacketReceived is fired when packets are available.
-func (s *PipeSubscription[T]) PipePacketReceived() *Event[func(s *PipeSubscription[T])] { return &s.received }
+func (s *PipeSubscription[T]) PipePacketReceived() *Event[func(s *PipeSubscription[T])] {
+	return &s.received
+}
 
 // Available returns the number of queued packets.
 func (s *PipeSubscription[T]) Available() int { return int(s.native.Available()) }

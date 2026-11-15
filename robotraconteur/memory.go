@@ -388,7 +388,9 @@ type SliceArrayMemory[T Primitive] struct {
 }
 
 // NewArrayMemory returns an ArrayMemory backed by data (shared, not copied).
-func NewArrayMemory[T Primitive](data []T) *SliceArrayMemory[T] { return &SliceArrayMemory[T]{data: data} }
+func NewArrayMemory[T Primitive](data []T) *SliceArrayMemory[T] {
+	return &SliceArrayMemory[T]{data: data}
+}
 
 // Data returns the backing slice.
 func (m *SliceArrayMemory[T]) Data() []T { return m.data }
@@ -436,7 +438,9 @@ func NewMultiDimArrayMemory[T Primitive](data *MultiDimArray[T]) *SliceMultiDimA
 func (m *SliceMultiDimArrayMemory[T]) Data() *MultiDimArray[T] { return m.data }
 
 func (m *SliceMultiDimArrayMemory[T]) Dimensions() ([]uint64, error) { return dims64(m.data.Dims), nil }
-func (m *SliceMultiDimArrayMemory[T]) DimCount() (uint64, error)     { return uint64(len(m.data.Dims)), nil }
+func (m *SliceMultiDimArrayMemory[T]) DimCount() (uint64, error) {
+	return uint64(len(m.data.Dims)), nil
+}
 
 func (m *SliceMultiDimArrayMemory[T]) Read(memorypos []uint64, buffer *MultiDimArray[T], bufferpos, count []uint64) error {
 	m.mu.Lock()
@@ -457,10 +461,14 @@ type SlicePodArrayMemory[T any] struct {
 }
 
 // NewPodArrayMemory returns a pod array memory backed by data.
-func NewPodArrayMemory[T Pod](data []T) *SlicePodArrayMemory[T] { return &SlicePodArrayMemory[T]{data: data} }
+func NewPodArrayMemory[T Pod](data []T) *SlicePodArrayMemory[T] {
+	return &SlicePodArrayMemory[T]{data: data}
+}
 
 // NewNamedArrayMemory returns a namedarray array memory backed by data.
-func NewNamedArrayMemory[T any](data []T) *SlicePodArrayMemory[T] { return &SlicePodArrayMemory[T]{data: data} }
+func NewNamedArrayMemory[T any](data []T) *SlicePodArrayMemory[T] {
+	return &SlicePodArrayMemory[T]{data: data}
+}
 
 // Data returns the backing slice.
 func (m *SlicePodArrayMemory[T]) Data() []T { return m.data }
@@ -504,9 +512,13 @@ func NewPodMultiDimArrayMemory[T Pod](data *PodMultiDimArray[T]) *SlicePodMultiD
 	return &SlicePodMultiDimArrayMemory[T]{data: data}
 }
 
-func (m *SlicePodMultiDimArrayMemory[T]) Data() *PodMultiDimArray[T]   { return m.data }
-func (m *SlicePodMultiDimArrayMemory[T]) Dimensions() ([]uint64, error) { return dims64(m.data.Dims), nil }
-func (m *SlicePodMultiDimArrayMemory[T]) DimCount() (uint64, error)     { return uint64(len(m.data.Dims)), nil }
+func (m *SlicePodMultiDimArrayMemory[T]) Data() *PodMultiDimArray[T] { return m.data }
+func (m *SlicePodMultiDimArrayMemory[T]) Dimensions() ([]uint64, error) {
+	return dims64(m.data.Dims), nil
+}
+func (m *SlicePodMultiDimArrayMemory[T]) DimCount() (uint64, error) {
+	return uint64(len(m.data.Dims)), nil
+}
 
 func (m *SlicePodMultiDimArrayMemory[T]) Read(memorypos []uint64, buffer *PodMultiDimArray[T], bufferpos, count []uint64) error {
 	m.mu.Lock()
@@ -535,7 +547,9 @@ func (m *SliceNamedMultiDimArrayMemory[T]) Data() *NamedMultiDimArray[T] { retur
 func (m *SliceNamedMultiDimArrayMemory[T]) Dimensions() ([]uint64, error) {
 	return dims64(m.data.Dims), nil
 }
-func (m *SliceNamedMultiDimArrayMemory[T]) DimCount() (uint64, error) { return uint64(len(m.data.Dims)), nil }
+func (m *SliceNamedMultiDimArrayMemory[T]) DimCount() (uint64, error) {
+	return uint64(len(m.data.Dims)), nil
+}
 
 func (m *SliceNamedMultiDimArrayMemory[T]) Read(memorypos []uint64, buffer *NamedMultiDimArray[T], bufferpos, count []uint64) error {
 	m.mu.Lock()
@@ -554,12 +568,12 @@ func (m *SliceNamedMultiDimArrayMemory[T]) Write(memorypos []uint64, buffer *Nam
 // MemoryServer is an opaque native memory adapter returned by generated
 // skeletons for memory members.
 type MemoryServer struct {
-	array      swig.WrappedArrayMemoryDirector
-	multidim   swig.WrappedMultiDimArrayMemoryDirector
-	pod        swig.WrappedPodArrayMemoryDirector
-	podmd      swig.WrappedPodMultiDimArrayMemoryDirector
-	named      swig.WrappedNamedArrayMemoryDirector
-	namedmd    swig.WrappedNamedMultiDimArrayMemoryDirector
+	array    swig.WrappedArrayMemoryDirector
+	multidim swig.WrappedMultiDimArrayMemoryDirector
+	pod      swig.WrappedPodArrayMemoryDirector
+	podmd    swig.WrappedPodMultiDimArrayMemoryDirector
+	named    swig.WrappedNamedArrayMemoryDirector
+	namedmd  swig.WrappedNamedMultiDimArrayMemoryDirector
 }
 
 type arrayMemoryDirector[T Primitive] struct{ mem ArrayMemory[T] }
@@ -1254,4 +1268,3 @@ func NewNamedMultiDimArrayMemoryClient[T NamedArray[E], E Primitive, P NamedArra
 	return &namedMultiDimArrayMemoryClient[T]{elementMultiDimMemoryClient[T]{named: m,
 		codec: mdListCodec[T]{list: namedListCodec[T, E, P](), typeName: zero.RRType(), mdType: DataTypeNamedArrayMultiDimArray}}}, nil
 }
-

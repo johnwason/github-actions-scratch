@@ -2,6 +2,7 @@ package robotraconteur
 
 import (
 	"fmt"
+	"math"
 	"sync"
 	"time"
 
@@ -384,6 +385,11 @@ func (n *Node) ObjectType(obj any) (string, error) {
 	return call(func() string { return n.native.GetObjectType(b.inner) })
 }
 
+// timeFromMicros converts microseconds since the Unix epoch. The native
+// not_a_date_time value (math.MinInt64) becomes the zero time.Time.
 func timeFromMicros(us int64) time.Time {
+	if us == math.MinInt64 {
+		return time.Time{}
+	}
 	return time.UnixMicro(us).UTC()
 }

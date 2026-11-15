@@ -14,5 +14,6 @@ scripts/gen_test.sh
 PKGS=${*:-./...}
 # -unsafeptr=false: C++ owned memory (RRBaseArray::void_ptr, SWIG handles) is
 # reached through uintptr by design; it is never Go heap memory.
+(cd build/go && ctest --output-on-failure)
 go vet -unsafeptr=false $PKGS
 go test -count=1 -timeout 600s $PKGS

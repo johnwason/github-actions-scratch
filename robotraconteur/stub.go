@@ -264,11 +264,11 @@ type ClientServiceListenerEventType int32
 
 // Client connection events.
 const (
-	ClientClosed                     ClientServiceListenerEventType = 1
-	ClientConnectionTimeout          ClientServiceListenerEventType = 2
-	TransportConnectionConnected     ClientServiceListenerEventType = 3
-	TransportConnectionClosed        ClientServiceListenerEventType = 4
-	ServicePathReleased              ClientServiceListenerEventType = 5
+	ClientClosed                 ClientServiceListenerEventType = 1
+	ClientConnectionTimeout      ClientServiceListenerEventType = 2
+	TransportConnectionConnected ClientServiceListenerEventType = 3
+	TransportConnectionClosed    ClientServiceListenerEventType = 4
+	ServicePathReleased          ClientServiceListenerEventType = 5
 )
 
 // ClientServiceListenerEvent is passed to a connection listener.

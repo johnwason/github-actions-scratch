@@ -89,3 +89,11 @@ add_custom_target(rrgo_errors ALL DEPENDS "${CMAKE_SOURCE_DIR}/robotraconteur/er
 find_package(Boost REQUIRED COMPONENTS program_options filesystem)
 add_executable(RobotRaconteurGenGo gen/main.cpp gen/GoServiceLangGen.cpp gen/GoServiceLangGen.h)
 target_link_libraries(RobotRaconteurGenGo RobotRaconteurCore Boost::program_options Boost::filesystem)
+
+# Generator golden test (ctest -R test_gen_go). Update with:
+#   cmake -DUPDATE=ON -DGEN=... -P cmake/check_golden.cmake (see scripts/update_golden.sh)
+enable_testing()
+add_test(NAME test_gen_go
+         COMMAND ${CMAKE_COMMAND} -DGEN=$<TARGET_FILE:RobotRaconteurGenGo> -DROBDEF_DIR=${RR_SOURCE_DIR}/test/robdef
+                 -DOUT=${CMAKE_BINARY_DIR}/gen_golden -DGOLDEN=${CMAKE_SOURCE_DIR}/test/golden -P
+                 ${CMAKE_SOURCE_DIR}/cmake/check_golden.cmake)

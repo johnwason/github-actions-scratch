@@ -355,7 +355,9 @@ type SliceGenerator[R any] struct {
 }
 
 // NewSliceGenerator2 returns a Generator2 producing values in order.
-func NewSliceGenerator2[R any](values []R) *SliceGenerator[R] { return &SliceGenerator[R]{values: values} }
+func NewSliceGenerator2[R any](values []R) *SliceGenerator[R] {
+	return &SliceGenerator[R]{values: values}
+}
 
 // Next returns the next value or ErrStopIteration.
 func (g *SliceGenerator[R]) Next() (R, error) {

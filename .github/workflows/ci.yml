@@ -56,3 +56,8 @@ jobs:
           RRGO_CACHE_DIR: ${{ runner.temp }}/rr-go-cache
           RR_SRC_DIR: ${{ github.workspace }}/robotraconteur
         run: robotraconteur_go/scripts/podman.sh test
+      - name: Check upstream merge patch
+        env:
+          RRGO_CACHE_DIR: ${{ runner.temp }}/rr-go-cache
+          RR_SRC_DIR: ${{ github.workspace }}/robotraconteur
+        run: robotraconteur_go/scripts/podman.sh shell scripts/check_upstream_merge.sh

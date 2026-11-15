@@ -1,0 +1,17 @@
+service rostopic_sensor_msgs__RelativeHumidity
+
+stdver 0.10
+
+import rosmsg_sensor_msgs__RelativeHumidity
+
+object subscriber
+    pipe rosmsg_sensor_msgs__RelativeHumidity.RelativeHumidity subscriberpipe [readonly]
+    wire rosmsg_sensor_msgs__RelativeHumidity.RelativeHumidity subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_sensor_msgs__RelativeHumidity.RelativeHumidity m)
+    pipe rosmsg_sensor_msgs__RelativeHumidity.RelativeHumidity publisherpipe [writeonly]
+    wire rosmsg_sensor_msgs__RelativeHumidity.RelativeHumidity publisherwire [writeonly]
+end

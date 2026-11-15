@@ -1,0 +1,11 @@
+service rosmsg_geometry_msgs__Transform
+
+stdver 0.10
+
+import rosmsg_geometry_msgs__Vector3
+import rosmsg_geometry_msgs__Quaternion
+
+struct Transform
+    field rosmsg_geometry_msgs__Vector3.Vector3 translation
+    field rosmsg_geometry_msgs__Quaternion.Quaternion rotation
+end

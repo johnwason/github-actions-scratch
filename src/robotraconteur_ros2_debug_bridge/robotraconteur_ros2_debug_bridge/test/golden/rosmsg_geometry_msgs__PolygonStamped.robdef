@@ -1,0 +1,11 @@
+service rosmsg_geometry_msgs__PolygonStamped
+
+stdver 0.10
+
+import rosmsg_std_msgs__Header
+import rosmsg_geometry_msgs__Polygon
+
+struct PolygonStamped
+    field rosmsg_std_msgs__Header.Header header
+    field rosmsg_geometry_msgs__Polygon.Polygon polygon
+end

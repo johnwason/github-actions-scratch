@@ -1,0 +1,17 @@
+service rostopic_geometry_msgs__VelocityWithCovarianceStamped
+
+stdver 0.10
+
+import rosmsg_geometry_msgs__VelocityWithCovarianceStamped
+
+object subscriber
+    pipe rosmsg_geometry_msgs__VelocityWithCovarianceStamped.VelocityWithCovarianceStamped subscriberpipe [readonly]
+    wire rosmsg_geometry_msgs__VelocityWithCovarianceStamped.VelocityWithCovarianceStamped subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_geometry_msgs__VelocityWithCovarianceStamped.VelocityWithCovarianceStamped m)
+    pipe rosmsg_geometry_msgs__VelocityWithCovarianceStamped.VelocityWithCovarianceStamped publisherpipe [writeonly]
+    wire rosmsg_geometry_msgs__VelocityWithCovarianceStamped.VelocityWithCovarianceStamped publisherwire [writeonly]
+end

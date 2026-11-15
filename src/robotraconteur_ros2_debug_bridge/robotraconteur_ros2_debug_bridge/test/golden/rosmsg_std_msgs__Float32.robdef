@@ -1,0 +1,7 @@
+service rosmsg_std_msgs__Float32
+
+stdver 0.10
+
+struct Float32
+    field single data
+end

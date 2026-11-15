@@ -1,0 +1,9 @@
+service rosmsg_test_msgs__Nested
+
+stdver 0.10
+
+import rosmsg_test_msgs__BasicTypes
+
+struct Nested
+    field rosmsg_test_msgs__BasicTypes.BasicTypes basic_types_value
+end

@@ -1,0 +1,17 @@
+service rostopic_nav_msgs__Path
+
+stdver 0.10
+
+import rosmsg_nav_msgs__Path
+
+object subscriber
+    pipe rosmsg_nav_msgs__Path.Path subscriberpipe [readonly]
+    wire rosmsg_nav_msgs__Path.Path subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_nav_msgs__Path.Path m)
+    pipe rosmsg_nav_msgs__Path.Path publisherpipe [writeonly]
+    wire rosmsg_nav_msgs__Path.Path publisherwire [writeonly]
+end

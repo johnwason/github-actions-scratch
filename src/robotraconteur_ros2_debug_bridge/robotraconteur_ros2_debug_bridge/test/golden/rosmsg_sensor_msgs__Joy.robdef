@@ -1,0 +1,11 @@
+service rosmsg_sensor_msgs__Joy
+
+stdver 0.10
+
+import rosmsg_std_msgs__Header
+
+struct Joy
+    field rosmsg_std_msgs__Header.Header header
+    field single[] axes
+    field int32[] buttons
+end

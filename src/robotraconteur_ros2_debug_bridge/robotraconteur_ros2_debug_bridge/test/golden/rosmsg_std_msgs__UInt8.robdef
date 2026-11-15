@@ -1,0 +1,7 @@
+service rosmsg_std_msgs__UInt8
+
+stdver 0.10
+
+struct UInt8
+    field uint8 data
+end

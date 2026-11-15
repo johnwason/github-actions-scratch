@@ -1,0 +1,10 @@
+service rosmsg_std_msgs__MultiArrayLayout
+
+stdver 0.10
+
+import rosmsg_std_msgs__MultiArrayDimension
+
+struct MultiArrayLayout
+    field rosmsg_std_msgs__MultiArrayDimension.MultiArrayDimension{list} dim
+    field uint32 data_offset
+end

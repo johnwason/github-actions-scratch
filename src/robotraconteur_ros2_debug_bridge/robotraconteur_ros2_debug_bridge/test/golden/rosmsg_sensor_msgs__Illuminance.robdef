@@ -1,0 +1,11 @@
+service rosmsg_sensor_msgs__Illuminance
+
+stdver 0.10
+
+import rosmsg_std_msgs__Header
+
+struct Illuminance
+    field rosmsg_std_msgs__Header.Header header
+    field double illuminance
+    field double variance
+end

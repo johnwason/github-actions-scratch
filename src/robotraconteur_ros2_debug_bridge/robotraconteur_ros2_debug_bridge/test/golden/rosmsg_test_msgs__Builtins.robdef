@@ -1,0 +1,11 @@
+service rosmsg_test_msgs__Builtins
+
+stdver 0.10
+
+import rosmsg_builtin_interfaces__Duration
+import rosmsg_builtin_interfaces__Time
+
+struct Builtins
+    field rosmsg_builtin_interfaces__Duration.Duration duration_value
+    field rosmsg_builtin_interfaces__Time.Time time_value
+end

@@ -1,0 +1,18 @@
+service rosmsg_sensor_msgs__LaserScan
+
+stdver 0.10
+
+import rosmsg_std_msgs__Header
+
+struct LaserScan
+    field rosmsg_std_msgs__Header.Header header
+    field single angle_min
+    field single angle_max
+    field single angle_increment
+    field single time_increment
+    field single scan_time
+    field single range_min
+    field single range_max
+    field single[] ranges
+    field single[] intensities
+end

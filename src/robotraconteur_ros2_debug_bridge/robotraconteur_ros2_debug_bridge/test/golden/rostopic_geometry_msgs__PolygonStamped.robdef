@@ -1,0 +1,17 @@
+service rostopic_geometry_msgs__PolygonStamped
+
+stdver 0.10
+
+import rosmsg_geometry_msgs__PolygonStamped
+
+object subscriber
+    pipe rosmsg_geometry_msgs__PolygonStamped.PolygonStamped subscriberpipe [readonly]
+    wire rosmsg_geometry_msgs__PolygonStamped.PolygonStamped subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_geometry_msgs__PolygonStamped.PolygonStamped m)
+    pipe rosmsg_geometry_msgs__PolygonStamped.PolygonStamped publisherpipe [writeonly]
+    wire rosmsg_geometry_msgs__PolygonStamped.PolygonStamped publisherwire [writeonly]
+end

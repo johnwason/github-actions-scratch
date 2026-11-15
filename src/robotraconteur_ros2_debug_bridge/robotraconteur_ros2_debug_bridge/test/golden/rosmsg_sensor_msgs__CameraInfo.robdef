@@ -1,0 +1,20 @@
+service rosmsg_sensor_msgs__CameraInfo
+
+stdver 0.10
+
+import rosmsg_std_msgs__Header
+import rosmsg_sensor_msgs__RegionOfInterest
+
+struct CameraInfo
+    field rosmsg_std_msgs__Header.Header header
+    field uint32 height
+    field uint32 width
+    field string distortion_model
+    field double[] d
+    field double[9] k
+    field double[9] r
+    field double[12] p
+    field uint32 binning_x
+    field uint32 binning_y
+    field rosmsg_sensor_msgs__RegionOfInterest.RegionOfInterest roi
+end

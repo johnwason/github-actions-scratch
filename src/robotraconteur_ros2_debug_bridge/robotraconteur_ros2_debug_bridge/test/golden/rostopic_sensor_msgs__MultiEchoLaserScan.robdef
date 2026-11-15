@@ -1,0 +1,17 @@
+service rostopic_sensor_msgs__MultiEchoLaserScan
+
+stdver 0.10
+
+import rosmsg_sensor_msgs__MultiEchoLaserScan
+
+object subscriber
+    pipe rosmsg_sensor_msgs__MultiEchoLaserScan.MultiEchoLaserScan subscriberpipe [readonly]
+    wire rosmsg_sensor_msgs__MultiEchoLaserScan.MultiEchoLaserScan subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_sensor_msgs__MultiEchoLaserScan.MultiEchoLaserScan m)
+    pipe rosmsg_sensor_msgs__MultiEchoLaserScan.MultiEchoLaserScan publisherpipe [writeonly]
+    wire rosmsg_sensor_msgs__MultiEchoLaserScan.MultiEchoLaserScan publisherwire [writeonly]
+end

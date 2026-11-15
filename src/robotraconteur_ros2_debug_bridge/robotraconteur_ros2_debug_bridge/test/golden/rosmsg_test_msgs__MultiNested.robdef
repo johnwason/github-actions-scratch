@@ -1,0 +1,19 @@
+service rosmsg_test_msgs__MultiNested
+
+stdver 0.10
+
+import rosmsg_test_msgs__Arrays
+import rosmsg_test_msgs__BoundedSequences
+import rosmsg_test_msgs__UnboundedSequences
+
+struct MultiNested
+    field rosmsg_test_msgs__Arrays.Arrays{list} array_of_arrays
+    field rosmsg_test_msgs__BoundedSequences.BoundedSequences{list} array_of_bounded_sequences
+    field rosmsg_test_msgs__UnboundedSequences.UnboundedSequences{list} array_of_unbounded_sequences
+    field rosmsg_test_msgs__Arrays.Arrays{list} bounded_sequence_of_arrays
+    field rosmsg_test_msgs__BoundedSequences.BoundedSequences{list} bounded_sequence_of_bounded_sequences
+    field rosmsg_test_msgs__UnboundedSequences.UnboundedSequences{list} bounded_sequence_of_unbounded_sequences
+    field rosmsg_test_msgs__Arrays.Arrays{list} unbounded_sequence_of_arrays
+    field rosmsg_test_msgs__BoundedSequences.BoundedSequences{list} unbounded_sequence_of_bounded_sequences
+    field rosmsg_test_msgs__UnboundedSequences.UnboundedSequences{list} unbounded_sequence_of_unbounded_sequences
+end

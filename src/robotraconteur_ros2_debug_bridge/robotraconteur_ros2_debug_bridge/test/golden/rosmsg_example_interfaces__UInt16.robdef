@@ -1,0 +1,7 @@
+service rosmsg_example_interfaces__UInt16
+
+stdver 0.10
+
+struct UInt16
+    field uint16 data
+end

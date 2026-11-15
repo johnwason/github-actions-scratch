@@ -1,0 +1,17 @@
+service rostopic_geometry_msgs__AccelStamped
+
+stdver 0.10
+
+import rosmsg_geometry_msgs__AccelStamped
+
+object subscriber
+    pipe rosmsg_geometry_msgs__AccelStamped.AccelStamped subscriberpipe [readonly]
+    wire rosmsg_geometry_msgs__AccelStamped.AccelStamped subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_geometry_msgs__AccelStamped.AccelStamped m)
+    pipe rosmsg_geometry_msgs__AccelStamped.AccelStamped publisherpipe [writeonly]
+    wire rosmsg_geometry_msgs__AccelStamped.AccelStamped publisherwire [writeonly]
+end

@@ -1,0 +1,6 @@
+service rosmsg_example_interfaces__Empty
+
+stdver 0.10
+
+struct Empty
+end

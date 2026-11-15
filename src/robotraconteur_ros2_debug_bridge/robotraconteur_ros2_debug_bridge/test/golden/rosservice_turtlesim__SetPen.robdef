@@ -1,0 +1,23 @@
+service rosservice_turtlesim__SetPen
+
+stdver 0.10
+
+struct SetPenRequest
+    field uint8 r
+    field uint8 g
+    field uint8 b
+    field uint8 width
+    field uint8 off
+end
+
+struct SetPenResponse
+end
+
+object rosclient
+    function SetPenResponse call(SetPenRequest request)
+    function bool wait_for_service(double timeout)
+end
+
+object rosservice
+    callback SetPenResponse servicefunction(SetPenRequest request)
+end

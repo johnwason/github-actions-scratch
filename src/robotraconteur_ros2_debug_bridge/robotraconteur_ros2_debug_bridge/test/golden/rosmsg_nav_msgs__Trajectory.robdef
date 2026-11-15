@@ -1,0 +1,11 @@
+service rosmsg_nav_msgs__Trajectory
+
+stdver 0.10
+
+import rosmsg_std_msgs__Header
+import rosmsg_nav_msgs__TrajectoryPoint
+
+struct Trajectory
+    field rosmsg_std_msgs__Header.Header header
+    field rosmsg_nav_msgs__TrajectoryPoint.TrajectoryPoint{list} points
+end

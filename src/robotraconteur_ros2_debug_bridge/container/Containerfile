@@ -1,0 +1,121 @@
+# robotraconteur_ros2_debug_bridge development/test image (ROS 2 Jazzy, Ubuntu 24.04).
+#
+# Network is used ONLY while this image is built (scripts/build-image.sh).
+# Sources fetched here (keep this list current; note additions in commits):
+#   - docker.io/library/ros (base image, pinned by digest)
+#   - Ubuntu and ROS 2 apt mirrors configured in the base image
+#   - github.com/robotraconteur/robotraconteur (master; resolved SHA recorded)
+#   - github.com/robotraconteur-contrib/robotraconteur_ros2_bridge (master,
+#     test reference only; resolved SHA recorded)
+#
+# Every build/test container started from this image runs with --network=none.
+
+# ros:jazzy-ros-base, Ubuntu 24.04.5, amd64. Same digest as ../rmw_intraprocess.
+ARG BASE_IMAGE=docker.io/library/ros@sha256:00b8d47a6e6384a2834e3d01fa87ae767876543baa574f2d64a75c04ea33c698
+FROM ${BASE_IMAGE}
+
+ARG BASE_IMAGE
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Robot Raconteur build dependencies (docs/common/building.md, "Ubuntu Jammy
+# and Noble", without the Java/.NET/MATLAB ones), SWIG for the Python 3
+# bindings (master has no pregenerated sources), and the ROS packages this
+# repo, ../rmw_intraprocess and the planned tests use.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      binutils \
+      file \
+      gdb \
+      libboost-all-dev \
+      libbluetooth-dev \
+      libdbus-1-dev \
+      libssl-dev \
+      libusb-1.0-0-dev \
+      python3-dev \
+      python3-numpy \
+      python3-pytest \
+      python3-setuptools \
+      python3-wheel \
+      swig \
+      zlib1g-dev \
+      ros-jazzy-action-tutorials-cpp \
+      ros-jazzy-action-tutorials-interfaces \
+      ros-jazzy-ament-cmake-gtest \
+      ros-jazzy-ament-cmake-pytest \
+      ros-jazzy-ament-lint-auto \
+      ros-jazzy-ament-lint-common \
+      ros-jazzy-common-interfaces \
+      ros-jazzy-composition \
+      ros-jazzy-demo-nodes-cpp \
+      ros-jazzy-example-interfaces \
+      ros-jazzy-rosidl-typesupport-fastrtps-c \
+      ros-jazzy-rosidl-typesupport-fastrtps-cpp \
+      ros-jazzy-rosidl-typesupport-introspection-c \
+      ros-jazzy-rosidl-typesupport-introspection-cpp \
+      ros-jazzy-test-msgs \
+      ros-jazzy-turtlesim \
+ && rm -rf /var/lib/apt/lists/*
+
+# Robot Raconteur from GitHub master, built in its ROS mode (core library,
+# RobotRaconteurGen, Python 3 bindings; the same mode as its own ROS CI) into
+# /opt/robotraconteur. RR_CACHE_BUST changes the layer to fetch a newer master.
+ARG RR_REF=master
+ARG RR_CACHE_BUST=0
+RUN set -e; \
+    . /opt/ros/jazzy/setup.sh; \
+    set -u; \
+    echo "cache bust ${RR_CACHE_BUST}"; \
+    mkdir -p /opt/robotraconteur_ws/src; \
+    git clone --depth 1 --branch "${RR_REF}" \
+      https://github.com/robotraconteur/robotraconteur.git \
+      /opt/robotraconteur_ws/src/robotraconteur; \
+    cd /opt/robotraconteur_ws; \
+    colcon build --merge-install --install-base /opt/robotraconteur \
+      --event-handlers console_cohesion+ \
+      --cmake-args -DROBOTRACONTEUR_ROS=ON -DBUILD_TESTING=OFF \
+        -DCMAKE_BUILD_TYPE=Release -DPYTHON3_EXECUTABLE=/usr/bin/python3; \
+    echo "robotraconteur $(git -C src/robotraconteur rev-parse HEAD)" > /opt/robotraconteur/VERSIONS; \
+    rm -rf /opt/robotraconteur_ws/build /opt/robotraconteur_ws/log; \
+    cat /opt/robotraconteur/VERSIONS
+
+# Optional second Robot Raconteur build instrumented with ThreadSanitizer,
+# for the tsan variant (the static core is linked into instrumented code;
+# uninstrumented, its internal synchronization would be invisible to TSan).
+# Built only when RR_TSAN_BUILD=1 (the GitHub TSan job), same sources.
+ARG RR_TSAN_BUILD=0
+RUN set -e; \
+    if [ "${RR_TSAN_BUILD}" = "1" ]; then \
+      . /opt/ros/jazzy/setup.sh; \
+      set -u; \
+      cd /opt/robotraconteur_ws; \
+      colcon build --merge-install --install-base /opt/robotraconteur-tsan \
+        --build-base /opt/robotraconteur_ws/build-tsan \
+        --event-handlers console_cohesion+ \
+        --cmake-args -DROBOTRACONTEUR_ROS=ON -DBUILD_TESTING=OFF -DBUILD_PYTHON3=OFF \
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+          "-DCMAKE_C_FLAGS=-fsanitize=thread -fno-omit-frame-pointer" \
+          "-DCMAKE_CXX_FLAGS=-fsanitize=thread -fno-omit-frame-pointer" \
+          "-DCMAKE_EXE_LINKER_FLAGS=-fsanitize=thread" \
+          "-DCMAKE_SHARED_LINKER_FLAGS=-fsanitize=thread" \
+          -DPYTHON3_EXECUTABLE=/usr/bin/python3; \
+      rm -rf /opt/robotraconteur_ws/build-tsan /opt/robotraconteur_ws/log; \
+    fi
+
+# The existing Python bridge (test reference for B2's compatibility test).
+ARG RR_ROS2_BRIDGE_REF=master
+RUN set -eu; \
+    echo "cache bust ${RR_CACHE_BUST}"; \
+    git clone --depth 1 --branch "${RR_ROS2_BRIDGE_REF}" \
+      https://github.com/robotraconteur-contrib/robotraconteur_ros2_bridge.git \
+      /opt/robotraconteur_ros2_bridge; \
+    echo "robotraconteur_ros2_bridge $(git -C /opt/robotraconteur_ros2_bridge rev-parse HEAD)" \
+      >> /opt/robotraconteur/VERSIONS; \
+    cat /opt/robotraconteur/VERSIONS
+
+RUN mkdir -p /ws/src /ws/build /ws/install /ws/log
+
+LABEL org.opencontainers.image.title="robotraconteur_ros2_debug_bridge-dev" \
+      org.opencontainers.image.base.name="${BASE_IMAGE}" \
+      robotraconteur_ros2_debug_bridge.ros_distro="jazzy"
+
+WORKDIR /ws

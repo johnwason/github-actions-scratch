@@ -1,0 +1,17 @@
+service rostopic_sensor_msgs__NavSatStatus
+
+stdver 0.10
+
+import rosmsg_sensor_msgs__NavSatStatus
+
+object subscriber
+    pipe rosmsg_sensor_msgs__NavSatStatus.NavSatStatus subscriberpipe [readonly]
+    wire rosmsg_sensor_msgs__NavSatStatus.NavSatStatus subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_sensor_msgs__NavSatStatus.NavSatStatus m)
+    pipe rosmsg_sensor_msgs__NavSatStatus.NavSatStatus publisherpipe [writeonly]
+    wire rosmsg_sensor_msgs__NavSatStatus.NavSatStatus publisherwire [writeonly]
+end

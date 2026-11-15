@@ -1,0 +1,21 @@
+service rosservice_nav_msgs__GetMap
+
+stdver 0.10
+
+import rosmsg_nav_msgs__OccupancyGrid
+
+struct GetMapRequest
+end
+
+struct GetMapResponse
+    field rosmsg_nav_msgs__OccupancyGrid.OccupancyGrid map
+end
+
+object rosclient
+    function GetMapResponse call(GetMapRequest request)
+    function bool wait_for_service(double timeout)
+end
+
+object rosservice
+    callback GetMapResponse servicefunction(GetMapRequest request)
+end

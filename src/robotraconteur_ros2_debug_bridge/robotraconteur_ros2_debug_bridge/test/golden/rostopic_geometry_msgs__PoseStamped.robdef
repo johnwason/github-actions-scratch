@@ -1,0 +1,17 @@
+service rostopic_geometry_msgs__PoseStamped
+
+stdver 0.10
+
+import rosmsg_geometry_msgs__PoseStamped
+
+object subscriber
+    pipe rosmsg_geometry_msgs__PoseStamped.PoseStamped subscriberpipe [readonly]
+    wire rosmsg_geometry_msgs__PoseStamped.PoseStamped subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_geometry_msgs__PoseStamped.PoseStamped m)
+    pipe rosmsg_geometry_msgs__PoseStamped.PoseStamped publisherpipe [writeonly]
+    wire rosmsg_geometry_msgs__PoseStamped.PoseStamped publisherwire [writeonly]
+end

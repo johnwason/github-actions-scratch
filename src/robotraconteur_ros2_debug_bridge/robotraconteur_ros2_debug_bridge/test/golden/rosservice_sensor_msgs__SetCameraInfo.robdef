@@ -1,0 +1,23 @@
+service rosservice_sensor_msgs__SetCameraInfo
+
+stdver 0.10
+
+import rosmsg_sensor_msgs__CameraInfo
+
+struct SetCameraInfoRequest
+    field rosmsg_sensor_msgs__CameraInfo.CameraInfo camera_info
+end
+
+struct SetCameraInfoResponse
+    field bool success
+    field string status_message
+end
+
+object rosclient
+    function SetCameraInfoResponse call(SetCameraInfoRequest request)
+    function bool wait_for_service(double timeout)
+end
+
+object rosservice
+    callback SetCameraInfoResponse servicefunction(SetCameraInfoRequest request)
+end

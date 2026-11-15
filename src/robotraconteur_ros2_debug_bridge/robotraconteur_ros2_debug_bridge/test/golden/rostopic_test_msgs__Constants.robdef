@@ -1,0 +1,17 @@
+service rostopic_test_msgs__Constants
+
+stdver 0.10
+
+import rosmsg_test_msgs__Constants
+
+object subscriber
+    pipe rosmsg_test_msgs__Constants.Constants subscriberpipe [readonly]
+    wire rosmsg_test_msgs__Constants.Constants subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_test_msgs__Constants.Constants m)
+    pipe rosmsg_test_msgs__Constants.Constants publisherpipe [writeonly]
+    wire rosmsg_test_msgs__Constants.Constants publisherwire [writeonly]
+end

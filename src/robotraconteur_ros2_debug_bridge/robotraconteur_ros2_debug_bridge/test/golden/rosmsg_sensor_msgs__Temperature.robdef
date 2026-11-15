@@ -1,0 +1,11 @@
+service rosmsg_sensor_msgs__Temperature
+
+stdver 0.10
+
+import rosmsg_std_msgs__Header
+
+struct Temperature
+    field rosmsg_std_msgs__Header.Header header
+    field double temperature
+    field double variance
+end

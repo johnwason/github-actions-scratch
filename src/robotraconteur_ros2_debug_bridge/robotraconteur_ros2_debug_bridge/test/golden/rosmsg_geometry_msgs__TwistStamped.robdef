@@ -1,0 +1,11 @@
+service rosmsg_geometry_msgs__TwistStamped
+
+stdver 0.10
+
+import rosmsg_std_msgs__Header
+import rosmsg_geometry_msgs__Twist
+
+struct TwistStamped
+    field rosmsg_std_msgs__Header.Header header
+    field rosmsg_geometry_msgs__Twist.Twist twist
+end

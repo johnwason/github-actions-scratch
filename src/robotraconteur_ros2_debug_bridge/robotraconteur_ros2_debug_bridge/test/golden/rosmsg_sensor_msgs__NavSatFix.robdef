@@ -1,0 +1,20 @@
+service rosmsg_sensor_msgs__NavSatFix
+
+stdver 0.10
+
+import rosmsg_std_msgs__Header
+import rosmsg_sensor_msgs__NavSatStatus
+
+struct NavSatFix
+    constant uint16 COVARIANCE_TYPE_UNKNOWN 0
+    constant uint16 COVARIANCE_TYPE_APPROXIMATED 1
+    constant uint16 COVARIANCE_TYPE_DIAGONAL_KNOWN 2
+    constant uint16 COVARIANCE_TYPE_KNOWN 3
+    field rosmsg_std_msgs__Header.Header header
+    field rosmsg_sensor_msgs__NavSatStatus.NavSatStatus status
+    field double latitude
+    field double longitude
+    field double altitude
+    field double[9] position_covariance
+    field uint8 position_covariance_type
+end

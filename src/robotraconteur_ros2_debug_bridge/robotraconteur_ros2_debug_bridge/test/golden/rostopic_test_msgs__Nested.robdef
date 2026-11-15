@@ -1,0 +1,17 @@
+service rostopic_test_msgs__Nested
+
+stdver 0.10
+
+import rosmsg_test_msgs__Nested
+
+object subscriber
+    pipe rosmsg_test_msgs__Nested.Nested subscriberpipe [readonly]
+    wire rosmsg_test_msgs__Nested.Nested subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_test_msgs__Nested.Nested m)
+    pipe rosmsg_test_msgs__Nested.Nested publisherpipe [writeonly]
+    wire rosmsg_test_msgs__Nested.Nested publisherwire [writeonly]
+end

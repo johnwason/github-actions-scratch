@@ -1,0 +1,12 @@
+service rosmsg_geometry_msgs__TransformStamped
+
+stdver 0.10
+
+import rosmsg_std_msgs__Header
+import rosmsg_geometry_msgs__Transform
+
+struct TransformStamped
+    field rosmsg_std_msgs__Header.Header header
+    field string child_frame_id
+    field rosmsg_geometry_msgs__Transform.Transform transform
+end

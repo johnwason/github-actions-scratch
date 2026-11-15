@@ -1,0 +1,10 @@
+service rosmsg_std_msgs__Float32MultiArray
+
+stdver 0.10
+
+import rosmsg_std_msgs__MultiArrayLayout
+
+struct Float32MultiArray
+    field rosmsg_std_msgs__MultiArrayLayout.MultiArrayLayout layout
+    field single[] data
+end

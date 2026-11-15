@@ -1,0 +1,21 @@
+service rosservice_example_interfaces__SetBool
+
+stdver 0.10
+
+struct SetBoolRequest
+    field bool data
+end
+
+struct SetBoolResponse
+    field bool success
+    field string message
+end
+
+object rosclient
+    function SetBoolResponse call(SetBoolRequest request)
+    function bool wait_for_service(double timeout)
+end
+
+object rosservice
+    callback SetBoolResponse servicefunction(SetBoolRequest request)
+end

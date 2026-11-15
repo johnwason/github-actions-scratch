@@ -1,0 +1,11 @@
+service rosmsg_geometry_msgs__QuaternionStamped
+
+stdver 0.10
+
+import rosmsg_std_msgs__Header
+import rosmsg_geometry_msgs__Quaternion
+
+struct QuaternionStamped
+    field rosmsg_std_msgs__Header.Header header
+    field rosmsg_geometry_msgs__Quaternion.Quaternion quaternion
+end

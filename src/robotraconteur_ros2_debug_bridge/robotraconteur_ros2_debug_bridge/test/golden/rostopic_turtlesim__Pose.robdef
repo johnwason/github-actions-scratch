@@ -1,0 +1,17 @@
+service rostopic_turtlesim__Pose
+
+stdver 0.10
+
+import rosmsg_turtlesim__Pose
+
+object subscriber
+    pipe rosmsg_turtlesim__Pose.Pose subscriberpipe [readonly]
+    wire rosmsg_turtlesim__Pose.Pose subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_turtlesim__Pose.Pose m)
+    pipe rosmsg_turtlesim__Pose.Pose publisherpipe [writeonly]
+    wire rosmsg_turtlesim__Pose.Pose publisherwire [writeonly]
+end

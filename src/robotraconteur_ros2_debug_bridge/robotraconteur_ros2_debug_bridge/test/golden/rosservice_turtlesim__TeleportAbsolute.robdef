@@ -1,0 +1,21 @@
+service rosservice_turtlesim__TeleportAbsolute
+
+stdver 0.10
+
+struct TeleportAbsoluteRequest
+    field single x
+    field single y
+    field single theta
+end
+
+struct TeleportAbsoluteResponse
+end
+
+object rosclient
+    function TeleportAbsoluteResponse call(TeleportAbsoluteRequest request)
+    function bool wait_for_service(double timeout)
+end
+
+object rosservice
+    callback TeleportAbsoluteResponse servicefunction(TeleportAbsoluteRequest request)
+end

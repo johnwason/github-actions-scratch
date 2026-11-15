@@ -1,0 +1,7 @@
+service rosmsg_sensor_msgs__LaserEcho
+
+stdver 0.10
+
+struct LaserEcho
+    field single[] echoes
+end

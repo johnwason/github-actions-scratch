@@ -1,0 +1,151 @@
+# GitHub CI for robotraconteur_ros2_debug_bridge (CLAUDE.md S3; the rules of
+# S6 in ../rmw_intraprocess/CLAUDE.md). scripts/push-ci.sh copies this to
+# .github/workflows/ in an orphan snapshot commit (this repo and
+# ../rmw_intraprocess, both at their committed HEAD) pushed to
+# ci/robotraconteur_ros2_debug_bridge of the scratch repo.
+name: robotraconteur_ros2_debug_bridge
+
+on:
+  push:
+    branches: ['ci/robotraconteur_ros2_debug_bridge']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Windows (B13, docs/windows.md): MSVC 2022, ROS 2 Jazzy from RoboStack
+  # (ci/pixi.toml), Robot Raconteur master built from source in the same
+  # workspace, as in the Linux image. Every test of the bridge, under both RMWs.
+  windows:
+    name: windows-2022 (RoboStack Jazzy, MSVC)
+    runs-on: windows-2022
+    timeout-minutes: 180
+    env:
+      AMENT_CPPCHECK_ALLOW_SLOW_VERSIONS: '1'
+      # Short paths (MAX_PATH; ../rmw_intraprocess/docs/windows.md).
+      CI_BUILD_BASE: C:/b
+      CI_INSTALL_BASE: C:/i
+      UPSTREAM_BRIDGE_DIR: C:/upstream/robotraconteur_ros2_bridge
+    steps:
+      - name: Keep LF line endings
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      # The same public sources as container/Containerfile (master of both).
+      - name: Fetch Robot Raconteur and the reference bridge
+        shell: bash
+        run: |
+          git clone --depth 1 https://github.com/robotraconteur/robotraconteur.git src/robotraconteur
+          git clone --depth 1 https://github.com/robotraconteur-contrib/robotraconteur_ros2_bridge.git \
+            "${UPSTREAM_BRIDGE_DIR}"
+          echo "robotraconteur $(git -C src/robotraconteur rev-parse HEAD)"
+          echo "robotraconteur_ros2_bridge $(git -C "${UPSTREAM_BRIDGE_DIR}" rev-parse HEAD)"
+          cp src/robotraconteur_ros2_debug_bridge/ci/pixi.toml pixi.toml
+      # Fixes for Robot Raconteur defects that master does not have yet
+      # (ci/patches; docs/upstream_issues.md). A patch master already contains
+      # is skipped with a warning (then delete it from ci/patches).
+      - name: Patch Robot Raconteur (until master is fixed)
+        shell: bash
+        run: |
+          for p in src/robotraconteur_ros2_debug_bridge/ci/patches/robotraconteur-*.patch; do
+            if git -C src/robotraconteur apply --check "$(pwd)/${p}" 2>/dev/null; then
+              git -C src/robotraconteur apply "$(pwd)/${p}"
+              echo "applied ${p}"
+            elif git -C src/robotraconteur apply --reverse --check "$(pwd)/${p}" 2>/dev/null; then
+              echo "::warning::${p} is already in Robot Raconteur master; remove it"
+            else
+              echo "::error::${p} does not apply to Robot Raconteur master"
+              exit 1
+            fi
+          done
+      - uses: prefix-dev/setup-pixi@v0.8.1
+        with:
+          cache: false
+      - name: Environment
+        run: pixi list
+      # conda-forge's Windows cppcheck cannot find std.cfg (its build
+      # machine's path is baked in); it also searches <exe dir>/cfg.
+      - name: Fix cppcheck cfg path
+        shell: bash
+        run: |
+          env=.pixi/envs/default
+          cfg=$(find "$env" -name std.cfg | head -1)
+          exe=$(find "$env" -iname cppcheck.exe | head -1)
+          echo "std.cfg: ${cfg}"
+          echo "cppcheck: ${exe}"
+          test -n "${cfg}" && test -n "${exe}"
+          cp -r "$(dirname "${cfg}")" "$(dirname "${exe}")/cfg"
+      - name: Build Robot Raconteur
+        run: pixi run build-robotraconteur
+      # Robot Raconteur's Python install drops the drive letter of the install
+      # base (it lands in \i\lib\python3.x\site-packages of the current
+      # drive), outside the install space's Python path; find it.
+      - name: Locate the Robot Raconteur Python module
+        shell: bash
+        run: |
+          # (one of the two roots does not exist: find fails for it)
+          pyd=$({ find /c/i /d/i -name '_RobotRaconteurPython*.pyd' 2>/dev/null || true; } | head -1)
+          echo "module: ${pyd}"
+          test -n "${pyd}"
+          site=$(cd "$(dirname "${pyd}")/.." && pwd -W)
+          echo "PYTHONPATH=${site}" >> "${GITHUB_ENV}"
+          echo "PYTHONPATH=${site}"
+      - name: Build
+        run: pixi run build
+      - name: Test
+        run: pixi run test
+      - name: Test results
+        if: always()
+        run: pixi run test-result
+      # upload-artifact only takes files inside the workspace.
+      - name: Collect test results
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p test_results
+          if [ -d "${CI_BUILD_BASE}/robotraconteur_ros2_debug_bridge/test_results" ]; then
+            cp -r "${CI_BUILD_BASE}/robotraconteur_ros2_debug_bridge/test_results" test_results/
+          fi
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-windows
+          path: |
+            log/
+            test_results/
+          if-no-files-found: ignore
+
+  # ThreadSanitizer, with the same image and scripts as the local gate
+  # (podman, --network=none inside the container). Locally TSan cannot start
+  # under the host kernel's mmap ASLR entropy; on this disposable runner VM it
+  # is lowered with sysctl. The image adds a TSan-instrumented Robot Raconteur
+  # build (RR_TSAN_BUILD=1).
+  tsan:
+    name: ubuntu-24.04 TSan (podman, local-gate image)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    env:
+      RR_BRIDGE_ENABLE_TSAN: '1'
+      RR_TSAN_BUILD: '1'
+    steps:
+      - name: Keep LF line endings
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - name: Lower mmap ASLR entropy for TSan (runner VM only)
+        run: sudo sysctl -w vm.mmap_rnd_bits=28
+      - name: Tool versions
+        run: podman --version && uname -r
+      - name: Build image
+        working-directory: src/robotraconteur_ros2_debug_bridge
+        run: scripts/build-image.sh
+      - name: Build (tsan)
+        working-directory: src/robotraconteur_ros2_debug_bridge
+        run: scripts/build.sh tsan
+      - name: Test (tsan)
+        working-directory: src/robotraconteur_ros2_debug_bridge
+        run: scripts/test.sh tsan

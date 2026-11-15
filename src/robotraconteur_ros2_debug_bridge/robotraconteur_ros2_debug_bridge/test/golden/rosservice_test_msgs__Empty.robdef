@@ -1,0 +1,18 @@
+service rosservice_test_msgs__Empty
+
+stdver 0.10
+
+struct EmptyRequest
+end
+
+struct EmptyResponse
+end
+
+object rosclient
+    function EmptyResponse call(EmptyRequest request)
+    function bool wait_for_service(double timeout)
+end
+
+object rosservice
+    callback EmptyResponse servicefunction(EmptyRequest request)
+end

@@ -1,0 +1,5 @@
+blackboard:
+  ros__parameters:
+    from_component_file: 2.5
+    overridden: 2
+    inline_wins: 10

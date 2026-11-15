@@ -1,0 +1,10 @@
+service rosmsg_geometry_msgs__PolygonInstance
+
+stdver 0.10
+
+import rosmsg_geometry_msgs__Polygon
+
+struct PolygonInstance
+    field rosmsg_geometry_msgs__Polygon.Polygon polygon
+    field int64 id
+end

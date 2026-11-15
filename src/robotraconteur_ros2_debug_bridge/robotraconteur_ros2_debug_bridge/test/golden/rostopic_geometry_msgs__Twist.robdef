@@ -1,0 +1,17 @@
+service rostopic_geometry_msgs__Twist
+
+stdver 0.10
+
+import rosmsg_geometry_msgs__Twist
+
+object subscriber
+    pipe rosmsg_geometry_msgs__Twist.Twist subscriberpipe [readonly]
+    wire rosmsg_geometry_msgs__Twist.Twist subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_geometry_msgs__Twist.Twist m)
+    pipe rosmsg_geometry_msgs__Twist.Twist publisherpipe [writeonly]
+    wire rosmsg_geometry_msgs__Twist.Twist publisherwire [writeonly]
+end

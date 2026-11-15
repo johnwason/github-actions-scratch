@@ -1,0 +1,7 @@
+service rosmsg_std_msgs__Int16
+
+stdver 0.10
+
+struct Int16
+    field int16 data
+end

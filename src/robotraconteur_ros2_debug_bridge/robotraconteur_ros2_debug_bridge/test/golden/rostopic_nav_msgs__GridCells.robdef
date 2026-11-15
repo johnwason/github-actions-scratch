@@ -1,0 +1,17 @@
+service rostopic_nav_msgs__GridCells
+
+stdver 0.10
+
+import rosmsg_nav_msgs__GridCells
+
+object subscriber
+    pipe rosmsg_nav_msgs__GridCells.GridCells subscriberpipe [readonly]
+    wire rosmsg_nav_msgs__GridCells.GridCells subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_nav_msgs__GridCells.GridCells m)
+    pipe rosmsg_nav_msgs__GridCells.GridCells publisherpipe [writeonly]
+    wire rosmsg_nav_msgs__GridCells.GridCells publisherwire [writeonly]
+end

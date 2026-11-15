@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.8)
+project(foo)
+set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
+add_library(foo SHARED src/foo.cpp)
+add_library(foo_headers INTERFACE)

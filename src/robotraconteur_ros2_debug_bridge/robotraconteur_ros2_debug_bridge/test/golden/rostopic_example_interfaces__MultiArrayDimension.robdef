@@ -1,0 +1,17 @@
+service rostopic_example_interfaces__MultiArrayDimension
+
+stdver 0.10
+
+import rosmsg_example_interfaces__MultiArrayDimension
+
+object subscriber
+    pipe rosmsg_example_interfaces__MultiArrayDimension.MultiArrayDimension subscriberpipe [readonly]
+    wire rosmsg_example_interfaces__MultiArrayDimension.MultiArrayDimension subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_example_interfaces__MultiArrayDimension.MultiArrayDimension m)
+    pipe rosmsg_example_interfaces__MultiArrayDimension.MultiArrayDimension publisherpipe [writeonly]
+    wire rosmsg_example_interfaces__MultiArrayDimension.MultiArrayDimension publisherwire [writeonly]
+end

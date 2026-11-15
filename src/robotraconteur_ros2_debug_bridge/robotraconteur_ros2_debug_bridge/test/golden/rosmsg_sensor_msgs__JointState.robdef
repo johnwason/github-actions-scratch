@@ -1,0 +1,13 @@
+service rosmsg_sensor_msgs__JointState
+
+stdver 0.10
+
+import rosmsg_std_msgs__Header
+
+struct JointState
+    field rosmsg_std_msgs__Header.Header header
+    field string{list} name
+    field double[] position
+    field double[] velocity
+    field double[] effort
+end

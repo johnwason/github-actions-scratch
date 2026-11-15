@@ -1,0 +1,10 @@
+# B0 smoke test service: a C++ Robot Raconteur service that a Python client
+# reaches over LocalTransport inside the container (no network).
+service experimental.ros2_debug_bridge_smoke
+
+stdver 0.10
+
+object Smoke
+    property string greeting [readonly]
+    function int32 add(int32 a, int32 b)
+end

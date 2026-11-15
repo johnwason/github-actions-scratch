@@ -1,0 +1,11 @@
+service rosmsg_sensor_msgs__CompressedImage
+
+stdver 0.10
+
+import rosmsg_std_msgs__Header
+
+struct CompressedImage
+    field rosmsg_std_msgs__Header.Header header
+    field string format
+    field uint8[] data
+end

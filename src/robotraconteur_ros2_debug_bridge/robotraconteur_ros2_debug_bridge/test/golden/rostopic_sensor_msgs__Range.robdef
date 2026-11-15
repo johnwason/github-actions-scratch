@@ -1,0 +1,17 @@
+service rostopic_sensor_msgs__Range
+
+stdver 0.10
+
+import rosmsg_sensor_msgs__Range
+
+object subscriber
+    pipe rosmsg_sensor_msgs__Range.Range subscriberpipe [readonly]
+    wire rosmsg_sensor_msgs__Range.Range subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_sensor_msgs__Range.Range m)
+    pipe rosmsg_sensor_msgs__Range.Range publisherpipe [writeonly]
+    wire rosmsg_sensor_msgs__Range.Range publisherwire [writeonly]
+end

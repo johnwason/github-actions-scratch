@@ -1,0 +1,17 @@
+service rostopic_nav_msgs__OccupancyGrid
+
+stdver 0.10
+
+import rosmsg_nav_msgs__OccupancyGrid
+
+object subscriber
+    pipe rosmsg_nav_msgs__OccupancyGrid.OccupancyGrid subscriberpipe [readonly]
+    wire rosmsg_nav_msgs__OccupancyGrid.OccupancyGrid subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_nav_msgs__OccupancyGrid.OccupancyGrid m)
+    pipe rosmsg_nav_msgs__OccupancyGrid.OccupancyGrid publisherpipe [writeonly]
+    wire rosmsg_nav_msgs__OccupancyGrid.OccupancyGrid publisherwire [writeonly]
+end

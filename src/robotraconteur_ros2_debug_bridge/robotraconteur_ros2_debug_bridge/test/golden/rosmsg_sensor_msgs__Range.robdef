@@ -1,0 +1,17 @@
+service rosmsg_sensor_msgs__Range
+
+stdver 0.10
+
+import rosmsg_std_msgs__Header
+
+struct Range
+    constant uint16 ULTRASOUND 0
+    constant uint16 INFRARED 1
+    field rosmsg_std_msgs__Header.Header header
+    field uint8 radiation_type
+    field single field_of_view
+    field single min_range
+    field single max_range
+    field single range
+    field single variance
+end

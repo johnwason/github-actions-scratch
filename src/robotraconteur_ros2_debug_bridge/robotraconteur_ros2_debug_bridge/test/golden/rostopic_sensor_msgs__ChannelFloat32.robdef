@@ -1,0 +1,17 @@
+service rostopic_sensor_msgs__ChannelFloat32
+
+stdver 0.10
+
+import rosmsg_sensor_msgs__ChannelFloat32
+
+object subscriber
+    pipe rosmsg_sensor_msgs__ChannelFloat32.ChannelFloat32 subscriberpipe [readonly]
+    wire rosmsg_sensor_msgs__ChannelFloat32.ChannelFloat32 subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_sensor_msgs__ChannelFloat32.ChannelFloat32 m)
+    pipe rosmsg_sensor_msgs__ChannelFloat32.ChannelFloat32 publisherpipe [writeonly]
+    wire rosmsg_sensor_msgs__ChannelFloat32.ChannelFloat32 publisherwire [writeonly]
+end

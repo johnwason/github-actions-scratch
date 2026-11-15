@@ -1,0 +1,18 @@
+service rosmsg_sensor_msgs__PointCloud2
+
+stdver 0.10
+
+import rosmsg_std_msgs__Header
+import rosmsg_sensor_msgs__PointField
+
+struct PointCloud2
+    field rosmsg_std_msgs__Header.Header header
+    field uint32 height
+    field uint32 width
+    field rosmsg_sensor_msgs__PointField.PointField{list} fields
+    field bool is_bigendian
+    field uint32 point_step
+    field uint32 row_step
+    field uint8[] data
+    field bool is_dense
+end

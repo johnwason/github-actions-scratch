@@ -1,0 +1,14 @@
+service rosmsg_nav_msgs__MapMetaData
+
+stdver 0.10
+
+import rosmsg_builtin_interfaces__Time
+import rosmsg_geometry_msgs__Pose
+
+struct MapMetaData
+    field rosmsg_builtin_interfaces__Time.Time map_load_time
+    field single resolution
+    field uint32 width
+    field uint32 height
+    field rosmsg_geometry_msgs__Pose.Pose origin
+end

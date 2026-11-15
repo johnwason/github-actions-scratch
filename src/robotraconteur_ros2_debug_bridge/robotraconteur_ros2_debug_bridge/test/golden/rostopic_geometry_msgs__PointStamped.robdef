@@ -1,0 +1,17 @@
+service rostopic_geometry_msgs__PointStamped
+
+stdver 0.10
+
+import rosmsg_geometry_msgs__PointStamped
+
+object subscriber
+    pipe rosmsg_geometry_msgs__PointStamped.PointStamped subscriberpipe [readonly]
+    wire rosmsg_geometry_msgs__PointStamped.PointStamped subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_geometry_msgs__PointStamped.PointStamped m)
+    pipe rosmsg_geometry_msgs__PointStamped.PointStamped publisherpipe [writeonly]
+    wire rosmsg_geometry_msgs__PointStamped.PointStamped publisherwire [writeonly]
+end

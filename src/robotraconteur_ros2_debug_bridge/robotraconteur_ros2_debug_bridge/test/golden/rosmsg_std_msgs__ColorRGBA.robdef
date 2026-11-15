@@ -1,0 +1,10 @@
+service rosmsg_std_msgs__ColorRGBA
+
+stdver 0.10
+
+struct ColorRGBA
+    field single r
+    field single g
+    field single b
+    field single a
+end

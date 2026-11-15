@@ -1,0 +1,10 @@
+service rosmsg_std_msgs__UInt64MultiArray
+
+stdver 0.10
+
+import rosmsg_std_msgs__MultiArrayLayout
+
+struct UInt64MultiArray
+    field rosmsg_std_msgs__MultiArrayLayout.MultiArrayLayout layout
+    field uint64[] data
+end

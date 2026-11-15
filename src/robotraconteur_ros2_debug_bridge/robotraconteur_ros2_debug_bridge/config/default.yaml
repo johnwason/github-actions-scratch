@@ -1,0 +1,74 @@
+# Default configuration of robotraconteur_ros2_debug_bridge.
+#
+# SAFE BY DEFAULT (CLAUDE.md S2, S5): only in-process (IntraTransport) and
+# same-machine, same-user (LocalTransport) clients can connect. TCP, node
+# announce and discovery listening are off; only the read capability is on.
+# Copy this file and set the component's config_file parameter to change it.
+
+robotraconteur:
+  # Robot Raconteur NodeName (LocalTransport uses it to find this node).
+  node_name: ros2_debug_bridge
+  # Name the root object is registered under (URL service=...).
+  service_name: ros2_debug_bridge
+  transports:
+    intra: true          # clients in the same process
+    local: true          # clients on this machine, same user
+    tcp:
+      enabled: false     # opt in to accept network clients
+      port: 34573
+      localhost_only: true
+      tls:
+        enabled: false   # needs a Robot Raconteur node certificate (docs/security.md)
+        require: false   # reject clients without TLS
+  node_announce: false             # UDP broadcast/multicast announce
+  node_discovery_listening: false  # listen for other nodes' announces
+  # Require a user name and password (docs/security.md). Over TCP, use TLS.
+  authentication:
+    enabled: false
+    password_file: ''    # relative to this file
+
+# Individually enabled capabilities (PLAN.md 2.5). Anything that changes the
+# running system is off by default.
+capabilities:
+  read: true
+  publish: false
+  call_service: false
+  serve_service: false
+  action: false
+  set_parameter: false
+  load_component: false
+
+# What is reachable over Robot Raconteur. DENY BY DEFAULT: with no rules
+# nothing is visible. Patterns match fully qualified ROS names: "*" within one
+# name segment, "**" across segments, "?" one character. Deny always wins.
+exposure:
+  nodes:          # listed in the graph
+    allow: []
+    deny: []
+  topics:
+    allow: []     # visible and subscribable (read capability)
+    publish: []   # publishable (also needs the publish capability)
+    deny: []
+  services:
+    allow: []     # visible
+    call: []      # callable (also needs the call_service capability)
+    serve: []     # served by a client, register_service (also needs serve_service)
+    deny: []
+  actions:
+    allow: []     # visible
+    send: []      # goals (also need the action capability)
+    deny: []
+  parameters:     # by node name
+    allow: []     # list, describe, get, events
+    set: []       # set (also needs the set_parameter capability)
+    deny: []
+  components:     # containers (by node name) to list, load into and unload from
+    allow: []     # (also needs the load_component capability)
+    deny: []
+
+# With rmw_intraprocess_cpp: take subscribed messages from its tap API
+# (the publisher's message itself, no deserialization) for volatile topics.
+# Ignored with other RMWs. Off by default: the conversion then runs inside
+# the application's publish() (slower publishing, slightly lower bridge
+# latency). See docs/benchmark.md.
+fast_path: false

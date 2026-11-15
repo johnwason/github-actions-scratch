@@ -1,0 +1,17 @@
+service rostopic_sensor_msgs__BatteryState
+
+stdver 0.10
+
+import rosmsg_sensor_msgs__BatteryState
+
+object subscriber
+    pipe rosmsg_sensor_msgs__BatteryState.BatteryState subscriberpipe [readonly]
+    wire rosmsg_sensor_msgs__BatteryState.BatteryState subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_sensor_msgs__BatteryState.BatteryState m)
+    pipe rosmsg_sensor_msgs__BatteryState.BatteryState publisherpipe [writeonly]
+    wire rosmsg_sensor_msgs__BatteryState.BatteryState publisherwire [writeonly]
+end

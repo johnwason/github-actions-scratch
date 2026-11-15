@@ -1,0 +1,24 @@
+service rosservice_nav_msgs__SetMap
+
+stdver 0.10
+
+import rosmsg_nav_msgs__OccupancyGrid
+import rosmsg_geometry_msgs__PoseWithCovarianceStamped
+
+struct SetMapRequest
+    field rosmsg_nav_msgs__OccupancyGrid.OccupancyGrid map
+    field rosmsg_geometry_msgs__PoseWithCovarianceStamped.PoseWithCovarianceStamped initial_pose
+end
+
+struct SetMapResponse
+    field bool success
+end
+
+object rosclient
+    function SetMapResponse call(SetMapRequest request)
+    function bool wait_for_service(double timeout)
+end
+
+object rosservice
+    callback SetMapResponse servicefunction(SetMapRequest request)
+end

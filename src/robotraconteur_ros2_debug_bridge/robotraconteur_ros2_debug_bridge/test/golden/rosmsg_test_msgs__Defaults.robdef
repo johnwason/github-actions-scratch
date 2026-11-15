@@ -1,0 +1,19 @@
+service rosmsg_test_msgs__Defaults
+
+stdver 0.10
+
+struct Defaults
+    field bool bool_value
+    field uint8 byte_value
+    field uint8 char_value
+    field single float32_value
+    field double float64_value
+    field int8 int8_value
+    field uint8 uint8_value
+    field int16 int16_value
+    field uint16 uint16_value
+    field int32 int32_value
+    field uint32 uint32_value
+    field int64 int64_value
+    field uint64 uint64_value
+end

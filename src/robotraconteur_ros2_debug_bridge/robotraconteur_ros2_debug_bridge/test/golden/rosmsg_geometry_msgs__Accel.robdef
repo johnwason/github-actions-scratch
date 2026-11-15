@@ -1,0 +1,10 @@
+service rosmsg_geometry_msgs__Accel
+
+stdver 0.10
+
+import rosmsg_geometry_msgs__Vector3
+
+struct Accel
+    field rosmsg_geometry_msgs__Vector3.Vector3 linear
+    field rosmsg_geometry_msgs__Vector3.Vector3 angular
+end

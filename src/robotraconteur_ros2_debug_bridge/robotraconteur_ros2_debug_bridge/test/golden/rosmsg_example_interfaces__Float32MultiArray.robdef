@@ -1,0 +1,10 @@
+service rosmsg_example_interfaces__Float32MultiArray
+
+stdver 0.10
+
+import rosmsg_example_interfaces__MultiArrayLayout
+
+struct Float32MultiArray
+    field rosmsg_example_interfaces__MultiArrayLayout.MultiArrayLayout layout
+    field single[] data
+end

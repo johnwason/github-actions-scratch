@@ -1,0 +1,19 @@
+service rosmsg_test_msgs__Constants
+
+stdver 0.10
+
+struct Constants
+    constant uint16 BOOL_CONST 1
+    constant uint16 BYTE_CONST 50
+    constant uint16 CHAR_CONST 100
+    constant single FLOAT32_CONST 1.125
+    constant double FLOAT64_CONST 1.125
+    constant int16 INT8_CONST -50
+    constant uint16 UINT8_CONST 200
+    constant int16 INT16_CONST -1000
+    constant uint16 UINT16_CONST 2000
+    constant int32 INT32_CONST -30000
+    constant uint32 UINT32_CONST 60000
+    constant int64 INT64_CONST -40000000
+    constant uint64 UINT64_CONST 50000000
+end

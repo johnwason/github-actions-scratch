@@ -1,0 +1,17 @@
+service rostopic_test_msgs__BoundedSequences
+
+stdver 0.10
+
+import rosmsg_test_msgs__BoundedSequences
+
+object subscriber
+    pipe rosmsg_test_msgs__BoundedSequences.BoundedSequences subscriberpipe [readonly]
+    wire rosmsg_test_msgs__BoundedSequences.BoundedSequences subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_test_msgs__BoundedSequences.BoundedSequences m)
+    pipe rosmsg_test_msgs__BoundedSequences.BoundedSequences publisherpipe [writeonly]
+    wire rosmsg_test_msgs__BoundedSequences.BoundedSequences publisherwire [writeonly]
+end

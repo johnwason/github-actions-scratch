@@ -1,0 +1,17 @@
+service rostopic_nav_msgs__Trajectory
+
+stdver 0.10
+
+import rosmsg_nav_msgs__Trajectory
+
+object subscriber
+    pipe rosmsg_nav_msgs__Trajectory.Trajectory subscriberpipe [readonly]
+    wire rosmsg_nav_msgs__Trajectory.Trajectory subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_nav_msgs__Trajectory.Trajectory m)
+    pipe rosmsg_nav_msgs__Trajectory.Trajectory publisherpipe [writeonly]
+    wire rosmsg_nav_msgs__Trajectory.Trajectory publisherwire [writeonly]
+end

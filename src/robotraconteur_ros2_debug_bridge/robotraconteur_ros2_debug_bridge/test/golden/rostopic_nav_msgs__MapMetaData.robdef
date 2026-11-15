@@ -1,0 +1,17 @@
+service rostopic_nav_msgs__MapMetaData
+
+stdver 0.10
+
+import rosmsg_nav_msgs__MapMetaData
+
+object subscriber
+    pipe rosmsg_nav_msgs__MapMetaData.MapMetaData subscriberpipe [readonly]
+    wire rosmsg_nav_msgs__MapMetaData.MapMetaData subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_nav_msgs__MapMetaData.MapMetaData m)
+    pipe rosmsg_nav_msgs__MapMetaData.MapMetaData publisherpipe [writeonly]
+    wire rosmsg_nav_msgs__MapMetaData.MapMetaData publisherwire [writeonly]
+end

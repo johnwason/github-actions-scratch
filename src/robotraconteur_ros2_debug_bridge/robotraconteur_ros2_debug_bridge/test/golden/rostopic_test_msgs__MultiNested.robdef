@@ -1,0 +1,17 @@
+service rostopic_test_msgs__MultiNested
+
+stdver 0.10
+
+import rosmsg_test_msgs__MultiNested
+
+object subscriber
+    pipe rosmsg_test_msgs__MultiNested.MultiNested subscriberpipe [readonly]
+    wire rosmsg_test_msgs__MultiNested.MultiNested subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_test_msgs__MultiNested.MultiNested m)
+    pipe rosmsg_test_msgs__MultiNested.MultiNested publisherpipe [writeonly]
+    wire rosmsg_test_msgs__MultiNested.MultiNested publisherwire [writeonly]
+end

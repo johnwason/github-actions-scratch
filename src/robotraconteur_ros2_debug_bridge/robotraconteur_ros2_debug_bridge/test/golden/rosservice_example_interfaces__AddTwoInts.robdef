@@ -1,0 +1,21 @@
+service rosservice_example_interfaces__AddTwoInts
+
+stdver 0.10
+
+struct AddTwoIntsRequest
+    field int64 a
+    field int64 b
+end
+
+struct AddTwoIntsResponse
+    field int64 sum
+end
+
+object rosclient
+    function AddTwoIntsResponse call(AddTwoIntsRequest request)
+    function bool wait_for_service(double timeout)
+end
+
+object rosservice
+    callback AddTwoIntsResponse servicefunction(AddTwoIntsRequest request)
+end

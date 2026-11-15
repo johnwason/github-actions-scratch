@@ -1,0 +1,11 @@
+service rosmsg_sensor_msgs__RegionOfInterest
+
+stdver 0.10
+
+struct RegionOfInterest
+    field uint32 x_offset
+    field uint32 y_offset
+    field uint32 height
+    field uint32 width
+    field bool do_rectify
+end

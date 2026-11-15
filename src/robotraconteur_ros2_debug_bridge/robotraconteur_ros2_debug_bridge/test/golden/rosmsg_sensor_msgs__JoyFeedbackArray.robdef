@@ -1,0 +1,9 @@
+service rosmsg_sensor_msgs__JoyFeedbackArray
+
+stdver 0.10
+
+import rosmsg_sensor_msgs__JoyFeedback
+
+struct JoyFeedbackArray
+    field rosmsg_sensor_msgs__JoyFeedback.JoyFeedback{list} array
+end

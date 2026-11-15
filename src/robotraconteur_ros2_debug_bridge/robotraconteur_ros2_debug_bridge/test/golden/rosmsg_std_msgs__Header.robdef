@@ -1,0 +1,10 @@
+service rosmsg_std_msgs__Header
+
+stdver 0.10
+
+import rosmsg_builtin_interfaces__Time
+
+struct Header
+    field rosmsg_builtin_interfaces__Time.Time stamp
+    field string frame_id
+end

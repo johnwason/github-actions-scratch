@@ -1,0 +1,17 @@
+service rostopic_geometry_msgs__Quaternion
+
+stdver 0.10
+
+import rosmsg_geometry_msgs__Quaternion
+
+object subscriber
+    pipe rosmsg_geometry_msgs__Quaternion.Quaternion subscriberpipe [readonly]
+    wire rosmsg_geometry_msgs__Quaternion.Quaternion subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_geometry_msgs__Quaternion.Quaternion m)
+    pipe rosmsg_geometry_msgs__Quaternion.Quaternion publisherpipe [writeonly]
+    wire rosmsg_geometry_msgs__Quaternion.Quaternion publisherwire [writeonly]
+end

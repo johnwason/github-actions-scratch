@@ -1,0 +1,17 @@
+service rostopic_std_msgs__MultiArrayDimension
+
+stdver 0.10
+
+import rosmsg_std_msgs__MultiArrayDimension
+
+object subscriber
+    pipe rosmsg_std_msgs__MultiArrayDimension.MultiArrayDimension subscriberpipe [readonly]
+    wire rosmsg_std_msgs__MultiArrayDimension.MultiArrayDimension subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_std_msgs__MultiArrayDimension.MultiArrayDimension m)
+    pipe rosmsg_std_msgs__MultiArrayDimension.MultiArrayDimension publisherpipe [writeonly]
+    wire rosmsg_std_msgs__MultiArrayDimension.MultiArrayDimension publisherwire [writeonly]
+end

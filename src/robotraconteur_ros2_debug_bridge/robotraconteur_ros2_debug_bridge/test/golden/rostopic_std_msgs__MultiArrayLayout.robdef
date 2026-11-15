@@ -1,0 +1,17 @@
+service rostopic_std_msgs__MultiArrayLayout
+
+stdver 0.10
+
+import rosmsg_std_msgs__MultiArrayLayout
+
+object subscriber
+    pipe rosmsg_std_msgs__MultiArrayLayout.MultiArrayLayout subscriberpipe [readonly]
+    wire rosmsg_std_msgs__MultiArrayLayout.MultiArrayLayout subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_std_msgs__MultiArrayLayout.MultiArrayLayout m)
+    pipe rosmsg_std_msgs__MultiArrayLayout.MultiArrayLayout publisherpipe [writeonly]
+    wire rosmsg_std_msgs__MultiArrayLayout.MultiArrayLayout publisherwire [writeonly]
+end

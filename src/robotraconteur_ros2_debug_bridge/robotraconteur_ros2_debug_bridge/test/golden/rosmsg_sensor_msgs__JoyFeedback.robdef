@@ -1,0 +1,12 @@
+service rosmsg_sensor_msgs__JoyFeedback
+
+stdver 0.10
+
+struct JoyFeedback
+    constant uint16 TYPE_LED 0
+    constant uint16 TYPE_RUMBLE 1
+    constant uint16 TYPE_BUZZER 2
+    field uint8 type
+    field uint8 id
+    field single intensity
+end

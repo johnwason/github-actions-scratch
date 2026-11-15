@@ -1,0 +1,17 @@
+service rostopic_nav_msgs__Goals
+
+stdver 0.10
+
+import rosmsg_nav_msgs__Goals
+
+object subscriber
+    pipe rosmsg_nav_msgs__Goals.Goals subscriberpipe [readonly]
+    wire rosmsg_nav_msgs__Goals.Goals subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_nav_msgs__Goals.Goals m)
+    pipe rosmsg_nav_msgs__Goals.Goals publisherpipe [writeonly]
+    wire rosmsg_nav_msgs__Goals.Goals publisherwire [writeonly]
+end

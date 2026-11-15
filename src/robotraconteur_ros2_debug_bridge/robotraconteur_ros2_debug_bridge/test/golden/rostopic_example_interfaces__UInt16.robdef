@@ -1,0 +1,17 @@
+service rostopic_example_interfaces__UInt16
+
+stdver 0.10
+
+import rosmsg_example_interfaces__UInt16
+
+object subscriber
+    pipe rosmsg_example_interfaces__UInt16.UInt16 subscriberpipe [readonly]
+    wire rosmsg_example_interfaces__UInt16.UInt16 subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_example_interfaces__UInt16.UInt16 m)
+    pipe rosmsg_example_interfaces__UInt16.UInt16 publisherpipe [writeonly]
+    wire rosmsg_example_interfaces__UInt16.UInt16 publisherwire [writeonly]
+end

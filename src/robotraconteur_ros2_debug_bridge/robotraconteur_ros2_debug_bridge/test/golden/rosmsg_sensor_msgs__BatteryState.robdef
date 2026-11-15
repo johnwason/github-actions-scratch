@@ -1,0 +1,47 @@
+service rosmsg_sensor_msgs__BatteryState
+
+stdver 0.10
+
+import rosmsg_std_msgs__Header
+
+struct BatteryState
+    constant uint16 POWER_SUPPLY_STATUS_UNKNOWN 0
+    constant uint16 POWER_SUPPLY_STATUS_CHARGING 1
+    constant uint16 POWER_SUPPLY_STATUS_DISCHARGING 2
+    constant uint16 POWER_SUPPLY_STATUS_NOT_CHARGING 3
+    constant uint16 POWER_SUPPLY_STATUS_FULL 4
+    constant uint16 POWER_SUPPLY_HEALTH_UNKNOWN 0
+    constant uint16 POWER_SUPPLY_HEALTH_GOOD 1
+    constant uint16 POWER_SUPPLY_HEALTH_OVERHEAT 2
+    constant uint16 POWER_SUPPLY_HEALTH_DEAD 3
+    constant uint16 POWER_SUPPLY_HEALTH_OVERVOLTAGE 4
+    constant uint16 POWER_SUPPLY_HEALTH_UNSPEC_FAILURE 5
+    constant uint16 POWER_SUPPLY_HEALTH_COLD 6
+    constant uint16 POWER_SUPPLY_HEALTH_WATCHDOG_TIMER_EXPIRE 7
+    constant uint16 POWER_SUPPLY_HEALTH_SAFETY_TIMER_EXPIRE 8
+    constant uint16 POWER_SUPPLY_TECHNOLOGY_UNKNOWN 0
+    constant uint16 POWER_SUPPLY_TECHNOLOGY_NIMH 1
+    constant uint16 POWER_SUPPLY_TECHNOLOGY_LION 2
+    constant uint16 POWER_SUPPLY_TECHNOLOGY_LIPO 3
+    constant uint16 POWER_SUPPLY_TECHNOLOGY_LIFE 4
+    constant uint16 POWER_SUPPLY_TECHNOLOGY_NICD 5
+    constant uint16 POWER_SUPPLY_TECHNOLOGY_LIMN 6
+    constant uint16 POWER_SUPPLY_TECHNOLOGY_TERNARY 7
+    constant uint16 POWER_SUPPLY_TECHNOLOGY_VRLA 8
+    field rosmsg_std_msgs__Header.Header header
+    field single voltage
+    field single temperature
+    field single current
+    field single charge
+    field single capacity
+    field single design_capacity
+    field single percentage
+    field uint8 power_supply_status
+    field uint8 power_supply_health
+    field uint8 power_supply_technology
+    field bool present
+    field single[] cell_voltage
+    field single[] cell_temperature
+    field string location
+    field string serial_number
+end

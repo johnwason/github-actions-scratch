@@ -1,0 +1,17 @@
+service rostopic_example_interfaces__Int8MultiArray
+
+stdver 0.10
+
+import rosmsg_example_interfaces__Int8MultiArray
+
+object subscriber
+    pipe rosmsg_example_interfaces__Int8MultiArray.Int8MultiArray subscriberpipe [readonly]
+    wire rosmsg_example_interfaces__Int8MultiArray.Int8MultiArray subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_example_interfaces__Int8MultiArray.Int8MultiArray m)
+    pipe rosmsg_example_interfaces__Int8MultiArray.Int8MultiArray publisherpipe [writeonly]
+    wire rosmsg_example_interfaces__Int8MultiArray.Int8MultiArray publisherwire [writeonly]
+end

@@ -1,0 +1,17 @@
+service rostopic_example_interfaces__Float64MultiArray
+
+stdver 0.10
+
+import rosmsg_example_interfaces__Float64MultiArray
+
+object subscriber
+    pipe rosmsg_example_interfaces__Float64MultiArray.Float64MultiArray subscriberpipe [readonly]
+    wire rosmsg_example_interfaces__Float64MultiArray.Float64MultiArray subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_example_interfaces__Float64MultiArray.Float64MultiArray m)
+    pipe rosmsg_example_interfaces__Float64MultiArray.Float64MultiArray publisherpipe [writeonly]
+    wire rosmsg_example_interfaces__Float64MultiArray.Float64MultiArray publisherwire [writeonly]
+end

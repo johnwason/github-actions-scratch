@@ -1,0 +1,16 @@
+service rosmsg_sensor_msgs__MultiDOFJointState
+
+stdver 0.10
+
+import rosmsg_std_msgs__Header
+import rosmsg_geometry_msgs__Transform
+import rosmsg_geometry_msgs__Twist
+import rosmsg_geometry_msgs__Wrench
+
+struct MultiDOFJointState
+    field rosmsg_std_msgs__Header.Header header
+    field string{list} joint_names
+    field rosmsg_geometry_msgs__Transform.Transform{list} transforms
+    field rosmsg_geometry_msgs__Twist.Twist{list} twist
+    field rosmsg_geometry_msgs__Wrench.Wrench{list} wrench
+end

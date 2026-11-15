@@ -1,0 +1,17 @@
+service rostopic_geometry_msgs__Vector3
+
+stdver 0.10
+
+import rosmsg_geometry_msgs__Vector3
+
+object subscriber
+    pipe rosmsg_geometry_msgs__Vector3.Vector3 subscriberpipe [readonly]
+    wire rosmsg_geometry_msgs__Vector3.Vector3 subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_geometry_msgs__Vector3.Vector3 m)
+    pipe rosmsg_geometry_msgs__Vector3.Vector3 publisherpipe [writeonly]
+    wire rosmsg_geometry_msgs__Vector3.Vector3 publisherwire [writeonly]
+end

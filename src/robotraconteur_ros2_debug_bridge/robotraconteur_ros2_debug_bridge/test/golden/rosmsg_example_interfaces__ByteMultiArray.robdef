@@ -1,0 +1,10 @@
+service rosmsg_example_interfaces__ByteMultiArray
+
+stdver 0.10
+
+import rosmsg_example_interfaces__MultiArrayLayout
+
+struct ByteMultiArray
+    field rosmsg_example_interfaces__MultiArrayLayout.MultiArrayLayout layout
+    field uint8[] data
+end

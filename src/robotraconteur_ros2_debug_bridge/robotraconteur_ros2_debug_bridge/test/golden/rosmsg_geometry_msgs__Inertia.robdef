@@ -1,0 +1,16 @@
+service rosmsg_geometry_msgs__Inertia
+
+stdver 0.10
+
+import rosmsg_geometry_msgs__Vector3
+
+struct Inertia
+    field double m
+    field rosmsg_geometry_msgs__Vector3.Vector3 com
+    field double ixx
+    field double ixy
+    field double ixz
+    field double iyy
+    field double iyz
+    field double izz
+end

@@ -1,0 +1,33 @@
+# ThreadSanitizer suppressions for this repo's tests. Each entry needs a
+# comment with the reason and a docs/upstream_issues.md entry. Never suppress
+# reports with robotraconteur_ros2_debug_bridge frames.
+
+# Robot Raconteur master 7cd1610c, client connect path (ConnectService):
+# RobotRaconteurNode_connector::connected_transport holds the connector mutex
+# and calls ClientContext::AsyncConnectService (ClientContext mutex), while
+# ClientContext::AsyncConnectService7 holds the ClientContext mutex and its
+# completion calls RobotRaconteurNode_connector::connected_client (connector
+# mutex). Potential deadlock entirely inside Robot Raconteur's client code (the
+# tests' client nodes); reported to the RR maintainer 2026-11-14.
+deadlock:RobotRaconteur::detail::RobotRaconteurNode_connector
+
+# Fast DDS 2.14 (rmw_fastrtps_cpp, Jazzy): its shared-memory transport thread
+# (dds.shm.*) copies into a TopicPayloadPool payload buffer
+# (TopicPayloadPool::get_payload, do_get_payload) while a reader thread
+# deserializes from the
+# same buffer (fastcdr Cdr::deserialize_array). Both racing stacks are entirely
+# in Fast DDS/fastcdr, no robotraconteur_ros2_debug_bridge frames. Seen in
+# test_topics__rmw_fastrtps_cpp on the GitHub TSan job (run 43682189102),
+# 2026-11-15. Same user decision as ../rmw_intraprocess (upstream races
+# suppressed narrowly); docs/upstream_issues.md.
+race:eprosima::fastrtps::rtps::TopicPayloadPool::
+
+# rclcpp MultiThreadedExecutor workers during an entity recollect (a component
+# loaded by rclcpp_components::ComponentManager): one worker frees an object
+# another used under a mutex in NodeBase::callback_group_in_node; the ordering
+# is a shared_ptr refcount inside the uninstrumented librclcpp. Both stacks
+# are entirely in librclcpp, no robotraconteur_ros2_debug_bridge frames. Seen
+# in test_components on the GitHub TSan job (run 43683767686), 2026-11-15. The
+# same entry is in ../rmw_intraprocess (test_composition_demo); same user
+# decision; docs/upstream_issues.md.
+race:rclcpp::node_interfaces::NodeBase::callback_group_in_node

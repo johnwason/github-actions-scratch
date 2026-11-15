@@ -1,0 +1,10 @@
+service rosmsg_geometry_msgs__Quaternion
+
+stdver 0.10
+
+struct Quaternion
+    field double x
+    field double y
+    field double z
+    field double w
+end

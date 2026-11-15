@@ -1,0 +1,7 @@
+service rosmsg_example_interfaces__UInt64
+
+stdver 0.10
+
+struct UInt64
+    field uint64 data
+end

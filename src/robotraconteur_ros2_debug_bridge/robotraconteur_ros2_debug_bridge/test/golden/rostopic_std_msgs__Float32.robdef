@@ -1,0 +1,17 @@
+service rostopic_std_msgs__Float32
+
+stdver 0.10
+
+import rosmsg_std_msgs__Float32
+
+object subscriber
+    pipe rosmsg_std_msgs__Float32.Float32 subscriberpipe [readonly]
+    wire rosmsg_std_msgs__Float32.Float32 subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_std_msgs__Float32.Float32 m)
+    pipe rosmsg_std_msgs__Float32.Float32 publisherpipe [writeonly]
+    wire rosmsg_std_msgs__Float32.Float32 publisherwire [writeonly]
+end

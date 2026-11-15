@@ -1,0 +1,17 @@
+service rostopic_geometry_msgs__WrenchStamped
+
+stdver 0.10
+
+import rosmsg_geometry_msgs__WrenchStamped
+
+object subscriber
+    pipe rosmsg_geometry_msgs__WrenchStamped.WrenchStamped subscriberpipe [readonly]
+    wire rosmsg_geometry_msgs__WrenchStamped.WrenchStamped subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_geometry_msgs__WrenchStamped.WrenchStamped m)
+    pipe rosmsg_geometry_msgs__WrenchStamped.WrenchStamped publisherpipe [writeonly]
+    wire rosmsg_geometry_msgs__WrenchStamped.WrenchStamped publisherwire [writeonly]
+end

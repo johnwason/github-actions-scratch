@@ -1,0 +1,9 @@
+service rosmsg_turtlesim__Color
+
+stdver 0.10
+
+struct Color
+    field uint8 r
+    field uint8 g
+    field uint8 b
+end

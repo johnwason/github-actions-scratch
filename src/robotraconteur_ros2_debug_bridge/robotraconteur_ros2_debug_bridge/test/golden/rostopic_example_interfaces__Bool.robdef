@@ -1,0 +1,17 @@
+service rostopic_example_interfaces__Bool
+
+stdver 0.10
+
+import rosmsg_example_interfaces__Bool
+
+object subscriber
+    pipe rosmsg_example_interfaces__Bool.Bool subscriberpipe [readonly]
+    wire rosmsg_example_interfaces__Bool.Bool subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_example_interfaces__Bool.Bool m)
+    pipe rosmsg_example_interfaces__Bool.Bool publisherpipe [writeonly]
+    wire rosmsg_example_interfaces__Bool.Bool publisherwire [writeonly]
+end

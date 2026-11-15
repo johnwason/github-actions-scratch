@@ -1,0 +1,9 @@
+service rosmsg_geometry_msgs__Vector3
+
+stdver 0.10
+
+struct Vector3
+    field double x
+    field double y
+    field double z
+end

@@ -1,0 +1,28 @@
+service rosservice_nav_msgs__LoadMap
+
+stdver 0.10
+
+import rosmsg_nav_msgs__OccupancyGrid
+
+struct LoadMapRequest
+    field string map_url
+end
+
+struct LoadMapResponse
+    constant uint16 RESULT_SUCCESS 0
+    constant uint16 RESULT_MAP_DOES_NOT_EXIST 1
+    constant uint16 RESULT_INVALID_MAP_DATA 2
+    constant uint16 RESULT_INVALID_MAP_METADATA 3
+    constant uint16 RESULT_UNDEFINED_FAILURE 255
+    field rosmsg_nav_msgs__OccupancyGrid.OccupancyGrid map
+    field uint8 result
+end
+
+object rosclient
+    function LoadMapResponse call(LoadMapRequest request)
+    function bool wait_for_service(double timeout)
+end
+
+object rosservice
+    callback LoadMapResponse servicefunction(LoadMapRequest request)
+end

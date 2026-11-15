@@ -1,0 +1,19 @@
+service rosservice_turtlesim__Kill
+
+stdver 0.10
+
+struct KillRequest
+    field string name
+end
+
+struct KillResponse
+end
+
+object rosclient
+    function KillResponse call(KillRequest request)
+    function bool wait_for_service(double timeout)
+end
+
+object rosservice
+    callback KillResponse servicefunction(KillRequest request)
+end

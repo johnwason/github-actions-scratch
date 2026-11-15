@@ -1,0 +1,9 @@
+service rosmsg_geometry_msgs__Point32
+
+stdver 0.10
+
+struct Point32
+    field single x
+    field single y
+    field single z
+end

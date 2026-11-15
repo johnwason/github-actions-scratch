@@ -1,0 +1,17 @@
+service rosmsg_sensor_msgs__Imu
+
+stdver 0.10
+
+import rosmsg_std_msgs__Header
+import rosmsg_geometry_msgs__Quaternion
+import rosmsg_geometry_msgs__Vector3
+
+struct Imu
+    field rosmsg_std_msgs__Header.Header header
+    field rosmsg_geometry_msgs__Quaternion.Quaternion orientation
+    field double[9] orientation_covariance
+    field rosmsg_geometry_msgs__Vector3.Vector3 angular_velocity
+    field double[9] angular_velocity_covariance
+    field rosmsg_geometry_msgs__Vector3.Vector3 linear_acceleration
+    field double[9] linear_acceleration_covariance
+end

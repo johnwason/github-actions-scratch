@@ -1,0 +1,17 @@
+service rostopic_std_msgs__ColorRGBA
+
+stdver 0.10
+
+import rosmsg_std_msgs__ColorRGBA
+
+object subscriber
+    pipe rosmsg_std_msgs__ColorRGBA.ColorRGBA subscriberpipe [readonly]
+    wire rosmsg_std_msgs__ColorRGBA.ColorRGBA subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_std_msgs__ColorRGBA.ColorRGBA m)
+    pipe rosmsg_std_msgs__ColorRGBA.ColorRGBA publisherpipe [writeonly]
+    wire rosmsg_std_msgs__ColorRGBA.ColorRGBA publisherwire [writeonly]
+end

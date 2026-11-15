@@ -1,0 +1,34 @@
+Robot Raconteur client: AsyncFindObjRef1 keeps a boost::string_ref into
+objecttype while the same call moves objecttype (RR_MOVE), so the type
+requested by AsyncPullServiceDefinitionAndImports can be garbage (seen with
+MSVC). Applied by the bridge's Windows CI job only, until Robot Raconteur
+master has a fix (user decision 2026-11-15; docs/upstream_issues.md).
+--- a/RobotRaconteurCore/src/Client.cpp
++++ b/RobotRaconteurCore/src/Client.cpp
+@@ -383,7 +383,7 @@
+                 throw ObjectNotFoundException("Object type was not returned.");
+             }
+
+-            boost::string_ref objectdef = SplitQualifiedName(objecttype).get<0>();
++            std::string objectdef = SplitQualifiedName(objecttype).get<0>().to_string();
+
+             if (use_pulled_types)
+             {
+@@ -396,7 +396,7 @@
+                     AsyncPullServiceDefinitionAndImports(
+                         objectdef,
+                         boost::bind(&ClientContext::AsyncFindObjRef2, shared_from_this(), RR_BOOST_PLACEHOLDERS(_1),
+-                                    RR_BOOST_PLACEHOLDERS(_2), RR_MOVE(objecttype), objectdef.to_string(), path,
++                                    RR_BOOST_PLACEHOLDERS(_2), RR_MOVE(objecttype), objectdef, path,
+                                     objecttype2, handler, timeout),
+                         timeout);
+                     return;
+@@ -404,7 +404,7 @@
+             }
+
+             AsyncFindObjRef2(RR_SHARED_PTR<PullServiceDefinitionAndImportsReturn>(),
+-                             RR_SHARED_PTR<RobotRaconteurException>(), objecttype, objectdef.to_string(), path,
++                             RR_SHARED_PTR<RobotRaconteurException>(), objecttype, objectdef, path,
+                              objecttype2, (handler), timeout);
+         }
+         catch (std::exception& err)

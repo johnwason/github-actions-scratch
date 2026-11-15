@@ -1,0 +1,6 @@
+service rosmsg_test_msgs__Empty
+
+stdver 0.10
+
+struct Empty
+end

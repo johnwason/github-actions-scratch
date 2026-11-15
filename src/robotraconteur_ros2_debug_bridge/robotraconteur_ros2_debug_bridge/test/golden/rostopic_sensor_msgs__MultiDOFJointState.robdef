@@ -1,0 +1,17 @@
+service rostopic_sensor_msgs__MultiDOFJointState
+
+stdver 0.10
+
+import rosmsg_sensor_msgs__MultiDOFJointState
+
+object subscriber
+    pipe rosmsg_sensor_msgs__MultiDOFJointState.MultiDOFJointState subscriberpipe [readonly]
+    wire rosmsg_sensor_msgs__MultiDOFJointState.MultiDOFJointState subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_sensor_msgs__MultiDOFJointState.MultiDOFJointState m)
+    pipe rosmsg_sensor_msgs__MultiDOFJointState.MultiDOFJointState publisherpipe [writeonly]
+    wire rosmsg_sensor_msgs__MultiDOFJointState.MultiDOFJointState publisherwire [writeonly]
+end

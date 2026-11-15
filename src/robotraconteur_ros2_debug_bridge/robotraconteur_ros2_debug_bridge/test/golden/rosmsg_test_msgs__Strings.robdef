@@ -1,0 +1,19 @@
+service rosmsg_test_msgs__Strings
+
+stdver 0.10
+
+struct Strings
+    constant string STRING_CONST "Hello world!"
+    field string string_value
+    field string string_value_default1
+    field string string_value_default2
+    field string string_value_default3
+    field string string_value_default4
+    field string string_value_default5
+    field string bounded_string_value
+    field string bounded_string_value_default1
+    field string bounded_string_value_default2
+    field string bounded_string_value_default3
+    field string bounded_string_value_default4
+    field string bounded_string_value_default5
+end

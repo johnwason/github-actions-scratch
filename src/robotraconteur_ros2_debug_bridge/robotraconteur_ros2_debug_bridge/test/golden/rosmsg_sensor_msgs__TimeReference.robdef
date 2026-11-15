@@ -1,0 +1,12 @@
+service rosmsg_sensor_msgs__TimeReference
+
+stdver 0.10
+
+import rosmsg_std_msgs__Header
+import rosmsg_builtin_interfaces__Time
+
+struct TimeReference
+    field rosmsg_std_msgs__Header.Header header
+    field rosmsg_builtin_interfaces__Time.Time time_ref
+    field string source
+end

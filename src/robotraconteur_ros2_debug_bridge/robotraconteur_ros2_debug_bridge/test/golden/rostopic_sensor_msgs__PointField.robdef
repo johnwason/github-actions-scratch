@@ -1,0 +1,17 @@
+service rostopic_sensor_msgs__PointField
+
+stdver 0.10
+
+import rosmsg_sensor_msgs__PointField
+
+object subscriber
+    pipe rosmsg_sensor_msgs__PointField.PointField subscriberpipe [readonly]
+    wire rosmsg_sensor_msgs__PointField.PointField subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_sensor_msgs__PointField.PointField m)
+    pipe rosmsg_sensor_msgs__PointField.PointField publisherpipe [writeonly]
+    wire rosmsg_sensor_msgs__PointField.PointField publisherwire [writeonly]
+end

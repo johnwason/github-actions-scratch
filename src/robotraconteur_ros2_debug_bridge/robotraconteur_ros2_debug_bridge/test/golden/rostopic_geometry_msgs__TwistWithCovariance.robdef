@@ -1,0 +1,17 @@
+service rostopic_geometry_msgs__TwistWithCovariance
+
+stdver 0.10
+
+import rosmsg_geometry_msgs__TwistWithCovariance
+
+object subscriber
+    pipe rosmsg_geometry_msgs__TwistWithCovariance.TwistWithCovariance subscriberpipe [readonly]
+    wire rosmsg_geometry_msgs__TwistWithCovariance.TwistWithCovariance subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_geometry_msgs__TwistWithCovariance.TwistWithCovariance m)
+    pipe rosmsg_geometry_msgs__TwistWithCovariance.TwistWithCovariance publisherpipe [writeonly]
+    wire rosmsg_geometry_msgs__TwistWithCovariance.TwistWithCovariance publisherwire [writeonly]
+end

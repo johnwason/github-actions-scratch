@@ -1,0 +1,7 @@
+service rosmsg_example_interfaces__WString
+
+stdver 0.10
+
+struct WString
+    field string data
+end

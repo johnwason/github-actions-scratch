@@ -1,0 +1,17 @@
+service rostopic_std_msgs__UInt64
+
+stdver 0.10
+
+import rosmsg_std_msgs__UInt64
+
+object subscriber
+    pipe rosmsg_std_msgs__UInt64.UInt64 subscriberpipe [readonly]
+    wire rosmsg_std_msgs__UInt64.UInt64 subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_std_msgs__UInt64.UInt64 m)
+    pipe rosmsg_std_msgs__UInt64.UInt64 publisherpipe [writeonly]
+    wire rosmsg_std_msgs__UInt64.UInt64 publisherwire [writeonly]
+end

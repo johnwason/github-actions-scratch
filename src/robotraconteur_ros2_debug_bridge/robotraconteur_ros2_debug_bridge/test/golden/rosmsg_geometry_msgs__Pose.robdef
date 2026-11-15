@@ -1,0 +1,11 @@
+service rosmsg_geometry_msgs__Pose
+
+stdver 0.10
+
+import rosmsg_geometry_msgs__Point
+import rosmsg_geometry_msgs__Quaternion
+
+struct Pose
+    field rosmsg_geometry_msgs__Point.Point position
+    field rosmsg_geometry_msgs__Quaternion.Quaternion orientation
+end

@@ -1,0 +1,42 @@
+service rosmsg_test_msgs__UnboundedSequences
+
+stdver 0.10
+
+import rosmsg_test_msgs__BasicTypes
+import rosmsg_test_msgs__Constants
+import rosmsg_test_msgs__Defaults
+
+struct UnboundedSequences
+    field bool[] bool_values
+    field uint8[] byte_values
+    field uint8[] char_values
+    field single[] float32_values
+    field double[] float64_values
+    field int8[] int8_values
+    field uint8[] uint8_values
+    field int16[] int16_values
+    field uint16[] uint16_values
+    field int32[] int32_values
+    field uint32[] uint32_values
+    field int64[] int64_values
+    field uint64[] uint64_values
+    field string{list} string_values
+    field rosmsg_test_msgs__BasicTypes.BasicTypes{list} basic_types_values
+    field rosmsg_test_msgs__Constants.Constants{list} constants_values
+    field rosmsg_test_msgs__Defaults.Defaults{list} defaults_values
+    field bool[] bool_values_default
+    field uint8[] byte_values_default
+    field uint8[] char_values_default
+    field single[] float32_values_default
+    field double[] float64_values_default
+    field int8[] int8_values_default
+    field uint8[] uint8_values_default
+    field int16[] int16_values_default
+    field uint16[] uint16_values_default
+    field int32[] int32_values_default
+    field uint32[] uint32_values_default
+    field int64[] int64_values_default
+    field uint64[] uint64_values_default
+    field string{list} string_values_default
+    field int32 alignment_check
+end

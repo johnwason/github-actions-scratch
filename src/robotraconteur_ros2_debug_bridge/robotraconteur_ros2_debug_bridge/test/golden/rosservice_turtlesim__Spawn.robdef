@@ -1,0 +1,23 @@
+service rosservice_turtlesim__Spawn
+
+stdver 0.10
+
+struct SpawnRequest
+    field single x
+    field single y
+    field single theta
+    field string name
+end
+
+struct SpawnResponse
+    field string name
+end
+
+object rosclient
+    function SpawnResponse call(SpawnRequest request)
+    function bool wait_for_service(double timeout)
+end
+
+object rosservice
+    callback SpawnResponse servicefunction(SpawnRequest request)
+end

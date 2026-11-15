@@ -1,0 +1,17 @@
+service rostopic_geometry_msgs__Polygon
+
+stdver 0.10
+
+import rosmsg_geometry_msgs__Polygon
+
+object subscriber
+    pipe rosmsg_geometry_msgs__Polygon.Polygon subscriberpipe [readonly]
+    wire rosmsg_geometry_msgs__Polygon.Polygon subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_geometry_msgs__Polygon.Polygon m)
+    pipe rosmsg_geometry_msgs__Polygon.Polygon publisherpipe [writeonly]
+    wire rosmsg_geometry_msgs__Polygon.Polygon publisherwire [writeonly]
+end

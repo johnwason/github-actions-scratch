@@ -1,0 +1,7 @@
+service rosmsg_std_msgs__Bool
+
+stdver 0.10
+
+struct Bool
+    field bool data
+end

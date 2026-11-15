@@ -1,0 +1,17 @@
+service rostopic_test_msgs__WStrings
+
+stdver 0.10
+
+import rosmsg_test_msgs__WStrings
+
+object subscriber
+    pipe rosmsg_test_msgs__WStrings.WStrings subscriberpipe [readonly]
+    wire rosmsg_test_msgs__WStrings.WStrings subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_test_msgs__WStrings.WStrings m)
+    pipe rosmsg_test_msgs__WStrings.WStrings publisherpipe [writeonly]
+    wire rosmsg_test_msgs__WStrings.WStrings publisherwire [writeonly]
+end

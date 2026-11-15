@@ -1,0 +1,17 @@
+service rostopic_test_msgs__UnboundedSequences
+
+stdver 0.10
+
+import rosmsg_test_msgs__UnboundedSequences
+
+object subscriber
+    pipe rosmsg_test_msgs__UnboundedSequences.UnboundedSequences subscriberpipe [readonly]
+    wire rosmsg_test_msgs__UnboundedSequences.UnboundedSequences subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_test_msgs__UnboundedSequences.UnboundedSequences m)
+    pipe rosmsg_test_msgs__UnboundedSequences.UnboundedSequences publisherpipe [writeonly]
+    wire rosmsg_test_msgs__UnboundedSequences.UnboundedSequences publisherwire [writeonly]
+end

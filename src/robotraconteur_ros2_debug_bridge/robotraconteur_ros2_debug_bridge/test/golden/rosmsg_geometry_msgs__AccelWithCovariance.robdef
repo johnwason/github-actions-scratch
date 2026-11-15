@@ -1,0 +1,10 @@
+service rosmsg_geometry_msgs__AccelWithCovariance
+
+stdver 0.10
+
+import rosmsg_geometry_msgs__Accel
+
+struct AccelWithCovariance
+    field rosmsg_geometry_msgs__Accel.Accel accel
+    field double[36] covariance
+end

@@ -1,0 +1,76 @@
+# RoboStack (ROS 2 Jazzy on conda-forge) environment for the Windows job of
+# the bridge's GitHub CI (CLAUDE.md S3; S6 of ../rmw_intraprocess/CLAUDE.md).
+# The workflow copies this file to the root of the CI snapshot, next to
+# src/ (this repo, ../rmw_intraprocess, and a clone of Robot Raconteur
+# master). Not used for local builds: those run in podman (scripts/build.sh).
+# docs/windows.md.
+
+[workspace]
+name = "robotraconteur_ros2_debug_bridge_ci"
+channels = ["robostack-jazzy", "conda-forge"]
+platforms = ["win-64"]
+
+[dependencies]
+cmake = "*"
+ninja = "*"
+pkg-config = "*"
+git = "*"
+colcon-common-extensions = "*"
+# Robot Raconteur (core, RobotRaconteurGen, Python 3 module).
+libboost-devel = "*"
+swig = "*"
+numpy = "*"
+setuptools = "*"
+wheel = "*"
+pytest = "*"
+# ROS.
+ros-jazzy-ament-cmake = "*"
+ros-jazzy-ament-cmake-gtest = "*"
+ros-jazzy-ament-cmake-pytest = "*"
+ros-jazzy-ament-lint-auto = "*"
+ros-jazzy-ament-lint-common = "*"
+ros-jazzy-ament-index-cpp = "*"
+ros-jazzy-action-msgs = "*"
+ros-jazzy-action-tutorials-cpp = "*"
+ros-jazzy-action-tutorials-interfaces = "*"
+ros-jazzy-class-loader = "*"
+ros-jazzy-common-interfaces = "*"
+ros-jazzy-composition = "*"
+ros-jazzy-composition-interfaces = "*"
+ros-jazzy-demo-nodes-cpp = "*"
+ros-jazzy-example-interfaces = "*"
+ros-jazzy-rclcpp = "*"
+ros-jazzy-rclcpp-action = "*"
+ros-jazzy-rclcpp-components = "*"
+ros-jazzy-rclcpp-lifecycle = "*"
+ros-jazzy-rcl-yaml-param-parser = "*"
+ros-jazzy-rcpputils = "*"
+ros-jazzy-rmw = "*"
+ros-jazzy-rmw-fastrtps-cpp = "*"
+ros-jazzy-rmw-implementation = "*"
+ros-jazzy-rosbag2-cpp = "*"
+ros-jazzy-rosbag2-storage-mcap = "*"
+ros-jazzy-rosbag2-transport = "*"
+ros-jazzy-rosidl-default-generators = "*"
+ros-jazzy-rosidl-default-runtime = "*"
+ros-jazzy-rosidl-typesupport-fastrtps-c = "*"
+ros-jazzy-rosidl-typesupport-fastrtps-cpp = "*"
+ros-jazzy-rosidl-typesupport-introspection-c = "*"
+ros-jazzy-rosidl-typesupport-introspection-cpp = "*"
+ros-jazzy-lifecycle-msgs = "*"
+ros-jazzy-std-msgs = "*"
+ros-jazzy-test-msgs = "*"
+ros-jazzy-turtlesim = "*"
+ros-jazzy-yaml-cpp-vendor = "*"
+# Same uncrustify as the ROS Jazzy apt packages used by the local gate.
+uncrustify = "0.78.1.*"
+vs2022_win-64 = "*"
+
+[tasks]
+# CI_BUILD_BASE / CI_INSTALL_BASE: short absolute directories (MAX_PATH; see
+# ../rmw_intraprocess/docs/windows.md). Robot Raconteur builds in its ROS
+# mode, as in the Linux image (container/Containerfile).
+build-robotraconteur = "colcon build --merge-install --base-paths src --build-base $CI_BUILD_BASE --install-base $CI_INSTALL_BASE --packages-select robotraconteur --event-handlers console_direct+ --cmake-args -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF -DROBOTRACONTEUR_ROS=ON"
+build = "colcon build --merge-install --base-paths src --build-base $CI_BUILD_BASE --install-base $CI_INSTALL_BASE --packages-up-to robotraconteur_ros2_debug_bridge --packages-skip robotraconteur --event-handlers console_direct+ --cmake-args -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON -DUPSTREAM_BRIDGE_DIR=$UPSTREAM_BRIDGE_DIR"
+test = "colcon test --merge-install --base-paths src --build-base $CI_BUILD_BASE --install-base $CI_INSTALL_BASE --packages-select robotraconteur_ros2_debug_bridge --event-handlers console_direct+ --return-code-on-test-failure --ctest-args --output-on-failure"
+test-result = "colcon test-result --test-result-base $CI_BUILD_BASE/robotraconteur_ros2_debug_bridge --verbose"

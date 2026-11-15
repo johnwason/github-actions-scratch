@@ -1,0 +1,84 @@
+service rosservice_test_msgs__Arrays
+
+stdver 0.10
+
+import rosmsg_test_msgs__BasicTypes
+import rosmsg_test_msgs__Constants
+import rosmsg_test_msgs__Defaults
+
+struct ArraysRequest
+    field bool[3] bool_values
+    field uint8[3] byte_values
+    field uint8[3] char_values
+    field single[3] float32_values
+    field double[3] float64_values
+    field int8[3] int8_values
+    field uint8[3] uint8_values
+    field int16[3] int16_values
+    field uint16[3] uint16_values
+    field int32[3] int32_values
+    field uint32[3] uint32_values
+    field int64[3] int64_values
+    field uint64[3] uint64_values
+    field string{list} string_values
+    field rosmsg_test_msgs__BasicTypes.BasicTypes{list} basic_types_values
+    field rosmsg_test_msgs__Constants.Constants{list} constants_values
+    field rosmsg_test_msgs__Defaults.Defaults{list} defaults_values
+    field bool[3] bool_values_default
+    field uint8[3] byte_values_default
+    field uint8[3] char_values_default
+    field single[3] float32_values_default
+    field double[3] float64_values_default
+    field int8[3] int8_values_default
+    field uint8[3] uint8_values_default
+    field int16[3] int16_values_default
+    field uint16[3] uint16_values_default
+    field int32[3] int32_values_default
+    field uint32[3] uint32_values_default
+    field int64[3] int64_values_default
+    field uint64[3] uint64_values_default
+    field string{list} string_values_default
+end
+
+struct ArraysResponse
+    field bool[3] bool_values
+    field uint8[3] byte_values
+    field uint8[3] char_values
+    field single[3] float32_values
+    field double[3] float64_values
+    field int8[3] int8_values
+    field uint8[3] uint8_values
+    field int16[3] int16_values
+    field uint16[3] uint16_values
+    field int32[3] int32_values
+    field uint32[3] uint32_values
+    field int64[3] int64_values
+    field uint64[3] uint64_values
+    field string{list} string_values
+    field rosmsg_test_msgs__BasicTypes.BasicTypes{list} basic_types_values
+    field rosmsg_test_msgs__Constants.Constants{list} constants_values
+    field rosmsg_test_msgs__Defaults.Defaults{list} defaults_values
+    field bool[3] bool_values_default
+    field uint8[3] byte_values_default
+    field uint8[3] char_values_default
+    field single[3] float32_values_default
+    field double[3] float64_values_default
+    field int8[3] int8_values_default
+    field uint8[3] uint8_values_default
+    field int16[3] int16_values_default
+    field uint16[3] uint16_values_default
+    field int32[3] int32_values_default
+    field uint32[3] uint32_values_default
+    field int64[3] int64_values_default
+    field uint64[3] uint64_values_default
+    field string{list} string_values_default
+end
+
+object rosclient
+    function ArraysResponse call(ArraysRequest request)
+    function bool wait_for_service(double timeout)
+end
+
+object rosservice
+    callback ArraysResponse servicefunction(ArraysRequest request)
+end

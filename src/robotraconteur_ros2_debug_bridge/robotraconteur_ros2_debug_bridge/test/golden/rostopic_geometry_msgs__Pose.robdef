@@ -1,0 +1,17 @@
+service rostopic_geometry_msgs__Pose
+
+stdver 0.10
+
+import rosmsg_geometry_msgs__Pose
+
+object subscriber
+    pipe rosmsg_geometry_msgs__Pose.Pose subscriberpipe [readonly]
+    wire rosmsg_geometry_msgs__Pose.Pose subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_geometry_msgs__Pose.Pose m)
+    pipe rosmsg_geometry_msgs__Pose.Pose publisherpipe [writeonly]
+    wire rosmsg_geometry_msgs__Pose.Pose publisherwire [writeonly]
+end

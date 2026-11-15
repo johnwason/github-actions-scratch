@@ -1,0 +1,17 @@
+service rostopic_sensor_msgs__PointCloud2
+
+stdver 0.10
+
+import rosmsg_sensor_msgs__PointCloud2
+
+object subscriber
+    pipe rosmsg_sensor_msgs__PointCloud2.PointCloud2 subscriberpipe [readonly]
+    wire rosmsg_sensor_msgs__PointCloud2.PointCloud2 subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_sensor_msgs__PointCloud2.PointCloud2 m)
+    pipe rosmsg_sensor_msgs__PointCloud2.PointCloud2 publisherpipe [writeonly]
+    wire rosmsg_sensor_msgs__PointCloud2.PointCloud2 publisherwire [writeonly]
+end

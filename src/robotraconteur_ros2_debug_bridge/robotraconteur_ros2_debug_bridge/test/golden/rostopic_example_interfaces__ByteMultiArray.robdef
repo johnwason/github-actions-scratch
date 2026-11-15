@@ -1,0 +1,17 @@
+service rostopic_example_interfaces__ByteMultiArray
+
+stdver 0.10
+
+import rosmsg_example_interfaces__ByteMultiArray
+
+object subscriber
+    pipe rosmsg_example_interfaces__ByteMultiArray.ByteMultiArray subscriberpipe [readonly]
+    wire rosmsg_example_interfaces__ByteMultiArray.ByteMultiArray subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_example_interfaces__ByteMultiArray.ByteMultiArray m)
+    pipe rosmsg_example_interfaces__ByteMultiArray.ByteMultiArray publisherpipe [writeonly]
+    wire rosmsg_example_interfaces__ByteMultiArray.ByteMultiArray publisherwire [writeonly]
+end

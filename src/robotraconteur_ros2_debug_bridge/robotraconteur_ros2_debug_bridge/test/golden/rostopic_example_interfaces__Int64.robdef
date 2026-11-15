@@ -1,0 +1,17 @@
+service rostopic_example_interfaces__Int64
+
+stdver 0.10
+
+import rosmsg_example_interfaces__Int64
+
+object subscriber
+    pipe rosmsg_example_interfaces__Int64.Int64 subscriberpipe [readonly]
+    wire rosmsg_example_interfaces__Int64.Int64 subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_example_interfaces__Int64.Int64 m)
+    pipe rosmsg_example_interfaces__Int64.Int64 publisherpipe [writeonly]
+    wire rosmsg_example_interfaces__Int64.Int64 publisherwire [writeonly]
+end

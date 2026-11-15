@@ -1,0 +1,12 @@
+service rosmsg_nav_msgs__OccupancyGrid
+
+stdver 0.10
+
+import rosmsg_std_msgs__Header
+import rosmsg_nav_msgs__MapMetaData
+
+struct OccupancyGrid
+    field rosmsg_std_msgs__Header.Header header
+    field rosmsg_nav_msgs__MapMetaData.MapMetaData info
+    field int8[] data
+end

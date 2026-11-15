@@ -1,0 +1,11 @@
+service rosmsg_geometry_msgs__TwistWithCovarianceStamped
+
+stdver 0.10
+
+import rosmsg_std_msgs__Header
+import rosmsg_geometry_msgs__TwistWithCovariance
+
+struct TwistWithCovarianceStamped
+    field rosmsg_std_msgs__Header.Header header
+    field rosmsg_geometry_msgs__TwistWithCovariance.TwistWithCovariance twist
+end

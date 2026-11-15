@@ -1,0 +1,17 @@
+service rostopic_geometry_msgs__InertiaStamped
+
+stdver 0.10
+
+import rosmsg_geometry_msgs__InertiaStamped
+
+object subscriber
+    pipe rosmsg_geometry_msgs__InertiaStamped.InertiaStamped subscriberpipe [readonly]
+    wire rosmsg_geometry_msgs__InertiaStamped.InertiaStamped subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_geometry_msgs__InertiaStamped.InertiaStamped m)
+    pipe rosmsg_geometry_msgs__InertiaStamped.InertiaStamped publisherpipe [writeonly]
+    wire rosmsg_geometry_msgs__InertiaStamped.InertiaStamped publisherwire [writeonly]
+end

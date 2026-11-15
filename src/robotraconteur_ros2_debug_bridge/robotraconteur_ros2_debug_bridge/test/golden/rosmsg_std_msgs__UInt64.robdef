@@ -1,0 +1,7 @@
+service rosmsg_std_msgs__UInt64
+
+stdver 0.10
+
+struct UInt64
+    field uint64 data
+end

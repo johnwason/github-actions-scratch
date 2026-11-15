@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>rmw_intraprocess_torture</name>
+  <version>0.0.0</version>
+  <description>Test-only torture components for rmw_intraprocess_cpp (M8c): composable nodes that stress topics, services, actions, parameters, lifecycle and entity churn in one process.</description>
+  <maintainer email="wason@wasontech.com">John Wason</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>rosidl_default_generators</buildtool_depend>
+
+  <!-- Build-time for colcon ordering: the test CMake locates the RMW library. -->
+  <build_depend>rmw_intraprocess_cpp</build_depend>
+
+  <depend>rclcpp</depend>
+  <depend>rclcpp_action</depend>
+  <depend>rclcpp_components</depend>
+  <depend>rclcpp_lifecycle</depend>
+  <depend>test_msgs</depend>
+
+  <exec_depend>rosidl_default_runtime</exec_depend>
+
+  <test_depend>ament_cmake_gtest</test_depend>
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+  <test_depend>composition_interfaces</test_depend>
+  <test_depend>lifecycle_msgs</test_depend>
+
+  <member_of_group>rosidl_interface_packages</member_of_group>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

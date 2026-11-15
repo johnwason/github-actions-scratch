@@ -1,0 +1,17 @@
+service rostopic_geometry_msgs__AccelWithCovariance
+
+stdver 0.10
+
+import rosmsg_geometry_msgs__AccelWithCovariance
+
+object subscriber
+    pipe rosmsg_geometry_msgs__AccelWithCovariance.AccelWithCovariance subscriberpipe [readonly]
+    wire rosmsg_geometry_msgs__AccelWithCovariance.AccelWithCovariance subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_geometry_msgs__AccelWithCovariance.AccelWithCovariance m)
+    pipe rosmsg_geometry_msgs__AccelWithCovariance.AccelWithCovariance publisherpipe [writeonly]
+    wire rosmsg_geometry_msgs__AccelWithCovariance.AccelWithCovariance publisherwire [writeonly]
+end

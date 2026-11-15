@@ -1,0 +1,10 @@
+service rosmsg_geometry_msgs__PoseWithCovariance
+
+stdver 0.10
+
+import rosmsg_geometry_msgs__Pose
+
+struct PoseWithCovariance
+    field rosmsg_geometry_msgs__Pose.Pose pose
+    field double[36] covariance
+end

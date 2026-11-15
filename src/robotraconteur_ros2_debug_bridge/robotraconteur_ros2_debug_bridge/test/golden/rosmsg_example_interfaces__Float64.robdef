@@ -1,0 +1,7 @@
+service rosmsg_example_interfaces__Float64
+
+stdver 0.10
+
+struct Float64
+    field double data
+end

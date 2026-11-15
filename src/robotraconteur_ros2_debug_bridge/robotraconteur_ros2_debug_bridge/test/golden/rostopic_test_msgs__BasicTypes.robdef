@@ -1,0 +1,17 @@
+service rostopic_test_msgs__BasicTypes
+
+stdver 0.10
+
+import rosmsg_test_msgs__BasicTypes
+
+object subscriber
+    pipe rosmsg_test_msgs__BasicTypes.BasicTypes subscriberpipe [readonly]
+    wire rosmsg_test_msgs__BasicTypes.BasicTypes subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_test_msgs__BasicTypes.BasicTypes m)
+    pipe rosmsg_test_msgs__BasicTypes.BasicTypes publisherpipe [writeonly]
+    wire rosmsg_test_msgs__BasicTypes.BasicTypes publisherwire [writeonly]
+end

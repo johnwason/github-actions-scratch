@@ -1,0 +1,44 @@
+service rosaction_test_msgs__NestedMessage
+
+stdver 0.10
+
+import rosmsg_test_msgs__Builtins
+import rosmsg_test_msgs__BasicTypes
+import rosmsg_builtin_interfaces__Time
+
+struct NestedMessageGoal
+    field rosmsg_test_msgs__Builtins.Builtins nested_field_no_pkg
+    field rosmsg_test_msgs__BasicTypes.BasicTypes nested_field
+    field rosmsg_builtin_interfaces__Time.Time nested_different_pkg
+end
+
+struct NestedMessageResult
+    field rosmsg_test_msgs__Builtins.Builtins nested_field_no_pkg
+    field rosmsg_test_msgs__BasicTypes.BasicTypes nested_field
+    field rosmsg_builtin_interfaces__Time.Time nested_different_pkg
+end
+
+struct NestedMessageFeedback
+    field rosmsg_test_msgs__Builtins.Builtins nested_field_no_pkg
+    field rosmsg_test_msgs__BasicTypes.BasicTypes nested_field
+    field rosmsg_builtin_interfaces__Time.Time nested_different_pkg
+end
+
+struct NestedMessageGoalStatus
+    constant int16 STATUS_UNKNOWN 0
+    constant int16 STATUS_ACCEPTED 1
+    constant int16 STATUS_EXECUTING 2
+    constant int16 STATUS_CANCELING 3
+    constant int16 STATUS_SUCCEEDED 4
+    constant int16 STATUS_CANCELED 5
+    constant int16 STATUS_ABORTED 6
+    field uint8[16] goal_id
+    field int8 status
+    field NestedMessageFeedback feedback
+    field NestedMessageResult result
+end
+
+object rosactionclient
+    function NestedMessageGoalStatus{generator} send_goal(NestedMessageGoal goal)
+    function bool wait_for_server(double timeout)
+end

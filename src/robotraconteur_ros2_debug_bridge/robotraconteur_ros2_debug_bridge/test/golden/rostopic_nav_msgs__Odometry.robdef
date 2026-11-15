@@ -1,0 +1,17 @@
+service rostopic_nav_msgs__Odometry
+
+stdver 0.10
+
+import rosmsg_nav_msgs__Odometry
+
+object subscriber
+    pipe rosmsg_nav_msgs__Odometry.Odometry subscriberpipe [readonly]
+    wire rosmsg_nav_msgs__Odometry.Odometry subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_nav_msgs__Odometry.Odometry m)
+    pipe rosmsg_nav_msgs__Odometry.Odometry publisherpipe [writeonly]
+    wire rosmsg_nav_msgs__Odometry.Odometry publisherwire [writeonly]
+end

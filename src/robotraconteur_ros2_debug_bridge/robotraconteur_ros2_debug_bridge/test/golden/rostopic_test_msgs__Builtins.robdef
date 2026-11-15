@@ -1,0 +1,17 @@
+service rostopic_test_msgs__Builtins
+
+stdver 0.10
+
+import rosmsg_test_msgs__Builtins
+
+object subscriber
+    pipe rosmsg_test_msgs__Builtins.Builtins subscriberpipe [readonly]
+    wire rosmsg_test_msgs__Builtins.Builtins subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_test_msgs__Builtins.Builtins m)
+    pipe rosmsg_test_msgs__Builtins.Builtins publisherpipe [writeonly]
+    wire rosmsg_test_msgs__Builtins.Builtins publisherwire [writeonly]
+end

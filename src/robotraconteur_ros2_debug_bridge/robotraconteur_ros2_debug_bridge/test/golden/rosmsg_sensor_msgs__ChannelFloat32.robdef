@@ -1,0 +1,8 @@
+service rosmsg_sensor_msgs__ChannelFloat32
+
+stdver 0.10
+
+struct ChannelFloat32
+    field string name
+    field single[] values
+end

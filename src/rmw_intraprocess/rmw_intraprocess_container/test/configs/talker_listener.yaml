@@ -1,0 +1,20 @@
+# Used by test_cli and the container_host smoke test.
+executor: single_threaded
+parameter_files: [global_params.yaml]
+components:
+  - package: composition
+    plugin: composition::Talker
+    name: talker
+    namespace: /smoke
+    remappings: {chatter: smoke_chat}
+  - package: composition
+    plugin: composition::Listener
+    name: listener
+    namespace: /smoke
+    remappings: ["chatter:=smoke_chat"]
+  - package: demo_nodes_cpp
+    plugin: demo_nodes_cpp::ParameterBlackboard
+    name: blackboard
+    parameter_files: [blackboard_params.yaml]
+    parameters:
+      inline_wins: 11

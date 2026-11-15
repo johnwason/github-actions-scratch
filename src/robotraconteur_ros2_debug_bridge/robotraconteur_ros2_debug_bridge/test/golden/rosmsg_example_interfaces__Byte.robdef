@@ -1,0 +1,7 @@
+service rosmsg_example_interfaces__Byte
+
+stdver 0.10
+
+struct Byte
+    field uint8 data
+end

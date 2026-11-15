@@ -1,0 +1,10 @@
+service rosmsg_example_interfaces__UInt64MultiArray
+
+stdver 0.10
+
+import rosmsg_example_interfaces__MultiArrayLayout
+
+struct UInt64MultiArray
+    field rosmsg_example_interfaces__MultiArrayLayout.MultiArrayLayout layout
+    field uint64[] data
+end

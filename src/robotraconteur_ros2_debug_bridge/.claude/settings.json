@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "deny": [
+      "Bash(git push:*)",
+      "Bash(git remote add:*)",
+      "Bash(git remote set-url:*)",
+      "Bash(sudo:*)",
+      "Bash(podman push:*)",
+      "Bash(podman login:*)",
+      "Bash(podman run --network=host:*)",
+      "Bash(podman run --net=host:*)",
+      "Bash(podman run --privileged:*)",
+      "Bash(colcon:*)",
+      "Bash(cmake:*)",
+      "Bash(make:*)",
+      "Bash(ninja:*)",
+      "Bash(rosdep:*)",
+      "Bash(apt:*)",
+      "Bash(apt-get:*)",
+      "Bash(pip:*)",
+      "Bash(pip3:*)",
+      "Bash(ros2:*)",
+      "Bash(ssh:*)",
+      "Bash(scp:*)",
+      "Bash(nmap:*)",
+      "Bash(ping:*)",
+      "Bash(arp-scan:*)",
+      "Bash(avahi-browse:*)",
+      "Bash(nc:*)",
+      "Bash(ncat:*)",
+      "Bash(socat:*)"
+    ]
+  }
+}

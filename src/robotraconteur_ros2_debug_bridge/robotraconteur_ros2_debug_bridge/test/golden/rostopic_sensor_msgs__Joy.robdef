@@ -1,0 +1,17 @@
+service rostopic_sensor_msgs__Joy
+
+stdver 0.10
+
+import rosmsg_sensor_msgs__Joy
+
+object subscriber
+    pipe rosmsg_sensor_msgs__Joy.Joy subscriberpipe [readonly]
+    wire rosmsg_sensor_msgs__Joy.Joy subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_sensor_msgs__Joy.Joy m)
+    pipe rosmsg_sensor_msgs__Joy.Joy publisherpipe [writeonly]
+    wire rosmsg_sensor_msgs__Joy.Joy publisherwire [writeonly]
+end

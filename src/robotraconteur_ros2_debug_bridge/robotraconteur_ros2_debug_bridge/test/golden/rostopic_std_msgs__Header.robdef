@@ -1,0 +1,17 @@
+service rostopic_std_msgs__Header
+
+stdver 0.10
+
+import rosmsg_std_msgs__Header
+
+object subscriber
+    pipe rosmsg_std_msgs__Header.Header subscriberpipe [readonly]
+    wire rosmsg_std_msgs__Header.Header subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_std_msgs__Header.Header m)
+    pipe rosmsg_std_msgs__Header.Header publisherpipe [writeonly]
+    wire rosmsg_std_msgs__Header.Header publisherwire [writeonly]
+end

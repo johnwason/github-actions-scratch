@@ -1,0 +1,10 @@
+service rosmsg_geometry_msgs__Twist
+
+stdver 0.10
+
+import rosmsg_geometry_msgs__Vector3
+
+struct Twist
+    field rosmsg_geometry_msgs__Vector3.Vector3 linear
+    field rosmsg_geometry_msgs__Vector3.Vector3 angular
+end

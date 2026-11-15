@@ -1,0 +1,18 @@
+service rosmsg_sensor_msgs__NavSatStatus
+
+stdver 0.10
+
+struct NavSatStatus
+    constant int16 STATUS_UNKNOWN -2
+    constant int16 STATUS_NO_FIX -1
+    constant int16 STATUS_FIX 0
+    constant int16 STATUS_SBAS_FIX 1
+    constant int16 STATUS_GBAS_FIX 2
+    constant uint16 SERVICE_UNKNOWN 0
+    constant uint16 SERVICE_GPS 1
+    constant uint16 SERVICE_GLONASS 2
+    constant uint16 SERVICE_COMPASS 4
+    constant uint16 SERVICE_GALILEO 8
+    field int8 status
+    field uint16 rosservice
+end

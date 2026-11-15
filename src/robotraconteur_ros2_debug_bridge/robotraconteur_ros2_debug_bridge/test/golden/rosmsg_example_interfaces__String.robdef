@@ -1,0 +1,7 @@
+service rosmsg_example_interfaces__String
+
+stdver 0.10
+
+struct String
+    field string data
+end

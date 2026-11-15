@@ -1,0 +1,17 @@
+service rostopic_example_interfaces__Byte
+
+stdver 0.10
+
+import rosmsg_example_interfaces__Byte
+
+object subscriber
+    pipe rosmsg_example_interfaces__Byte.Byte subscriberpipe [readonly]
+    wire rosmsg_example_interfaces__Byte.Byte subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_example_interfaces__Byte.Byte m)
+    pipe rosmsg_example_interfaces__Byte.Byte publisherpipe [writeonly]
+    wire rosmsg_example_interfaces__Byte.Byte publisherwire [writeonly]
+end

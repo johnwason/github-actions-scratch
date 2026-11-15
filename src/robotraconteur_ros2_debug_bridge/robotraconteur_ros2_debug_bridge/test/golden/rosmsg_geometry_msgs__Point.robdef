@@ -1,0 +1,9 @@
+service rosmsg_geometry_msgs__Point
+
+stdver 0.10
+
+struct Point
+    field double x
+    field double y
+    field double z
+end

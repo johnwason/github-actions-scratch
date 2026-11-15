@@ -1,0 +1,17 @@
+service rosmsg_nav_msgs__TrajectoryPoint
+
+stdver 0.10
+
+import rosmsg_std_msgs__Header
+import rosmsg_geometry_msgs__Pose
+import rosmsg_geometry_msgs__Twist
+import rosmsg_geometry_msgs__Accel
+import rosmsg_geometry_msgs__Wrench
+
+struct TrajectoryPoint
+    field rosmsg_std_msgs__Header.Header header
+    field rosmsg_geometry_msgs__Pose.Pose pose
+    field rosmsg_geometry_msgs__Twist.Twist velocity
+    field rosmsg_geometry_msgs__Accel.Accel acceleration
+    field rosmsg_geometry_msgs__Wrench.Wrench effort
+end

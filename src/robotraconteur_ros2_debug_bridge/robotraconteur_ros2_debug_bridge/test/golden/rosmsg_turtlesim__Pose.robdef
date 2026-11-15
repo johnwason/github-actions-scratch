@@ -1,0 +1,11 @@
+service rosmsg_turtlesim__Pose
+
+stdver 0.10
+
+struct Pose
+    field single x
+    field single y
+    field single theta
+    field single linear_velocity
+    field single angular_velocity
+end

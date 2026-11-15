@@ -1,0 +1,9 @@
+service rosmsg_example_interfaces__MultiArrayDimension
+
+stdver 0.10
+
+struct MultiArrayDimension
+    field string label
+    field uint32 size
+    field uint32 stride
+end

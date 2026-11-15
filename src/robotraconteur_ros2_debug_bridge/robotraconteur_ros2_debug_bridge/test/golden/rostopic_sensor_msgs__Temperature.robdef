@@ -1,0 +1,17 @@
+service rostopic_sensor_msgs__Temperature
+
+stdver 0.10
+
+import rosmsg_sensor_msgs__Temperature
+
+object subscriber
+    pipe rosmsg_sensor_msgs__Temperature.Temperature subscriberpipe [readonly]
+    wire rosmsg_sensor_msgs__Temperature.Temperature subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_sensor_msgs__Temperature.Temperature m)
+    pipe rosmsg_sensor_msgs__Temperature.Temperature publisherpipe [writeonly]
+    wire rosmsg_sensor_msgs__Temperature.Temperature publisherwire [writeonly]
+end

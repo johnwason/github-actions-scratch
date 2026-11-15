@@ -1,0 +1,72 @@
+# Example configuration for container_host (see docs/container.md).
+# Run: ros2 run rmw_intraprocess_container container_host \
+#        $(ros2 pkg prefix rmw_intraprocess_container)/share/rmw_intraprocess_container/config/demo.yaml
+# or:  container_host <path>/demo.yaml
+
+# Optional. Default: RMW_IMPLEMENTATION if set, else rmw_intraprocess_cpp.
+# --rmw on the command line overrides both.
+rmw_implementation: rmw_intraprocess_cpp
+
+# Process-wide --ros-args for rclcpp::init (logging and the like).
+ros_arguments: [--log-level, info]
+
+# single_threaded | multi_threaded | events, or a mapping:
+#   {type: multi_threaded, threads: 4, isolated: false}
+# isolated: true gives each component its own executor and thread.
+executor:
+  type: multi_threaded
+  threads: 4
+
+# The container node (it serves ~/_container/load_node, unload_node and
+# list_nodes inside this process).
+container:
+  name: component_container
+  namespace: /
+
+# Default for every component; each component can override it.
+use_intra_process_comms: false
+
+# Parameter files every component loads (ROS parameter-file format, matched by
+# node name or /**), before its own parameter_files and inline parameters.
+# Relative paths are relative to this file; $(find-pkg-share PKG) and
+# $(env NAME [DEFAULT]) are substituted.
+# parameter_files: [params.yaml]
+
+# Keep loading the remaining components when one fails (default false: stop
+# and exit with status 1).
+continue_on_error: false
+
+components:
+  - package: composition
+    plugin: composition::Talker
+    name: talker
+    namespace: /demo
+    remappings:
+      chatter: /demo/chat
+
+  - package: composition
+    plugin: composition::Listener
+    name: listener
+    namespace: /demo
+    remappings: ["chatter:=/demo/chat"]
+
+  - package: composition
+    plugin: composition::Server
+
+  - package: composition
+    plugin: composition::Client
+
+  - package: demo_nodes_cpp
+    plugin: demo_nodes_cpp::ParameterBlackboard
+    name: blackboard
+    parameters:
+      robot:
+        name: "demo"        # robot.name (string)
+        max_speed: 0.5      # robot.max_speed (double)
+      wheels: [1, 2, 3, 4]  # integer array
+    # parameter_files: [$(find-pkg-share my_robot)/config/blackboard.yaml]
+    # ros_arguments: [--log-level, "blackboard:=debug"]
+
+  - package: action_tutorials_cpp
+    plugin: action_tutorials_cpp::FibonacciActionServer
+    enabled: true

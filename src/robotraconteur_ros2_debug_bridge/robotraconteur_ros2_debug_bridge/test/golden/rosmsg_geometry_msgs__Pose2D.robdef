@@ -1,0 +1,9 @@
+service rosmsg_geometry_msgs__Pose2D
+
+stdver 0.10
+
+struct Pose2D
+    field double x
+    field double y
+    field double theta
+end

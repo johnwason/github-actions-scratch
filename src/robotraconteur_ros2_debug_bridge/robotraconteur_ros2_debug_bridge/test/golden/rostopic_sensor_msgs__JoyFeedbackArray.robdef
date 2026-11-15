@@ -1,0 +1,17 @@
+service rostopic_sensor_msgs__JoyFeedbackArray
+
+stdver 0.10
+
+import rosmsg_sensor_msgs__JoyFeedbackArray
+
+object subscriber
+    pipe rosmsg_sensor_msgs__JoyFeedbackArray.JoyFeedbackArray subscriberpipe [readonly]
+    wire rosmsg_sensor_msgs__JoyFeedbackArray.JoyFeedbackArray subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_sensor_msgs__JoyFeedbackArray.JoyFeedbackArray m)
+    pipe rosmsg_sensor_msgs__JoyFeedbackArray.JoyFeedbackArray publisherpipe [writeonly]
+    wire rosmsg_sensor_msgs__JoyFeedbackArray.JoyFeedbackArray publisherwire [writeonly]
+end

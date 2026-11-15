@@ -1,0 +1,20 @@
+service rosservice_turtlesim__TeleportRelative
+
+stdver 0.10
+
+struct TeleportRelativeRequest
+    field single linear
+    field single angular
+end
+
+struct TeleportRelativeResponse
+end
+
+object rosclient
+    function TeleportRelativeResponse call(TeleportRelativeRequest request)
+    function bool wait_for_service(double timeout)
+end
+
+object rosservice
+    callback TeleportRelativeResponse servicefunction(TeleportRelativeRequest request)
+end

@@ -1,0 +1,10 @@
+service rosmsg_std_msgs__Int8MultiArray
+
+stdver 0.10
+
+import rosmsg_std_msgs__MultiArrayLayout
+
+struct Int8MultiArray
+    field rosmsg_std_msgs__MultiArrayLayout.MultiArrayLayout layout
+    field int8[] data
+end

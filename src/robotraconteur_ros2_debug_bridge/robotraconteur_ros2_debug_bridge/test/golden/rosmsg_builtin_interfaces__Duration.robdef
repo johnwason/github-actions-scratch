@@ -1,0 +1,8 @@
+service rosmsg_builtin_interfaces__Duration
+
+stdver 0.10
+
+struct Duration
+    field int32 sec
+    field uint32 nanosec
+end

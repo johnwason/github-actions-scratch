@@ -1,0 +1,10 @@
+service rosmsg_geometry_msgs__TwistWithCovariance
+
+stdver 0.10
+
+import rosmsg_geometry_msgs__Twist
+
+struct TwistWithCovariance
+    field rosmsg_geometry_msgs__Twist.Twist twist
+    field double[36] covariance
+end

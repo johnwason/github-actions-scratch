@@ -1,0 +1,18 @@
+service rosmsg_sensor_msgs__PointField
+
+stdver 0.10
+
+struct PointField
+    constant uint16 INT8 1
+    constant uint16 UINT8 2
+    constant uint16 INT16 3
+    constant uint16 UINT16 4
+    constant uint16 INT32 5
+    constant uint16 UINT32 6
+    constant uint16 FLOAT32 7
+    constant uint16 FLOAT64 8
+    field string name
+    field uint32 offset
+    field uint8 datatype
+    field uint32 count
+end

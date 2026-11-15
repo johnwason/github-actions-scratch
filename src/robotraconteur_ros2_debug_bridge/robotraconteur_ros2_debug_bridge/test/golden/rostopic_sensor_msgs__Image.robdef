@@ -1,0 +1,17 @@
+service rostopic_sensor_msgs__Image
+
+stdver 0.10
+
+import rosmsg_sensor_msgs__Image
+
+object subscriber
+    pipe rosmsg_sensor_msgs__Image.Image subscriberpipe [readonly]
+    wire rosmsg_sensor_msgs__Image.Image subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_sensor_msgs__Image.Image m)
+    pipe rosmsg_sensor_msgs__Image.Image publisherpipe [writeonly]
+    wire rosmsg_sensor_msgs__Image.Image publisherwire [writeonly]
+end

@@ -1,0 +1,17 @@
+service rostopic_example_interfaces__Empty
+
+stdver 0.10
+
+import rosmsg_example_interfaces__Empty
+
+object subscriber
+    pipe rosmsg_example_interfaces__Empty.Empty subscriberpipe [readonly]
+    wire rosmsg_example_interfaces__Empty.Empty subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_example_interfaces__Empty.Empty m)
+    pipe rosmsg_example_interfaces__Empty.Empty publisherpipe [writeonly]
+    wire rosmsg_example_interfaces__Empty.Empty publisherwire [writeonly]
+end

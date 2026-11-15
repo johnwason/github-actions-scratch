@@ -1,0 +1,17 @@
+service rostopic_sensor_msgs__LaserScan
+
+stdver 0.10
+
+import rosmsg_sensor_msgs__LaserScan
+
+object subscriber
+    pipe rosmsg_sensor_msgs__LaserScan.LaserScan subscriberpipe [readonly]
+    wire rosmsg_sensor_msgs__LaserScan.LaserScan subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_sensor_msgs__LaserScan.LaserScan m)
+    pipe rosmsg_sensor_msgs__LaserScan.LaserScan publisherpipe [writeonly]
+    wire rosmsg_sensor_msgs__LaserScan.LaserScan publisherwire [writeonly]
+end

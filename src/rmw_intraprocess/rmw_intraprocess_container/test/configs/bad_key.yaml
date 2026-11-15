@@ -1,0 +1,4 @@
+components:
+  - package: composition
+    plugin: composition::Talker
+    nmae: typo

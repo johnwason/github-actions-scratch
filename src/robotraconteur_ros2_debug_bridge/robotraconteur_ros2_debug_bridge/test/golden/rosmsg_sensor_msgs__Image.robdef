@@ -1,0 +1,15 @@
+service rosmsg_sensor_msgs__Image
+
+stdver 0.10
+
+import rosmsg_std_msgs__Header
+
+struct Image
+    field rosmsg_std_msgs__Header.Header header
+    field uint32 height
+    field uint32 width
+    field string encoding
+    field uint8 is_bigendian
+    field uint32 step
+    field uint8[] data
+end

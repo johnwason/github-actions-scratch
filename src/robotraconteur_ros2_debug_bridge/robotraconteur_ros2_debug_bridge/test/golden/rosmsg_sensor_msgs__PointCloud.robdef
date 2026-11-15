@@ -1,0 +1,13 @@
+service rosmsg_sensor_msgs__PointCloud
+
+stdver 0.10
+
+import rosmsg_std_msgs__Header
+import rosmsg_geometry_msgs__Point32
+import rosmsg_sensor_msgs__ChannelFloat32
+
+struct PointCloud
+    field rosmsg_std_msgs__Header.Header header
+    field rosmsg_geometry_msgs__Point32.Point32{list} points
+    field rosmsg_sensor_msgs__ChannelFloat32.ChannelFloat32{list} channels
+end

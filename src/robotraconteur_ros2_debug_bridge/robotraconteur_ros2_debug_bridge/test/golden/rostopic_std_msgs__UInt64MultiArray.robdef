@@ -1,0 +1,17 @@
+service rostopic_std_msgs__UInt64MultiArray
+
+stdver 0.10
+
+import rosmsg_std_msgs__UInt64MultiArray
+
+object subscriber
+    pipe rosmsg_std_msgs__UInt64MultiArray.UInt64MultiArray subscriberpipe [readonly]
+    wire rosmsg_std_msgs__UInt64MultiArray.UInt64MultiArray subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_std_msgs__UInt64MultiArray.UInt64MultiArray m)
+    pipe rosmsg_std_msgs__UInt64MultiArray.UInt64MultiArray publisherpipe [writeonly]
+    wire rosmsg_std_msgs__UInt64MultiArray.UInt64MultiArray publisherwire [writeonly]
+end

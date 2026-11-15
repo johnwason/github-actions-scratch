@@ -1,0 +1,17 @@
+service rostopic_example_interfaces__WString
+
+stdver 0.10
+
+import rosmsg_example_interfaces__WString
+
+object subscriber
+    pipe rosmsg_example_interfaces__WString.WString subscriberpipe [readonly]
+    wire rosmsg_example_interfaces__WString.WString subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_example_interfaces__WString.WString m)
+    pipe rosmsg_example_interfaces__WString.WString publisherpipe [writeonly]
+    wire rosmsg_example_interfaces__WString.WString publisherwire [writeonly]
+end

@@ -1,0 +1,25 @@
+service rosservice_nav_msgs__GetPlan
+
+stdver 0.10
+
+import rosmsg_nav_msgs__Path
+import rosmsg_geometry_msgs__PoseStamped
+
+struct GetPlanRequest
+    field rosmsg_geometry_msgs__PoseStamped.PoseStamped start
+    field rosmsg_geometry_msgs__PoseStamped.PoseStamped goal
+    field single tolerance
+end
+
+struct GetPlanResponse
+    field rosmsg_nav_msgs__Path.Path plan
+end
+
+object rosclient
+    function GetPlanResponse call(GetPlanRequest request)
+    function bool wait_for_service(double timeout)
+end
+
+object rosservice
+    callback GetPlanResponse servicefunction(GetPlanRequest request)
+end

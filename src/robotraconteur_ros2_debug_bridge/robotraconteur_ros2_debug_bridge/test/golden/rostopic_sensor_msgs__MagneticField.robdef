@@ -1,0 +1,17 @@
+service rostopic_sensor_msgs__MagneticField
+
+stdver 0.10
+
+import rosmsg_sensor_msgs__MagneticField
+
+object subscriber
+    pipe rosmsg_sensor_msgs__MagneticField.MagneticField subscriberpipe [readonly]
+    wire rosmsg_sensor_msgs__MagneticField.MagneticField subscriberwire [readonly]
+    function void unsubscribe()
+end
+
+object publisher
+    function void publish(rosmsg_sensor_msgs__MagneticField.MagneticField m)
+    pipe rosmsg_sensor_msgs__MagneticField.MagneticField publisherpipe [writeonly]
+    wire rosmsg_sensor_msgs__MagneticField.MagneticField publisherwire [writeonly]
+end

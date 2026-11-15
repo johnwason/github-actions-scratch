@@ -1,0 +1,9 @@
+service rosmsg_geometry_msgs__Polygon
+
+stdver 0.10
+
+import rosmsg_geometry_msgs__Point32
+
+struct Polygon
+    field rosmsg_geometry_msgs__Point32.Point32{list} points
+end

@@ -1,0 +1,20 @@
+service rosservice_example_interfaces__Trigger
+
+stdver 0.10
+
+struct TriggerRequest
+end
+
+struct TriggerResponse
+    field bool success
+    field string message
+end
+
+object rosclient
+    function TriggerResponse call(TriggerRequest request)
+    function bool wait_for_service(double timeout)
+end
+
+object rosservice
+    callback TriggerResponse servicefunction(TriggerRequest request)
+end

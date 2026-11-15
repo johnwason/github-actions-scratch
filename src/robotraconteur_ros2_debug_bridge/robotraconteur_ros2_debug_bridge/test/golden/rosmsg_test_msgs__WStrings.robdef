@@ -1,0 +1,13 @@
+service rosmsg_test_msgs__WStrings
+
+stdver 0.10
+
+struct WStrings
+    field string wstring_value
+    field string wstring_value_default1
+    field string wstring_value_default2
+    field string wstring_value_default3
+    field string{list} array_of_wstrings
+    field string{list} bounded_sequence_of_wstrings
+    field string{list} unbounded_sequence_of_wstrings
+end

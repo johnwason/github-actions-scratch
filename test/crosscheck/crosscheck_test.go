@@ -88,3 +88,9 @@ func TestCppClientTestService5(t *testing.T) { runCpp(t, "robotraconteur_test_se
 func TestGoClientTestService1(t *testing.T) {
 	clienttests.RunTestService1(t, rr.DefaultNode(), fmt.Sprintf("rr+tcp://localhost:%d", port))
 }
+
+// TestGoClientTestService3 runs the Go port of ServiceTestClient2 against the
+// Go test services.
+func TestGoClientTestService3(t *testing.T) {
+	clienttests.RunTestService3(t, rr.DefaultNode(), fmt.Sprintf("rr+tcp://localhost:%d", port))
+}

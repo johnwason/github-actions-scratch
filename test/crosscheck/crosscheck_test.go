@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	rr "github.com/robotraconteur/robotraconteur_go/robotraconteur"
+	"github.com/robotraconteur/robotraconteur_go/test/clienttests"
 	"github.com/robotraconteur/robotraconteur_go/test/testservices"
 )
 
@@ -81,3 +82,9 @@ func TestCppClientTestService3(t *testing.T) { runCpp(t, "robotraconteur_test_se
 // TestCppClientTestService5 runs the C++ ServiceTestClient3 (TestService5,
 // asynchronous service) against the Go asynctestroot service.
 func TestCppClientTestService5(t *testing.T) { runCpp(t, "robotraconteur_test_service3") }
+
+// TestGoClientTestService1 runs the Go port of ServiceTestClient against the
+// Go test services (Go client and Go server).
+func TestGoClientTestService1(t *testing.T) {
+	clienttests.RunTestService1(t, rr.DefaultNode(), fmt.Sprintf("rr+tcp://localhost:%d", port))
+}

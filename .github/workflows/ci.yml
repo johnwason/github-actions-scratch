@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+  workflow_dispatch:
+
+env:
+  # Upstream Robot Raconteur commit the bindings are developed against
+  RR_REPO: robotraconteur/robotraconteur
+  RR_REF: 7cd1610c519613f241b25453754fb118b270cdaf
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: robotraconteur_go
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.RR_REPO }}
+          ref: ${{ env.RR_REF }}
+          path: robotraconteur
+      - name: Restore dev image
+        id: image-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/rr-go-dev.tar
+          key: rr-go-dev-${{ hashFiles('robotraconteur_go/docker/Dockerfile.dev') }}
+      - name: Load or build dev image
+        run: |
+          if [ -f "${{ runner.temp }}/rr-go-dev.tar" ]; then
+            podman load -i "${{ runner.temp }}/rr-go-dev.tar"
+          else
+            robotraconteur_go/scripts/podman.sh image
+            podman save -o "${{ runner.temp }}/rr-go-dev.tar" localhost/rr-go-dev:latest
+          fi
+      - name: Restore build caches
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/rr-go-cache
+          key: rr-go-cache-${{ env.RR_REF }}-${{ github.sha }}
+          restore-keys: |
+            rr-go-cache-${{ env.RR_REF }}-
+            rr-go-cache-
+      - name: Build
+        env:
+          RRGO_CACHE_DIR: ${{ runner.temp }}/rr-go-cache
+          RR_SRC_DIR: ${{ github.workspace }}/robotraconteur
+          JOBS: "4"
+        run: robotraconteur_go/scripts/podman.sh build
+      - name: Test (no network)
+        env:
+          RRGO_CACHE_DIR: ${{ runner.temp }}/rr-go-cache
+          RR_SRC_DIR: ${{ github.workspace }}/robotraconteur
+        run: robotraconteur_go/scripts/podman.sh test

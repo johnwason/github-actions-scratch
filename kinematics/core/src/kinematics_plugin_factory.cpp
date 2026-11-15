@@ -1,0 +1,471 @@
+/**
+ * @file kinematics_factory.h
+ * @brief Kinematics Factory
+ *
+ * @author Levi Armstrong
+ * @date April 15, 2018
+ *
+ * @copyright Copyright (c) 2013, Southwest Research Institute
+ *
+ * @par License
+ * Software License Agreement (Apache License)
+ * @par
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * @par
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+#include <tesseract/common/macros.h>
+TESSERACT_COMMON_IGNORE_WARNINGS_PUSH
+#include <boost/algorithm/string.hpp>
+TESSERACT_COMMON_IGNORE_WARNINGS_POP
+
+#include <tesseract/kinematics/inverse_kinematics.h>
+#include <tesseract/kinematics/forward_kinematics.h>
+#include <tesseract/common/property_tree.h>
+#include <tesseract/common/schema_registry.h>
+#include <tesseract/scene_graph/graph.h>
+#include <tesseract/scene_graph/scene_state.h>
+#include <tesseract/common/resource_locator.h>
+#include <tesseract/common/logging.h>
+#include <tesseract/common/yaml_utils.h>
+#include <tesseract/common/yaml_extensions.h>
+#include <tesseract/kinematics/kinematics_plugin_factory.h>
+#include <boost_plugin_loader/plugin_loader.hpp>
+#include <fstream>
+
+static const std::string TESSERACT_KINEMATICS_PLUGIN_DIRECTORIES_ENV = "TESSERACT_KINEMATICS_PLUGIN_DIRECTORIES";
+static const std::string TESSERACT_KINEMATICS_PLUGINS_ENV = "TESSERACT_KINEMATICS_PLUGINS";
+
+using tesseract::common::KinematicsPluginInfo;
+using tesseract::common::PluginDiscoveryInfo;
+
+namespace tesseract::kinematics
+{
+std::string InvKinFactory::getSection() { return "InvKin"; }
+
+tesseract::common::PropertyTree InvKinFactory::schema() const
+{
+  return tesseract::common::PropertyTreeBuilder().build();
+}
+
+std::unique_ptr<InverseKinematics> InvKinFactory::create(const std::string& solver_name,
+                                                         const tesseract::scene_graph::SceneGraph& scene_graph,
+                                                         const tesseract::scene_graph::SceneState& scene_state,
+                                                         const KinematicsPluginFactory& plugin_factory,
+                                                         const YAML::Node& config) const
+{
+  auto validated_config = schema();
+  auto errors = validated_config.applyConfig(config);
+  if (!errors.empty())
+    throw tesseract::common::PropertyTreeValidationError(std::move(errors));
+
+  return createImpl(solver_name, scene_graph, scene_state, plugin_factory, validated_config);
+}
+
+std::string FwdKinFactory::getSection() { return "FwdKin"; }
+
+tesseract::common::PropertyTree FwdKinFactory::schema() const
+{
+  return tesseract::common::PropertyTreeBuilder().build();
+}
+
+std::unique_ptr<ForwardKinematics> FwdKinFactory::create(const std::string& solver_name,
+                                                         const tesseract::scene_graph::SceneGraph& scene_graph,
+                                                         const tesseract::scene_graph::SceneState& scene_state,
+                                                         const KinematicsPluginFactory& plugin_factory,
+                                                         const YAML::Node& config) const
+{
+  auto validated_config = schema();
+  auto errors = validated_config.applyConfig(config);
+  if (!errors.empty())
+    throw tesseract::common::PropertyTreeValidationError(std::move(errors));
+
+  return createImpl(solver_name, scene_graph, scene_state, plugin_factory, validated_config);
+}
+
+KinematicsPluginFactory::KinematicsPluginFactory()
+{
+  plugin_loader_.search_libraries_env = TESSERACT_KINEMATICS_PLUGINS_ENV;
+  plugin_loader_.search_paths_env = TESSERACT_KINEMATICS_PLUGIN_DIRECTORIES_ENV;
+  plugin_loader_.search_paths.emplace_back(TESSERACT_KINEMATICS_PLUGIN_PATH);
+  boost::split(
+      plugin_loader_.search_libraries, TESSERACT_KINEMATICS_PLUGINS, boost::is_any_of(":"), boost::token_compress_on);
+
+  tesseract::common::removeDuplicates(plugin_loader_.search_paths);
+  tesseract::common::removeDuplicates(plugin_loader_.search_libraries);
+}
+
+void KinematicsPluginFactory::loadConfig(const YAML::Node& config)
+{
+  if (const YAML::Node& plugin_info = config[KinematicsPluginInfo::CONFIG_KEY])
+  {
+    YAML::Node plugin_info_for_decode = YAML::Clone(plugin_info);
+
+    // Stage 1 validates only the metadata required to discover plugin schemas.
+    auto discovery_schema = YAML::convert<PluginDiscoveryInfo>::schema();
+    YAML::Node plugin_info_for_discovery_validation = YAML::Clone(plugin_info_for_decode);
+    auto discovery_errors = discovery_schema.applyConfig(plugin_info_for_discovery_validation, true);
+    if (!discovery_errors.empty())
+    {
+      std::string error_msg = "KinematicsPluginFactory: Plugin discovery validation failed:\n";
+      for (const auto& error : discovery_errors)
+        error_msg += "  - " + error + "\n";
+
+      throw std::runtime_error(error_msg);
+    }
+
+    const auto discovery_info = plugin_info_for_decode.as<PluginDiscoveryInfo>();
+    boost_plugin_loader::PluginLoader candidate_loader = plugin_loader_;
+    candidate_loader.search_paths.insert(
+        candidate_loader.search_paths.end(), discovery_info.search_paths.begin(), discovery_info.search_paths.end());
+    candidate_loader.search_libraries.insert(candidate_loader.search_libraries.end(),
+                                             discovery_info.search_libraries.begin(),
+                                             discovery_info.search_libraries.end());
+    tesseract::common::removeDuplicates(candidate_loader.search_paths);
+    tesseract::common::removeDuplicates(candidate_loader.search_libraries);
+
+    // Loading the libraries runs their static schema registrations before strict validation.
+    // The registry retains their lifetime handles alongside the registered schemas.
+    tesseract::common::SchemaRegistry::instance()->loadAndRetainPluginLibraries(candidate_loader);
+
+    // Stage 2 strictly validates the complete configuration after plugin schemas are registered.
+    auto schema = YAML::convert<tesseract::common::KinematicsPluginInfo>::schema();
+    auto config_tree = schema;
+    YAML::Node plugin_info_for_validation = YAML::Clone(plugin_info_for_decode);
+    auto errors = config_tree.applyConfig(plugin_info_for_validation, false);
+
+    if (!errors.empty())
+    {
+      std::string error_msg = "KinematicsPluginFactory: Configuration validation failed:\n";
+      for (const auto& error : errors)
+      {
+        error_msg += "  - " + error + "\n";
+      }
+      throw std::runtime_error(error_msg);
+    }
+
+    auto kin_plugin_info = plugin_info_for_decode.as<tesseract::common::KinematicsPluginInfo>();
+    fwd_plugin_info_ = std::move(kin_plugin_info.fwd_plugin_infos);
+    inv_plugin_info_ = std::move(kin_plugin_info.inv_plugin_infos);
+    plugin_loader_ = std::move(candidate_loader);
+  }
+}
+
+KinematicsPluginFactory::KinematicsPluginFactory(YAML::Node config, const tesseract::common::ResourceLocator& locator)
+  : KinematicsPluginFactory()
+{
+  tesseract::common::processYamlIncludeDirective(config, locator);
+  loadConfig(config);
+}
+
+KinematicsPluginFactory::KinematicsPluginFactory(const std::filesystem::path& config,
+                                                 const tesseract::common::ResourceLocator& locator)
+  : KinematicsPluginFactory()
+{
+  loadConfig(tesseract::common::loadYamlFile(config.string(), locator));
+}
+
+KinematicsPluginFactory::KinematicsPluginFactory(const std::string& config,
+                                                 const tesseract::common::ResourceLocator& locator)
+  : KinematicsPluginFactory()
+{
+  loadConfig(tesseract::common::loadYamlString(config, locator));
+}
+
+// This prevents it from being defined inline.
+// If not the forward declare of PluginLoader cause compiler error.
+KinematicsPluginFactory::~KinematicsPluginFactory() = default;
+
+void KinematicsPluginFactory::addSearchPath(const std::string& path)
+{
+  auto& v = plugin_loader_.search_paths;
+  if (std::find(v.begin(), v.end(), path) == v.end())
+    v.push_back(path);
+}
+
+std::vector<std::string> KinematicsPluginFactory::getSearchPaths() const { return plugin_loader_.search_paths; }
+
+void KinematicsPluginFactory::addSearchLibrary(const std::string& library_name)
+{
+  auto& v = plugin_loader_.search_libraries;
+  if (std::find(v.begin(), v.end(), library_name) == v.end())
+    v.push_back(library_name);
+}
+
+std::vector<std::string> KinematicsPluginFactory::getSearchLibraries() const { return plugin_loader_.search_libraries; }
+
+void KinematicsPluginFactory::addFwdKinPlugin(const std::string& group_name,
+                                              const std::string& solver_name,
+                                              tesseract::common::PluginInfo plugin_info)
+{
+  fwd_plugin_info_[group_name].plugins[solver_name] = std::move(plugin_info);
+}
+
+std::map<std::string, tesseract::common::PluginInfoContainer> KinematicsPluginFactory::getFwdKinPlugins() const
+{
+  return fwd_plugin_info_;
+}
+
+void KinematicsPluginFactory::removeFwdKinPlugin(const std::string& group_name, const std::string& solver_name)
+{
+  auto group_it = fwd_plugin_info_.find(group_name);
+  if (group_it == fwd_plugin_info_.end())
+    throw std::runtime_error("KinematicsPluginFactory, tried to removed fwd kin solver '" + solver_name +
+                             "' for a group '" + group_name + "' that does not exist!");
+
+  auto solver_it = group_it->second.plugins.find(solver_name);
+  if (solver_it == group_it->second.plugins.end())
+    throw std::runtime_error("KinematicsPluginFactory, tried to removed fwd kin solver '" + solver_name +
+                             "' that does not exist for group '" + group_name + "'!");
+
+  group_it->second.plugins.erase(solver_it);
+  if (group_it->second.plugins.empty())
+    fwd_plugin_info_.erase(group_it);
+
+  if (group_it->second.default_plugin == solver_name)
+    group_it->second.default_plugin.clear();
+}
+
+void KinematicsPluginFactory::setDefaultFwdKinPlugin(const std::string& group_name, const std::string& solver_name)
+{
+  auto group_it = fwd_plugin_info_.find(group_name);
+  if (group_it == fwd_plugin_info_.end())
+    throw std::runtime_error("KinematicsPluginFactory, tried to set default fwd kin solver '" + solver_name +
+                             "' for a group '" + group_name + "' that does not exist!");
+
+  auto solver_it = group_it->second.plugins.find(solver_name);
+  if (solver_it == group_it->second.plugins.end())
+    throw std::runtime_error("KinematicsPluginFactory, tried to set default fwd kin solver '" + solver_name +
+                             "' that does not exist for group '" + group_name + "'!");
+
+  group_it->second.default_plugin = solver_name;
+}
+
+std::string KinematicsPluginFactory::getDefaultFwdKinPlugin(const std::string& group_name) const
+{
+  auto group_it = fwd_plugin_info_.find(group_name);
+  if (group_it == fwd_plugin_info_.end())
+    throw std::runtime_error("KinematicsPluginFactory, tried to get default fwd kin solver for a group '" + group_name +
+                             "' that does not exist!");
+
+  if (group_it->second.default_plugin.empty())
+    return group_it->second.plugins.begin()->first;
+
+  return group_it->second.default_plugin;
+}
+
+void KinematicsPluginFactory::addInvKinPlugin(const std::string& group_name,
+                                              const std::string& solver_name,
+                                              tesseract::common::PluginInfo plugin_info)
+{
+  inv_plugin_info_[group_name].plugins[solver_name] = std::move(plugin_info);
+}
+
+std::map<std::string, tesseract::common::PluginInfoContainer> KinematicsPluginFactory::getInvKinPlugins() const
+{
+  return inv_plugin_info_;
+}
+
+void KinematicsPluginFactory::removeInvKinPlugin(const std::string& group_name, const std::string& solver_name)
+{
+  auto group_it = inv_plugin_info_.find(group_name);
+  if (group_it == inv_plugin_info_.end())
+    throw std::runtime_error("KinematicsPluginFactory, tried to removed inv kin solver '" + solver_name +
+                             "' for a group '" + group_name + "' that does not exist!");
+
+  auto solver_it = group_it->second.plugins.find(solver_name);
+  if (solver_it == group_it->second.plugins.end())
+    throw std::runtime_error("KinematicsPluginFactory, tried to removed inv kin solver '" + solver_name +
+                             "' that does not exist for group '" + group_name + "'!");
+
+  group_it->second.plugins.erase(solver_it);
+  if (group_it->second.plugins.empty())
+    inv_plugin_info_.erase(group_it);
+
+  if (group_it->second.default_plugin == solver_name)
+    group_it->second.default_plugin.clear();
+}
+
+void KinematicsPluginFactory::setDefaultInvKinPlugin(const std::string& group_name, const std::string& solver_name)
+{
+  auto group_it = inv_plugin_info_.find(group_name);
+  if (group_it == inv_plugin_info_.end())
+    throw std::runtime_error("KinematicsPluginFactory, tried to set default inv kin solver '" + solver_name +
+                             "' for a group '" + group_name + "' that does not exist!");
+
+  auto solver_it = group_it->second.plugins.find(solver_name);
+  if (solver_it == group_it->second.plugins.end())
+    throw std::runtime_error("KinematicsPluginFactory, tried to set default inv kin solver '" + solver_name +
+                             "' that does not exist for group '" + group_name + "'!");
+
+  group_it->second.default_plugin = solver_name;
+}
+
+std::string KinematicsPluginFactory::getDefaultInvKinPlugin(const std::string& group_name) const
+{
+  auto group_it = inv_plugin_info_.find(group_name);
+  if (group_it == inv_plugin_info_.end())
+    throw std::runtime_error("KinematicsPluginFactory, tried to get default inv kin solver for a group '" + group_name +
+                             "' that does not exist!");
+
+  if (group_it->second.default_plugin.empty())
+    return group_it->second.plugins.begin()->first;
+
+  return group_it->second.default_plugin;
+}
+
+std::unique_ptr<ForwardKinematics>
+KinematicsPluginFactory::createFwdKin(const std::string& group_name,
+                                      const std::string& solver_name,
+                                      const tesseract::scene_graph::SceneGraph& scene_graph,
+                                      const tesseract::scene_graph::SceneState& scene_state) const
+{
+  auto group_it = fwd_plugin_info_.find(group_name);
+  if (group_it == fwd_plugin_info_.end())
+  {
+    TESSERACT_LOG_WARN("KinematicsPluginFactory, tried to get fwd kin solver '{}' for a group '{}' that does not "
+                       "exist!",
+                       solver_name,
+                       group_name);
+    return nullptr;
+  }
+
+  auto solver_it = group_it->second.plugins.find(solver_name);
+  if (solver_it == group_it->second.plugins.end())
+  {
+    TESSERACT_LOG_WARN("KinematicsPluginFactory, tried to get fwd kin solver '{}' that does not exist for group "
+                       "'{}'!",
+                       solver_name,
+                       group_name);
+    return nullptr;
+  }
+
+  return createFwdKin(solver_name, solver_it->second, scene_graph, scene_state);
+}
+
+std::unique_ptr<ForwardKinematics>
+KinematicsPluginFactory::createFwdKin(const std::string& solver_name,
+                                      const tesseract::common::PluginInfo& plugin_info,
+                                      const tesseract::scene_graph::SceneGraph& scene_graph,
+                                      const tesseract::scene_graph::SceneState& scene_state) const
+{
+  try
+  {
+    auto it = fwd_kin_factories_.find(plugin_info.class_name);
+    if (it != fwd_kin_factories_.end())
+      return it->second->create(solver_name, scene_graph, scene_state, *this, plugin_info.config);
+
+    // Loading a factory may register schemas containing callbacks implemented by
+    // its library. Retain the library until the schema registry is destroyed.
+    tesseract::common::SchemaRegistry::instance()->loadAndRetainPluginLibraries(plugin_loader_);
+    auto plugin = plugin_loader_.createInstance<FwdKinFactory>(plugin_info.class_name);
+    if (plugin == nullptr)
+    {
+      TESSERACT_LOG_WARN("Failed to load symbol '{}'", plugin_info.class_name);
+      return nullptr;
+    }
+    fwd_kin_factories_[plugin_info.class_name] = plugin;
+    return plugin->create(solver_name, scene_graph, scene_state, *this, plugin_info.config);
+  }
+  catch (const std::exception& e)
+  {
+    TESSERACT_LOG_WARN("Failed to create fwd kin solver '{}' with factory '{}'! Details: {}",
+                       solver_name,
+                       plugin_info.class_name,
+                       e.what());
+    return nullptr;
+  }
+}
+
+std::unique_ptr<InverseKinematics>
+KinematicsPluginFactory::createInvKin(const std::string& group_name,
+                                      const std::string& solver_name,
+                                      const tesseract::scene_graph::SceneGraph& scene_graph,
+                                      const tesseract::scene_graph::SceneState& scene_state) const
+{
+  auto group_it = inv_plugin_info_.find(group_name);
+  if (group_it == inv_plugin_info_.end())
+  {
+    TESSERACT_LOG_WARN("KinematicsPluginFactory, tried to get inv kin solver '{}' for a group '{}' that does not "
+                       "exist!",
+                       solver_name,
+                       group_name);
+    return nullptr;
+  }
+
+  auto solver_it = group_it->second.plugins.find(solver_name);
+  if (solver_it == group_it->second.plugins.end())
+  {
+    TESSERACT_LOG_WARN("KinematicsPluginFactory, tried to get inv kin solver '{}' that does not exist for group "
+                       "'{}'!",
+                       solver_name,
+                       group_name);
+    return nullptr;
+  }
+
+  return createInvKin(solver_name, solver_it->second, scene_graph, scene_state);
+}
+
+std::unique_ptr<InverseKinematics>
+KinematicsPluginFactory::createInvKin(const std::string& solver_name,
+                                      const tesseract::common::PluginInfo& plugin_info,
+                                      const tesseract::scene_graph::SceneGraph& scene_graph,
+                                      const tesseract::scene_graph::SceneState& scene_state) const
+{
+  try
+  {
+    auto it = inv_kin_factories_.find(plugin_info.class_name);
+    if (it != inv_kin_factories_.end())
+      return it->second->create(solver_name, scene_graph, scene_state, *this, plugin_info.config);
+
+    // Loading a factory may register schemas containing callbacks implemented by
+    // its library. Retain the library until the schema registry is destroyed.
+    tesseract::common::SchemaRegistry::instance()->loadAndRetainPluginLibraries(plugin_loader_);
+    auto plugin = plugin_loader_.createInstance<InvKinFactory>(plugin_info.class_name);
+    if (plugin == nullptr)
+    {
+      TESSERACT_LOG_WARN("Failed to load symbol '{}'", plugin_info.class_name);
+      return nullptr;
+    }
+    inv_kin_factories_[plugin_info.class_name] = plugin;
+    return plugin->create(solver_name, scene_graph, scene_state, *this, plugin_info.config);
+  }
+  catch (const std::exception& e)
+  {
+    TESSERACT_LOG_WARN("Failed to create inv kin solver '{}' with factory '{}'! Details: {}",
+                       solver_name,
+                       plugin_info.class_name,
+                       e.what());
+    return nullptr;
+  }
+}
+
+void KinematicsPluginFactory::saveConfig(const std::filesystem::path& file_path) const
+{
+  YAML::Node config = getConfig();
+  std::ofstream fout(file_path.string());
+  fout << config;
+}
+
+YAML::Node KinematicsPluginFactory::getConfig() const
+{
+  tesseract::common::KinematicsPluginInfo kinematic_plugins;
+  kinematic_plugins.search_paths = plugin_loader_.search_paths;
+  kinematic_plugins.search_libraries = plugin_loader_.search_libraries;
+  kinematic_plugins.fwd_plugin_infos = fwd_plugin_info_;
+  kinematic_plugins.inv_plugin_infos = inv_plugin_info_;
+
+  YAML::Node config;
+  config[KinematicsPluginInfo::CONFIG_KEY] = kinematic_plugins;
+
+  return config;
+}
+
+}  // namespace tesseract::kinematics

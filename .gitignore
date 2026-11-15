@@ -7,3 +7,4 @@ robotraconteur/errors_gen.go
 robotraconteur/constants_gen.go
 test/gen/
 test/testvectors/test_vectors.bin
+examples/reynard_the_robot/gen/

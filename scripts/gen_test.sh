@@ -9,4 +9,6 @@ build/go/RobotRaconteurGenGo --thunksource --go-import-prefix=github.com/robotra
   com.robotraconteur.testing.TestService3.robdef com.robotraconteur.testing.TestService4.robdef \
   com.robotraconteur.testing.TestService5.robdef > /dev/null
 gofmt -w test/gen
+# examples (same commands as their go:generate directives)
+(cd examples/reynard_the_robot && rm -rf gen && PATH=/work/robotraconteur_go/build/go:$PATH go generate generate.go)
 cp ../robotraconteur/test/data/test_vectors.bin test/testvectors/test_vectors.bin

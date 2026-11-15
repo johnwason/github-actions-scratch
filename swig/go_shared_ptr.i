@@ -120,6 +120,21 @@ template<class T> struct SWIG_intrusive_deleter {
 %typemap(goout) boost::intrusive_ptr< TYPE >, boost::intrusive_ptr< TYPE > &, const boost::intrusive_ptr< TYPE > &
 %{ if $input != nil && $input.Swigcptr() == 0 { $result = nil } else { $result = $input } %}
 
+// Raw pointers/references to intrusive types (including constructor results)
+// must take an intrusive reference: the object's lifetime is governed by its
+// intrusive count, which C++ intrusive_ptrs share with the Go handle.
+%typemap(out, fragment="SWIG_intrusive_deleter") TYPE *, const TYPE *
+%{ if ($1) { intrusive_ptr_add_ref($1);
+     *(boost::shared_ptr< TYPE >**)&$result = new boost::shared_ptr< TYPE >($1, SWIG_intrusive_deleter< TYPE >()); }
+   else { *(boost::shared_ptr< TYPE >**)&$result = 0; } %}
+%typemap(out, fragment="SWIG_intrusive_deleter") TYPE &, const TYPE &
+%{ intrusive_ptr_add_ref($1);
+   *(boost::shared_ptr< TYPE >**)&$result = new boost::shared_ptr< TYPE >($1, SWIG_intrusive_deleter< TYPE >()); %}
+%typemap(directorin, fragment="SWIG_intrusive_deleter") TYPE *, const TYPE *
+%{ if ($1) { intrusive_ptr_add_ref($1);
+     *(boost::shared_ptr< TYPE >**)&$input = new boost::shared_ptr< TYPE >($1, SWIG_intrusive_deleter< TYPE >()); }
+   else { *(boost::shared_ptr< TYPE >**)&$input = 0; } %}
+
 %typemap(in) boost::intrusive_ptr< TYPE >
 %{ { boost::shared_ptr< TYPE >* smartarg = *(boost::shared_ptr< TYPE >**)&$input;
      if (smartarg) $1 = boost::intrusive_ptr< TYPE >(smartarg->get(), true); } %}

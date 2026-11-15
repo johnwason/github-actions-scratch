@@ -75,7 +75,7 @@ add_custom_target(rrgo_cgo_flags ALL DEPENDS "${RRGO_GO_PKG_DIR}/cgo_flags_linux
 
 # Go error codes/types from the upstream core headers
 add_custom_command(
-    OUTPUT "${CMAKE_SOURCE_DIR}/robotraconteur/errors_gen.go"
+    OUTPUT "${CMAKE_SOURCE_DIR}/robotraconteur/errors_gen.go" "${CMAKE_SOURCE_DIR}/robotraconteur/constants_gen.go"
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/cmake/gen_go_errors.py"
             "${RR_SOURCE_DIR}/RobotRaconteurCore/include/RobotRaconteur" "${CMAKE_SOURCE_DIR}/robotraconteur/errors_gen.go"
     DEPENDS "${CMAKE_SOURCE_DIR}/cmake/gen_go_errors.py" "${RR_SOURCE_DIR}/RobotRaconteurCore/include/RobotRaconteur/Error.h"

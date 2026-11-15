@@ -9,7 +9,9 @@ BUILD=${BUILD:-$GO_DIR/build}
 # 8 GB RAM hosts: RR core and the SWIG wrapper are memory hungry to compile
 JOBS=${JOBS:-2}
 BUILD_TYPE=${BUILD_TYPE:-RelWithDebInfo}
-RR_TESTING=${RR_TESTING:-OFF}
+# BUILD_TESTING is only passed when RR_TESTING is set (otherwise the cached value is kept)
+RR_TESTING_ARG=""
+if [ -n "${RR_TESTING:-}" ]; then RR_TESTING_ARG="-DBUILD_TESTING=$RR_TESTING"; fi
 
 # Keep build outputs out of the Go module (./... must not see generated files)
 mkdir -p "$BUILD"; [ -f "$BUILD/go.mod" ] || printf "module rrgo_build_ignore\n" > "$BUILD/go.mod"
@@ -19,7 +21,7 @@ cmake -S "$RR_SRC" -B "$BUILD/rr" -G Ninja \
   -DCMAKE_INSTALL_PREFIX="$BUILD/install" \
   -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
   -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-  -DBUILD_GEN=ON -DBUILD_TESTING=$RR_TESTING -DBUILD_DOCUMENTATION=OFF
+  -DBUILD_GEN=ON $RR_TESTING_ARG -DBUILD_DOCUMENTATION=OFF
 cmake --build "$BUILD/rr" -j "$JOBS"
 cmake --install "$BUILD/rr" >/dev/null
 

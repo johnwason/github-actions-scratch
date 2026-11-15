@@ -9,8 +9,9 @@
  * %shared_ptr(T) or %rr_intrusive_ptr(T) holds a heap allocated
  * boost::shared_ptr<T>*. Intrusive pointers are wrapped in a shared_ptr whose
  * deleter calls intrusive_ptr_release (SWIG_intrusive_deleter), exactly like
- * the C# binding. Go owns every handle it receives and must call DeleteT()
- * (the public runtime does this with runtime.AddCleanup / Close()).
+ * the C# binding. Go owns every handle it receives (return values and
+ * director arguments) and must call DeleteT(). Handles returned *from* Go
+ * director methods are transferred to C++ (which deletes them).
  *
  * Passing a nil handle where C++ requires an object is a programmer error and
  * panics (_swig_gopanic), matching SWIG's own Go typemaps. Runtime errors
@@ -72,8 +73,10 @@ namespace boost { template<class T> class intrusive_ptr {}; }
 %{ *($&1_ltype*)&$result = $1 ? new $1_ltype($1) : 0; %}
 %typemap(directorin) SWIG_SHARED_PTR_QNAMESPACE::shared_ptr< CONST TYPE >
 %{ *($&1_ltype*)&$input = $1 ? new $1_ltype($1) : 0; %}
+// Director returns: the Go handle is transferred to C++ and deleted here
+// (Go code must not delete handles it returns from director methods).
 %typemap(directorout) SWIG_SHARED_PTR_QNAMESPACE::shared_ptr< CONST TYPE >
-%{ if (*($&1_ltype*)&$input) { $result = **($&1_ltype*)&$input; } %}
+%{ if (*($&1_ltype*)&$input) { $result = **($&1_ltype*)&$input; delete *($&1_ltype*)&$input; } %}
 
 // shared_ptr by reference
 %typemap(in) SWIG_SHARED_PTR_QNAMESPACE::shared_ptr< CONST TYPE > & ($*1_ltype tempnull)
@@ -156,7 +159,7 @@ template<class T> struct SWIG_intrusive_deleter {
    else { *(boost::shared_ptr< TYPE >**)&$input = 0; } %}
 %typemap(directorout) boost::intrusive_ptr< TYPE >
 %{ { boost::shared_ptr< TYPE >* smartarg = *(boost::shared_ptr< TYPE >**)&$input;
-     if (smartarg) $result = boost::intrusive_ptr< TYPE >(smartarg->get(), true); } %}
+     if (smartarg) { $result = boost::intrusive_ptr< TYPE >(smartarg->get(), true); delete smartarg; } } %}
 %typemap(typecheck, precedence=SWIG_TYPECHECK_POINTER, equivalent="TYPE *")
   boost::intrusive_ptr< TYPE >, boost::intrusive_ptr< TYPE > &, const boost::intrusive_ptr< TYPE > & ""
 %enddef

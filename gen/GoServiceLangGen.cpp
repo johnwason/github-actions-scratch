@@ -916,6 +916,63 @@ MemoryInfo memory_info(GenContext& ctx, const RR_SHARED_PTR<MemoryDefinition>& m
     throw DataTypeException("Invalid memory type");
 }
 
+
+// ---- generator functions
+struct GenInfo
+{
+    bool has_return;
+    bool has_param;
+    RR_SHARED_PTR<TypeDefinition> ret;   // container removed
+    RR_SHARED_PTR<TypeDefinition> param; // container removed
+    std::vector<RR_SHARED_PTR<TypeDefinition> > args; // non-generator parameters
+};
+
+GenInfo gen_info(const RR_SHARED_PTR<FunctionDefinition>& f)
+{
+    GenInfo o;
+    o.has_return = !is_void(f->ReturnType);
+    if (o.has_return)
+    {
+        o.ret = RR_MAKE_SHARED<TypeDefinition>();
+        f->ReturnType->CopyTo(*o.ret);
+        o.ret->RemoveContainers();
+        o.ret->ResolveNamedType_cache = f->ReturnType->ResolveNamedType_cache;
+    }
+    o.args = f->Parameters;
+    o.has_param = false;
+    if (!o.args.empty() && o.args.back()->ContainerType == DataTypes_ContainerTypes_generator)
+    {
+        o.has_param = true;
+        o.param = RR_MAKE_SHARED<TypeDefinition>();
+        o.args.back()->CopyTo(*o.param);
+        o.param->RemoveContainers();
+        o.param->ResolveNamedType_cache = o.args.back()->ResolveNamedType_cache;
+        o.args.pop_back();
+    }
+    return o;
+}
+
+std::string gen_go_type(GenContext& ctx, const GenInfo& g)
+{
+    if (g.has_return && g.has_param)
+        return "rr.Generator1[" + go_type(ctx, *g.ret) + ", " + go_type(ctx, *g.param) + "]";
+    if (g.has_return)
+        return "rr.Generator2[" + go_type(ctx, *g.ret) + "]";
+    return "rr.Generator3[" + go_type(ctx, *g.param) + "]";
+}
+
+std::string gen_codecs(GenContext& ctx, const GenInfo& g)
+{
+    std::string o;
+    if (g.has_return)
+        o += ", " + go_codec(ctx, *g.ret);
+    if (g.has_param)
+        o += ", " + go_codec(ctx, *g.param);
+    return o;
+}
+
+std::string gen_kind(const GenInfo& g) { return g.has_return && g.has_param ? "1" : (g.has_return ? "2" : "3"); }
+
 void GenerateObjectInterface(GenContext& ctx, const RR_SHARED_PTR<ServiceEntryDefinition>& e, std::ostream& w)
 {
     std::string name = exported(e->Name);
@@ -939,7 +996,11 @@ void GenerateObjectInterface(GenContext& ctx, const RR_SHARED_PTR<ServiceEntryDe
         else if (RR_SHARED_PTR<FunctionDefinition> f = RR_DYNAMIC_POINTER_CAST<FunctionDefinition>(m))
         {
             if (f->IsGenerator())
-                continue; // TODO(generators)
+            {
+                GenInfo g = gen_info(f);
+                w << "\t" << n << "(" << params_decl(ctx, g.args) << ") (" << gen_go_type(ctx, g) << ", error)\n";
+                continue;
+            }
             w << "\t" << n << "(" << params_decl(ctx, f->Parameters) << ") " << ret_sig(ctx, f->ReturnType) << "\n";
         }
         else if (RR_SHARED_PTR<EventDefinition> ev = RR_DYNAMIC_POINTER_CAST<EventDefinition>(m))
@@ -1108,7 +1169,15 @@ void GenerateStub(GenContext& ctx, const RR_SHARED_PTR<ServiceEntryDefinition>& 
         else if (RR_SHARED_PTR<FunctionDefinition> f = RR_DYNAMIC_POINTER_CAST<FunctionDefinition>(m))
         {
             if (f->IsGenerator())
+            {
+                GenInfo g = gen_info(f);
+                w << "func (rr_s *" << sn << ") " << n << "(" << params_decl(ctx, g.args) << ") (" << gen_go_type(ctx, g)
+                  << ", error) {\n";
+                w << pack_args(ctx, g.args);
+                w << "\treturn rr.CallGenerator" << gen_kind(g) << "Function(rr_s.StubBase, " << mname << ", &rr_b"
+                  << gen_codecs(ctx, g) << ")\n}\n\n";
                 continue;
+            }
             std::string pd = params_decl(ctx, f->Parameters);
             w << "func (rr_s *" << sn << ") " << n << "(" << pd << ") " << ret_sig(ctx, f->ReturnType) << " {\n";
             w << pack_args(ctx, f->Parameters);
@@ -1226,10 +1295,10 @@ void GenerateSkel(GenContext& ctx, const RR_SHARED_PTR<ServiceEntryDefinition>& 
     std::string kn = lower_first(name) + "Skel";
     std::map<std::string, std::string> mn = exported_names(e->Members);
 
-    w << "type " << kn << " struct {\n\tobj " << name << "\n}\n\n";
+    w << "type " << kn << " struct {\n\tobj " << name << "\n\tb   *rr.SkelBase\n}\n\n";
 
     // RRInit: pipes, wires, events, callbacks
-    w << "func (rr_s *" << kn << ") RRInit(rr_b *rr.SkelBase) error {\n";
+    w << "func (rr_s *" << kn << ") RRInit(rr_b *rr.SkelBase) error {\n\trr_s.b = rr_b\n";
     BOOST_FOREACH (const RR_SHARED_PTR<MemberDefinition>& m, e->Members)
     {
         std::string n = mn[m->Name];
@@ -1310,8 +1379,19 @@ void GenerateSkel(GenContext& ctx, const RR_SHARED_PTR<ServiceEntryDefinition>& 
     BOOST_FOREACH (const RR_SHARED_PTR<MemberDefinition>& m, e->Members)
     {
         RR_SHARED_PTR<FunctionDefinition> f = RR_DYNAMIC_POINTER_CAST<FunctionDefinition>(m);
-        if (!f || f->IsGenerator())
+        if (!f)
             continue;
+        if (f->IsGenerator())
+        {
+            GenInfo g = gen_info(f);
+            w << "\tcase " << go_string_literal(f->Name) << ":\n";
+            w << unpack_args(ctx, g.args, "\t\t", "return nil, rr_err");
+            w << "\t\trr_g, rr_err := rr_s.obj." << mn[f->Name] << "(" << params_names(g.args) << ")\n";
+            w << "\t\tif rr_err != nil {\n\t\t\treturn nil, rr_err\n\t\t}\n";
+            w << "\t\treturn rr.RegisterGenerator" << gen_kind(g) << "(rr_s.b, " << go_string_literal(f->Name)
+              << ", rr_g" << gen_codecs(ctx, g) << ")\n";
+            continue;
+        }
         w << "\tcase " << go_string_literal(f->Name) << ":\n";
         w << unpack_args(ctx, f->Parameters, "\t\t", "return nil, rr_err");
         if (is_void(f->ReturnType))
@@ -1437,7 +1517,12 @@ void GenerateDefaultImpl(GenContext& ctx, const RR_SHARED_PTR<ServiceEntryDefini
         else if (RR_SHARED_PTR<FunctionDefinition> f = RR_DYNAMIC_POINTER_CAST<FunctionDefinition>(m))
         {
             if (f->IsGenerator())
+            {
+                GenInfo g = gen_info(f);
+                w << "func (rr_s *" << dn << ") " << n << "(" << params_decl(ctx, g.args) << ") (" << gen_go_type(ctx, g)
+                  << ", error) {\n\treturn nil, rr.NewNotImplementedError(\"" << f->Name << " not implemented\")\n}\n\n";
                 continue;
+            }
             w << "func (rr_s *" << dn << ") " << n << "(" << params_decl(ctx, f->Parameters) << ") "
               << ret_sig(ctx, f->ReturnType) << " {\n";
             if (is_void(f->ReturnType))

@@ -71,3 +71,19 @@ added only by files in `swig/`:
 - **`SWIG/Logging.i`**: declare `class FileLogRecordHandler : public LogRecordHandler`. This also fixes the C# and Java bindings, and makes `LoggingGo.i` unnecessary.
 - **`SWIG/ServiceSecurity.i`**: expose an `AuthenticatedUser` constructor, or a factory, to allow user authenticators written in Go (and other director languages).
 - **MinGW/cgo**: Windows support requires `RobotRaconteurCore` to build with a cgo-compatible toolchain (MinGW-w64), or a C-ABI shim around an MSVC-built core.
+- **Connector self-deadlock (core bug, affects every language).** `RobotRaconteurNode_connector::connect`
+  (`RobotRaconteurNode_connector.cpp:420-428`) holds `active_lock` while it calls
+  `Transport::AsyncCreateTransportConnection`. `LocalTransport` connects synchronously. If
+  `ASIOStreamBaseTransport::AsyncAttachStream` then throws, its outer `catch`
+  (`ASIOStreamBaseTransport.cpp:171`) calls the handler synchronously with
+  `InvokeHandlerWithException`. The handler reaches `connected_transport` → `handle_error`, which locks
+  `active_lock` again on the same thread, and the thread blocks forever. Node shutdown then hangs in
+  `ThreadPool::Shutdown` joining that thread.
+
+  It was seen when a client connects over `rr+local` to a node that is shutting down: two test
+  processes discovering each other through the local transport hit it in about half of the runs.
+  Either change fixes it:
+  - `PostHandlerWithException` in that `catch`;
+  - releasing `active_lock` before calling `AsyncCreateTransportConnection`.
+
+  The tests in this repository run the C++ interop packages one at a time to avoid it.

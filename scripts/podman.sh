@@ -31,7 +31,7 @@ run() {
   fi
   podman run --rm -i $( [ -t 0 ] && echo -t ) \
     --network="$net" \
-    --userns=keep-id \
+    --userns=keep-id ${RRGO_PODMAN_ARGS:-} \
     -e HOME=/tmp/home \
     $(for v in JOBS BUILD_TYPE RR_TESTING; do [ -n "${!v:-}" ] && echo "-e $v=${!v}"; done) \
     -v "$RR_SRC_DIR:/work/robotraconteur:ro,Z" \

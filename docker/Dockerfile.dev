@@ -15,7 +15,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
  && apt-get install -y --no-install-recommends \
       cmake ninja-build g++ ccache swig curl ca-certificates \
       libboost-all-dev libssl-dev libdbus-1-dev libbluetooth-dev libusb-1.0-0-dev \
-      libgtest-dev git make python3 binutils file pkg-config
+      libgtest-dev git make python3 binutils file pkg-config gdb
 
 ARG GO_VERSION=1.27.4
 ARG GO_SHA256=7226736c2339719cda28fbf3a54d71aa63bcefe376e98cef00034268dab24840

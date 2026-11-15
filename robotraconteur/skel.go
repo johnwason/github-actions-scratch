@@ -129,6 +129,7 @@ type skelDirector struct{ b *SkelBase }
 func (d *skelDirector) Init(skel swig.WrappedServiceSkel) {
 	defer recoverDirector()
 	d.b.inner = skel
+	addCleanup(d.b, skel, swig.DeleteWrappedServiceSkel)
 	if err := d.b.impl.RRInit(d.b); err != nil {
 		setDirectorError(err)
 		return
@@ -425,6 +426,7 @@ func (n *Node) RegisterService(name, objectType string, obj any, opts ...Service
 		return nil, err
 	}
 	sc := &ServerContext{node: n, name: name, native: ctx}
+	addCleanup(sc, ctx, swig.DeleteServerContext)
 	n.mu.Lock()
 	if n.services == nil {
 		n.services = make(map[string]*ServerContext)
@@ -453,6 +455,5 @@ type serviceOptions struct {
 func WithSecurityPolicy(p *ServiceSecurityPolicy) ServiceOption {
 	return func(o *serviceOptions) { o.policy = p }
 }
-
 
 var _ = fmt.Sprintf

@@ -20,7 +20,9 @@ func NewBroadcastDownsampler(ctx *ServerContext, defaultDownsample uint32) (*Bro
 	if err != nil {
 		return nil, err
 	}
-	return &BroadcastDownsampler{native: n}, nil
+	d := &BroadcastDownsampler{native: n}
+	addCleanup(d, n, swig.DeleteBroadcastDownsampler)
+	return d, nil
 }
 
 // ClientDownsample returns the downsample factor of a client endpoint.

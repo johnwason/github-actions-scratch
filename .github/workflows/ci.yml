@@ -9,7 +9,7 @@ env:
   # rr-go-green-sync of this repository; its tip commit carries [skip ci] so the
   # upstream workflows do not run on it).
   RR_REPO: johnwason/github-actions-scratch
-  RR_REF: 5d20efc38eda98710318a50a1547108e4df213c8
+  RR_REF: 91ce8b3b53d13bf7eb845cdcad7e91ce34c2ef20
 
 jobs:
   linux:

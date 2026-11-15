@@ -41,7 +41,9 @@ func NewPipeClient[T any](b *StubBase, name string, codec Codec[T]) (*Pipe[T], e
 	if err != nil {
 		return nil, err
 	}
-	return &Pipe[T]{name: name, codec: codec, client: c}, nil
+	p := &Pipe[T]{name: name, codec: codec, client: c}
+	addCleanup(p, c, swig.DeleteWrappedPipeClient)
+	return p, nil
 }
 
 // MemberName returns the member name of the pipe.
@@ -149,6 +151,7 @@ func newPipeEndpoint[T any](native swig.WrappedPipeEndpoint, codec Codec[T]) (*P
 		return nil, NewNullValue("null pipe endpoint")
 	}
 	ep := &PipeEndpoint[T]{native: native, codec: codec}
+	addCleanup(ep, native, swig.DeleteWrappedPipeEndpoint)
 	impl := &pipeEndpointDirector[T]{ep: ep}
 	d := swig.NewDirectorWrappedPipeEndpointDirector(impl)
 	id := heapAdd(ep, func() { swig.DeleteDirectorWrappedPipeEndpointDirector(d) })

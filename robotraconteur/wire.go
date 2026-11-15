@@ -33,7 +33,9 @@ func NewWireClient[T any](b *StubBase, name string, codec Codec[T]) (*Wire[T], e
 	if err != nil {
 		return nil, err
 	}
-	return &Wire[T]{name: name, codec: codec, client: c}, nil
+	w := &Wire[T]{name: name, codec: codec, client: c}
+	addCleanup(w, c, swig.DeleteWrappedWireClient)
+	return w, nil
 }
 
 // MemberName returns the member name of the wire.
@@ -239,6 +241,7 @@ func newWireConnection[T any](native swig.WrappedWireConnection, codec Codec[T])
 		return nil, NewNullValue("null wire connection")
 	}
 	c := &WireConnection[T]{native: native, codec: codec}
+	addCleanup(c, native, swig.DeleteWrappedWireConnection)
 	impl := &wireConnectionDirector[T]{c: c}
 	d := swig.NewDirectorWrappedWireConnectionDirector(impl)
 	id := heapAdd(c, func() { swig.DeleteDirectorWrappedWireConnectionDirector(d) })

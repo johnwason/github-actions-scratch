@@ -114,7 +114,9 @@ func (g *Generator1Client[R, P]) Next(ctx context.Context, param P) (R, error) {
 type Generator2Client[R any] struct{ GeneratorClient[R, struct{}] }
 
 // Next returns the next value.
-func (g *Generator2Client[R]) Next(ctx context.Context) (R, error) { return g.next(ctx, struct{}{}, false) }
+func (g *Generator2Client[R]) Next(ctx context.Context) (R, error) {
+	return g.next(ctx, struct{}{}, false)
+}
 
 // NextAll reads all remaining values.
 func NextAll[R any](ctx context.Context, g Generator2[R]) ([]R, error) {
@@ -193,7 +195,9 @@ func CallGenerator1Function[R, P any](ctx context.Context, b *StubBase, name str
 	if err != nil {
 		return nil, err
 	}
-	return &Generator1Client[R, P]{GeneratorClient[R, P]{native: g, ret: &ret, param: &param}}, nil
+	c := &Generator1Client[R, P]{GeneratorClient[R, P]{native: g, ret: &ret, param: &param}}
+	addCleanup(c, g, swig.DeleteWrappedGeneratorClient)
+	return c, nil
 }
 
 // CallGenerator2Function calls a generator function returning a Generator2.
@@ -202,7 +206,9 @@ func CallGenerator2Function[R any](ctx context.Context, b *StubBase, name string
 	if err != nil {
 		return nil, err
 	}
-	return &Generator2Client[R]{GeneratorClient[R, struct{}]{native: g, ret: &ret}}, nil
+	c := &Generator2Client[R]{GeneratorClient[R, struct{}]{native: g, ret: &ret}}
+	addCleanup(c, g, swig.DeleteWrappedGeneratorClient)
+	return c, nil
 }
 
 // CallGenerator3Function calls a generator function returning a Generator3.
@@ -211,7 +217,9 @@ func CallGenerator3Function[P any](ctx context.Context, b *StubBase, name string
 	if err != nil {
 		return nil, err
 	}
-	return &Generator3Client[P]{GeneratorClient[struct{}, P]{native: g, param: &param}}, nil
+	c := &Generator3Client[P]{GeneratorClient[struct{}, P]{native: g, param: &param}}
+	addCleanup(c, g, swig.DeleteWrappedGeneratorClient)
+	return c, nil
 }
 
 // ---------------------------------------------------------------- service

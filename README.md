@@ -162,6 +162,17 @@ Other service-side features:
 - **Readonly wires and pipes.** These get broadcasters in the `DefaultImpl` (`RRBroadcaster_state`). `rr.NewBroadcastDownsampler` adds per-client downsampling.
 - **Security.** Pass `rr.WithSecurityPolicy(&rr.ServiceSecurityPolicy{Authenticator: rr.NewPasswordFileUserAuthenticator(data), Policies: ...})` to `RegisterService`. Authenticators can also be Go functions (`rr.UserAuthenticatorFunc`) that return an `*rr.AuthenticatedUser` or an error. Service members can call `rr.CurrentAuthenticatedUser(ctx)` and `rr.CurrentServerContext(ctx)`.
 
+## Memory management
+
+Native handles of long-lived objects are freed by `runtime.AddCleanup` once
+the Go object is unreachable. These are stubs, pipe endpoints, wire
+connections, generators, subscriptions, broadcasters, timers and memory
+clients. `Close`, `DisconnectService` and subscription `Close` only perform
+the native close; the core then releases the object's callbacks, which
+makes the Go object collectable. Native messages never reach user code:
+they are converted to Go values and freed immediately.
+`rr.NativeHandleCount` reports live handles, for leak tests.
+
 ## Errors
 
 Failures are returned as Go `error` values. Network, transport, remote and

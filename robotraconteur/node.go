@@ -233,9 +233,10 @@ func (n *Node) stubFromNative(ws swig.WrappedServiceStub) (any, error) {
 		return nil, err
 	}
 	base := &StubBase{node: n, inner: ws, objectType: objType}
+	addCleanup(base, ws, swig.DeleteWrappedServiceStub)
 	obj, err := f.CreateStub(objType, base)
 	if err != nil {
-		swig.DeleteWrappedServiceStub(ws)
+		_ = ws // freed by the cleanup
 		return nil, err
 	}
 	return obj, nil

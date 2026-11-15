@@ -230,7 +230,9 @@ func NewArrayMemoryClient[T Primitive](b *StubBase, name string) (ArrayMemory[T]
 	if err != nil {
 		return nil, err
 	}
-	return &arrayMemoryClient[T]{native: m}, nil
+	c := &arrayMemoryClient[T]{native: m}
+	addCleanup(c, m, swig.DeleteArrayMemoryBase)
+	return c, nil
 }
 
 func (m *arrayMemoryClient[T]) Length() (uint64, error) {
@@ -293,7 +295,9 @@ func NewMultiDimArrayMemoryClient[T Primitive](b *StubBase, name string) (MultiD
 	if err != nil {
 		return nil, err
 	}
-	return &multiDimArrayMemoryClient[T]{native: m}, nil
+	c := &multiDimArrayMemoryClient[T]{native: m}
+	addCleanup(c, m, swig.DeleteMultiDimArrayMemoryBase)
+	return c, nil
 }
 
 func (m *multiDimArrayMemoryClient[T]) Dimensions() ([]uint64, error) {
@@ -1069,7 +1073,9 @@ func NewPodArrayMemoryClient[T Pod, P PodPtr[T]](b *StubBase, name string) (PodA
 	if err != nil {
 		return nil, err
 	}
-	return &podArrayMemoryClient[T]{pod: m, codec: podListCodec[T, P]()}, nil
+	c := &podArrayMemoryClient[T]{pod: m, codec: podListCodec[T, P]()}
+	addCleanup(c, m, swig.DeleteWrappedPodArrayMemoryClient)
+	return c, nil
 }
 
 // NewNamedArrayMemoryClient creates the client side of a namedarray array memory.
@@ -1078,7 +1084,9 @@ func NewNamedArrayMemoryClient[T NamedArray[E], E Primitive, P NamedArrayPtr[T, 
 	if err != nil {
 		return nil, err
 	}
-	return &podArrayMemoryClient[T]{named: m, codec: namedListCodec[T, E, P]()}, nil
+	c := &podArrayMemoryClient[T]{named: m, codec: namedListCodec[T, E, P]()}
+	addCleanup(c, m, swig.DeleteWrappedNamedArrayMemoryClient)
+	return c, nil
 }
 
 func (m *podArrayMemoryClient[T]) Length() (uint64, error) {
@@ -1244,8 +1252,10 @@ func NewPodMultiDimArrayMemoryClient[T Pod, P PodPtr[T]](b *StubBase, name strin
 		return nil, err
 	}
 	var zero T
-	return &podMultiDimArrayMemoryClient[T]{elementMultiDimMemoryClient[T]{pod: m,
-		codec: mdListCodec[T]{list: podListCodec[T, P](), typeName: zero.RRType(), mdType: DataTypePodMultiDimArray}}}, nil
+	c := &podMultiDimArrayMemoryClient[T]{elementMultiDimMemoryClient[T]{pod: m,
+		codec: mdListCodec[T]{list: podListCodec[T, P](), typeName: zero.RRType(), mdType: DataTypePodMultiDimArray}}}
+	addCleanup(c, m, swig.DeleteWrappedPodMultiDimArrayMemoryClient)
+	return c, nil
 }
 
 type namedMultiDimArrayMemoryClient[T any] struct{ elementMultiDimMemoryClient[T] }
@@ -1265,6 +1275,8 @@ func NewNamedMultiDimArrayMemoryClient[T NamedArray[E], E Primitive, P NamedArra
 		return nil, err
 	}
 	var zero T
-	return &namedMultiDimArrayMemoryClient[T]{elementMultiDimMemoryClient[T]{named: m,
-		codec: mdListCodec[T]{list: namedListCodec[T, E, P](), typeName: zero.RRType(), mdType: DataTypeNamedArrayMultiDimArray}}}, nil
+	c := &namedMultiDimArrayMemoryClient[T]{elementMultiDimMemoryClient[T]{named: m,
+		codec: mdListCodec[T]{list: namedListCodec[T, E, P](), typeName: zero.RRType(), mdType: DataTypeNamedArrayMultiDimArray}}}
+	addCleanup(c, m, swig.DeleteWrappedNamedMultiDimArrayMemoryClient)
+	return c, nil
 }

@@ -100,6 +100,15 @@ type ServiceSubscription struct {
 	connected    Event[func(s *ServiceSubscription, id ServiceSubscriptionClientID, client any)]
 	disconnected Event[func(s *ServiceSubscription, id ServiceSubscriptionClientID, client any)]
 	failed       Event[func(s *ServiceSubscription, id ServiceSubscriptionClientID, urls []string, err error)]
+
+	childMu  sync.Mutex
+	children []interface{ Close() error } // wire/pipe subscriptions, closed with s
+}
+
+func (s *ServiceSubscription) addChild(c interface{ Close() error }) {
+	s.childMu.Lock()
+	s.children = append(s.children, c)
+	s.childMu.Unlock()
 }
 
 type serviceSubscriptionDirector struct{ s *ServiceSubscription }
@@ -157,6 +166,7 @@ var _ swig.WrappedServiceSubscriptionFilterPredicateDirectorMethods = (*filterPr
 
 func (n *Node) newServiceSubscription(native swig.WrappedServiceSubscription) (*ServiceSubscription, error) {
 	s := &ServiceSubscription{node: n, native: native}
+	addCleanup(s, native, swig.DeleteWrappedServiceSubscription)
 	impl := &serviceSubscriptionDirector{s: s}
 	d := swig.NewDirectorWrappedServiceSubscriptionDirector(impl)
 	id := heapAdd(impl, func() { swig.DeleteDirectorWrappedServiceSubscriptionDirector(d) })
@@ -383,7 +393,18 @@ func (s *ServiceSubscription) ReleaseClient(client any) error {
 }
 
 // Close closes the subscription and its connections.
-func (s *ServiceSubscription) Close() error { return callVoid(func() { s.native.Close() }) }
+// Close closes the subscription and the wire and pipe subscriptions
+// created from it.
+func (s *ServiceSubscription) Close() error {
+	s.childMu.Lock()
+	children := s.children
+	s.children = nil
+	s.childMu.Unlock()
+	for _, c := range children {
+		_ = c.Close()
+	}
+	return callVoid(func() { s.native.Close() })
+}
 
 // ---------------------------------------------------------------- wire subscription
 
@@ -450,6 +471,7 @@ func SubscribeWireCodec[T any](s *ServiceSubscription, member, servicePath strin
 		return nil, err
 	}
 	ws := &WireSubscription[T]{native: n, codec: codec}
+	addCleanup(ws, n, swig.DeleteWrappedWireSubscription)
 	impl := &wireSubscriptionDirector[T]{s: ws}
 	d := swig.NewDirectorWrappedWireSubscriptionDirector(impl)
 	id := heapAdd(impl, func() { swig.DeleteDirectorWrappedWireSubscriptionDirector(d) })
@@ -457,6 +479,7 @@ func SubscribeWireCodec[T any](s *ServiceSubscription, member, servicePath strin
 		heapRemove(id)
 		return nil, err
 	}
+	s.addChild(ws)
 	return ws, nil
 }
 
@@ -557,6 +580,7 @@ func SubscribePipeCodec[T any](s *ServiceSubscription, member, servicePath strin
 		return nil, err
 	}
 	ps := &PipeSubscription[T]{native: n, codec: codec}
+	addCleanup(ps, n, swig.DeleteWrappedPipeSubscription)
 	impl := &pipeSubscriptionDirector[T]{s: ps}
 	d := swig.NewDirectorWrappedPipeSubscriptionDirector(impl)
 	id := heapAdd(impl, func() { swig.DeleteDirectorWrappedPipeSubscriptionDirector(d) })
@@ -564,6 +588,7 @@ func SubscribePipeCodec[T any](s *ServiceSubscription, member, servicePath strin
 		heapRemove(id)
 		return nil, err
 	}
+	s.addChild(ps)
 	return ps, nil
 }
 
@@ -670,6 +695,7 @@ func (n *Node) SubscribeServiceInfo2(serviceTypes []string, filter *ServiceSubsc
 		return nil, err
 	}
 	s := &ServiceInfo2Subscription{native: native}
+	addCleanup(s, native, swig.DeleteWrappedServiceInfo2Subscription)
 	impl := &serviceInfo2SubscriptionDirector{s: s}
 	d := swig.NewDirectorWrappedServiceInfo2SubscriptionDirector(impl)
 	id := heapAdd(impl, func() { swig.DeleteDirectorWrappedServiceInfo2SubscriptionDirector(d) })

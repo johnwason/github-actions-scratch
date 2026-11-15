@@ -32,6 +32,7 @@ func NewPipeServer[T any](b *SkelBase, name string, codec Codec[T]) (*Pipe[T], e
 		return nil, err
 	}
 	p := &Pipe[T]{name: name, codec: codec, server: s}
+	addCleanup(p, s, swig.DeleteWrappedPipeServer)
 	impl := &pipeServerConnect[T]{p: p}
 	d := swig.NewDirectorWrappedPipeServerConnectDirector(impl)
 	id := heapAdd(impl, func() { swig.DeleteDirectorWrappedPipeServerConnectDirector(d) })
@@ -62,7 +63,9 @@ func NewPipeBroadcaster[T any](p *Pipe[T], maximumBacklog int32) (*PipeBroadcast
 	if err != nil {
 		return nil, err
 	}
-	return &PipeBroadcaster[T]{native: n, codec: p.codec}, nil
+	b := &PipeBroadcaster[T]{native: n, codec: p.codec}
+	addCleanup(b, n, swig.DeleteWrappedPipeBroadcaster)
+	return b, nil
 }
 
 // SendPacket sends a packet to all connected endpoints.
@@ -211,6 +214,7 @@ func NewWireServer[T any](b *SkelBase, name string, codec Codec[T]) (*Wire[T], e
 		return nil, err
 	}
 	w := &Wire[T]{name: name, codec: codec, server: s}
+	addCleanup(w, s, swig.DeleteWrappedWireServer)
 	impl := &wireServerConnect[T]{w: w}
 	d := swig.NewDirectorWrappedWireServerConnectDirector(impl)
 	id := heapAdd(impl, func() { swig.DeleteDirectorWrappedWireServerConnectDirector(d) })
@@ -279,7 +283,9 @@ func NewWireBroadcaster[T any](w *Wire[T]) (*WireBroadcaster[T], error) {
 	if err != nil {
 		return nil, err
 	}
-	return &WireBroadcaster[T]{native: n, codec: w.codec}, nil
+	b := &WireBroadcaster[T]{native: n, codec: w.codec}
+	addCleanup(b, n, swig.DeleteWrappedWireBroadcaster)
+	return b, nil
 }
 
 // SetOutValue sets the value sent to all connected clients.
@@ -364,6 +370,7 @@ func NewWireUnicastReceiver[T any](w *Wire[T]) (*WireUnicastReceiver[T], error) 
 		return nil, err
 	}
 	r.native = n
+	addCleanup(r, n, swig.DeleteWrappedWireUnicastReceiver)
 	return r, nil
 }
 

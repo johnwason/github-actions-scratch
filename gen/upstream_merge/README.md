@@ -91,8 +91,14 @@ which CI checks out:
   service members run on their own goroutine and complete requests through the adapter, so a generator
   function can register its generator from that goroutine. This is binding code only.
 
+- **`0004`: SWIG binding (`RobotRaconteurWrapped`).** It releases the director of a pipe endpoint or wire
+  connection after its closed callback. That covers closes by the peer and by a disconnect, not only
+  `Close()`. It also adds `Close()` to `WrappedWireSubscription`/`WrappedPipeSubscription` that releases their
+  director. Without these the director keeps the wrapping language's object reachable forever. The C#
+  and Java bindings leak those objects in the same way.
+
 None of the patches change the C++ library ABI. `0001` only touches a `.cpp` file; its class is declared in
-a private header and the exported symbols are identical. The Go bindings need `0002` and `0003` to build.
+a private header and the exported symbols are identical. The Go bindings need `0002` and `0003` to build, and `0004` to release closed objects.
 Drop the `[skip ci]` line, which is only there for the CI repository, from the commit messages when
 upstreaming.
 

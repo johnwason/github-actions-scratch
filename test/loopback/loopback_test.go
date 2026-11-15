@@ -40,6 +40,7 @@ func (t *testroot) Func3(ctx context.Context, d1, d2 float64) (float64, error) {
 
 // slowCall makes Func3 block for 200 ms (TestManyConcurrentCalls).
 const slowCall = 1000
+
 func (t *testroot) Func_errtest(ctx context.Context) error {
 	return rr.NewInvalidOperation("expected error")
 }

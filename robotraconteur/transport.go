@@ -23,7 +23,9 @@ func (s *NodeSetup) TCPTransport() *TCPTransport {
 	if err != nil || t == nil || t.Swigcptr() == 0 {
 		return nil
 	}
-	return &TCPTransport{native: t}
+	tt := &TCPTransport{native: t}
+	addCleanup(tt, t, swig.DeleteTcpTransport)
+	return tt
 }
 
 // LocalTransport returns the local transport of the setup, or nil.
@@ -34,7 +36,9 @@ func (s *NodeSetup) LocalTransport() *LocalTransport {
 	if err != nil || t == nil || t.Swigcptr() == 0 {
 		return nil
 	}
-	return &LocalTransport{native: t}
+	lt := &LocalTransport{native: t}
+	addCleanup(lt, t, swig.DeleteLocalTransport)
+	return lt
 }
 
 // IntraTransport returns the intra transport of the setup, or nil.
@@ -45,7 +49,9 @@ func (s *NodeSetup) IntraTransport() *IntraTransport {
 	if err != nil || t == nil || t.Swigcptr() == 0 {
 		return nil
 	}
-	return &IntraTransport{native: t}
+	it := &IntraTransport{native: t}
+	addCleanup(it, t, swig.DeleteIntraTransport)
+	return it
 }
 
 // ListenPort returns the TCP listen port.

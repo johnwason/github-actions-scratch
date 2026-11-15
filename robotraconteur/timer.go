@@ -63,7 +63,9 @@ func (n *Node) CreateTimer(period time.Duration, oneshot bool, handler func(Time
 		heapRemove(id)
 		return nil, err
 	}
-	return &Timer{native: t}, nil
+	tm := &Timer{native: t}
+	addCleanup(tm, t, swig.DeleteTimer)
+	return tm, nil
 }
 
 // Start starts the timer.
@@ -88,16 +90,9 @@ func (t *Timer) SetPeriod(period time.Duration) error {
 // IsRunning reports whether the timer is running.
 func (t *Timer) IsRunning() bool { return t.native.IsRunning() }
 
-// Close stops the timer and releases it.
-func (t *Timer) Close() error {
-	if t.native == nil {
-		return nil
-	}
-	err := t.TryStop()
-	swig.DeleteTimer(t.native)
-	t.native = nil
-	return err
-}
+// Close stops the timer. Its native timer is released when the Timer is no
+// longer referenced; keep a reference to a running timer to stop it later.
+func (t *Timer) Close() error { return t.TryStop() }
 
 // Rate sleeps to keep a loop at a fixed frequency, using the node's time
 // base. Create with Node.CreateRate.
@@ -114,16 +109,14 @@ func (n *Node) CreateRate(frequency float64) (*Rate, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Rate{native: r}, nil
+	rt := &Rate{native: r}
+	addCleanup(rt, r, swig.DeleteRate)
+	return rt, nil
 }
 
 // Sleep sleeps until the next period.
 func (r *Rate) Sleep() error { return callVoid(func() { r.native.Sleep() }) }
 
-// Close releases the rate.
-func (r *Rate) Close() {
-	if r.native != nil {
-		swig.DeleteRate(r.native)
-		r.native = nil
-	}
-}
+// Close does nothing; the native rate is released when the Rate is no
+// longer referenced. It is kept for symmetry with Timer.
+func (r *Rate) Close() {}

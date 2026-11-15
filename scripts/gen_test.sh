@@ -9,3 +9,4 @@ build/go/RobotRaconteurGenGo --thunksource --go-import-prefix=github.com/robotra
   com.robotraconteur.testing.TestService3.robdef com.robotraconteur.testing.TestService4.robdef \
   com.robotraconteur.testing.TestService5.robdef > /dev/null
 gofmt -w test/gen
+cp ../robotraconteur/test/data/test_vectors.bin test/testvectors/test_vectors.bin

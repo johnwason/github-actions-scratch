@@ -6,3 +6,4 @@ robotraconteur/internal/swig/upcasts_gen.go
 robotraconteur/errors_gen.go
 robotraconteur/constants_gen.go
 test/gen/
+test/testvectors/test_vectors.bin

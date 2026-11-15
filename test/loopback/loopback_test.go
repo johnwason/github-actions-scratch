@@ -2,6 +2,7 @@
 package loopback
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -28,28 +29,36 @@ type testroot struct {
 	bwire  *rr.Wire[float64]
 }
 
-func (t *testroot) SetBroadcastwire(w *rr.Wire[float64]) { t.bwire = w }
+func (t *testroot) Set_broadcastwire(w *rr.Wire[float64]) { t.bwire = w }
 
-func (t *testroot) Func3(d1, d2 float64) (float64, error) { return d1 + d2, nil }
-func (t *testroot) Func_errtest() error {
+func (t *testroot) Func3(ctx context.Context, d1, d2 float64) (float64, error) {
+	if d1 == slowCall {
+		time.Sleep(200 * time.Millisecond)
+	}
+	return d1 + d2, nil
+}
+
+// slowCall makes Func3 block for 200 ms (TestManyConcurrentCalls).
+const slowCall = 1000
+func (t *testroot) Func_errtest(ctx context.Context) error {
 	return rr.NewInvalidOperation("expected error")
 }
-func (t *testroot) Func_errtest2() error { return ts1.NewTestexception1("custom") }
-func (t *testroot) Func1() error {
-	for _, h := range t.Ev1().Handlers() {
+func (t *testroot) Func_errtest2(ctx context.Context) error { return ts1.NewTestexception1("custom") }
+func (t *testroot) Func1(ctx context.Context) error {
+	for _, h := range t.Get_ev1().Handlers() {
 		h()
 	}
 	return nil
 }
-func (t *testroot) GetO1() (ts1.Sub1, error)    { return t.o1, nil }
-func (t *testroot) M1() rr.ArrayMemory[float64] { return t.m1 }
-func (t *testroot) Test_callbacks() error {
-	ep, err := rr.CurrentEndpoint()
+func (t *testroot) Get_o1(ctx context.Context) (ts1.Sub1, error) { return t.o1, nil }
+func (t *testroot) Get_m1() rr.ArrayMemory[float64]              { return t.m1 }
+func (t *testroot) Test_callbacks(ctx context.Context) error {
+	ep, err := rr.CurrentEndpoint(ctx)
 	if err != nil {
 		return err
 	}
 	go func() {
-		f, err := t.Cb3().GetClientFunction(ep)
+		f, err := t.Get_cb3().GetClientFunction(ep)
 		if err != nil {
 			t.cbDone <- err
 			return
@@ -63,23 +72,23 @@ func (t *testroot) Test_callbacks() error {
 	return nil
 }
 
-func (t *testroot) SetP1(p *rr.Pipe[[]float64]) {
-	t.TestrootDefaultImpl.SetP1(p)
+func (t *testroot) Set_p1(p *rr.Pipe[[]float64]) {
+	t.TestrootDefaultImpl.Set_p1(p)
 	p.SetPipeConnectCallback(func(ep *rr.PipeEndpoint[[]float64]) {
 		ep.PacketReceivedEvent().Connect(func(ep *rr.PipeEndpoint[[]float64]) {
 			for ep.Available() > 0 {
 				v, err := ep.ReceivePacket()
 				if err == nil {
 					// echo back
-					ep.SendPacket(v)
+					ep.SendPacket(context.Background(), v)
 				}
 			}
 		})
 	})
 }
 
-func (t *testroot) SetW1(w *rr.Wire[[]float64]) {
-	t.TestrootDefaultImpl.SetW1(w)
+func (t *testroot) Set_w1(w *rr.Wire[[]float64]) {
+	t.TestrootDefaultImpl.Set_w1(w)
 	w.SetWireConnectCallback(func(c *rr.WireConnection[[]float64]) {
 		c.WireValueChanged().Connect(func(c *rr.WireConnection[[]float64], v []float64, ts rr.TimeSpec) {
 			c.SetOutValue(append([]float64{}, v...))
@@ -103,7 +112,7 @@ func TestMain(m *testing.M) {
 	}
 	node = setup.Node
 	root := &testroot{o1: &sub1{}, cbDone: make(chan error, 1), m1: rr.NewArrayMemory(make([]float64, 100))}
-	root.SetD1(1.5)
+	root.Set_d1(context.Background(), 1.5)
 	if testCtx, err = node.RegisterService("go_test", "com.robotraconteur.testing.TestService1.testroot", root); err != nil {
 		fmt.Println("register:", err)
 		os.Exit(1)
@@ -120,8 +129,9 @@ var (
 )
 
 func connect(t *testing.T) ts1.Testroot {
+	ctx := t.Context()
 	t.Helper()
-	o, err := node.ConnectService(fmt.Sprintf("rr+tcp://localhost:%d?service=go_test", port))
+	o, err := node.ConnectService(ctx, fmt.Sprintf("rr+tcp://localhost:%d?service=go_test", port))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,37 +140,39 @@ func connect(t *testing.T) ts1.Testroot {
 }
 
 func TestPropertiesAndFunctions(t *testing.T) {
+	ctx := t.Context()
 	r := connect(t)
-	if v, err := r.GetD1(); err != nil || v != 1.5 {
+	if v, err := r.Get_d1(ctx); err != nil || v != 1.5 {
 		t.Fatalf("d1 %v %v", v, err)
 	}
-	if err := r.SetD2([]float64{1, 2, 3}); err != nil {
+	if err := r.Set_d2(ctx, []float64{1, 2, 3}); err != nil {
 		t.Fatal(err)
 	}
-	if v, err := r.GetD2(); err != nil || !reflect.DeepEqual(v, []float64{1, 2, 3}) {
+	if v, err := r.Get_d2(ctx); err != nil || !reflect.DeepEqual(v, []float64{1, 2, 3}) {
 		t.Fatalf("d2 %v %v", v, err)
 	}
-	if v, err := r.Func3(1, 2); err != nil || v != 3 {
+	if v, err := r.Func3(ctx, 1, 2); err != nil || v != 3 {
 		t.Fatalf("func3 %v %v", v, err)
 	}
-	if err := r.Func_errtest(); !errors.Is(err, rr.ErrInvalidOperation) {
+	if err := r.Func_errtest(ctx); !errors.Is(err, rr.ErrInvalidOperation) {
 		t.Fatalf("func_errtest %v", err)
 	}
 	var e1 *ts1.Testexception1
-	if err := r.Func_errtest2(); !errors.As(err, &e1) || e1.E.Message != "custom" {
+	if err := r.Func_errtest2(ctx); !errors.As(err, &e1) || e1.E.Message != "custom" {
 		t.Fatalf("func_errtest2 %T %v", err, err)
 	}
-	if _, err := r.Meaning_of_life(); !errors.Is(err, rr.ErrNotImplementedError) {
+	if _, err := r.Meaning_of_life(ctx); !errors.Is(err, rr.ErrNotImplementedError) {
 		t.Fatalf("default impl should return NotImplemented, got %v", err)
 	}
 }
 
 func TestEventsAndCallbacks(t *testing.T) {
+	ctx := t.Context()
 	r := connect(t)
 	got := make(chan struct{}, 1)
-	c := r.Ev1().Connect(func() { got <- struct{}{} })
+	c := r.Get_ev1().Connect(func() { got <- struct{}{} })
 	defer c.Disconnect()
-	if err := r.Func1(); err != nil {
+	if err := r.Func1(ctx); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -168,8 +180,8 @@ func TestEventsAndCallbacks(t *testing.T) {
 	case <-time.After(3 * time.Second):
 		t.Fatal("event not received")
 	}
-	r.Cb3().SetFunction(func(d1, d2 float64) (float64, error) { return d1 + d2, nil })
-	if err := r.Test_callbacks(); err != nil {
+	r.Get_cb3().SetFunction(func(d1, d2 float64) (float64, error) { return d1 + d2, nil })
+	if err := r.Test_callbacks(ctx); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -183,41 +195,44 @@ func TestEventsAndCallbacks(t *testing.T) {
 }
 
 func TestObjRef(t *testing.T) {
+	ctx := t.Context()
 	r := connect(t)
-	o1, err := r.GetO1()
+	o1, err := r.Get_o1(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := o1.SetD1([]float64{9}); err != nil {
+	if err := o1.Set_d1(ctx, []float64{9}); err != nil {
 		t.Fatal(err)
 	}
-	if v, err := o1.GetD1(); err != nil || !reflect.DeepEqual(v, []float64{9}) {
+	if v, err := o1.Get_d1(ctx); err != nil || !reflect.DeepEqual(v, []float64{9}) {
 		t.Fatalf("o1.d1 %v %v", v, err)
 	}
-	if _, err := r.GetO2(1); !errors.Is(err, rr.ErrNotImplementedError) {
+	if _, err := r.Get_o2(ctx, 1); !errors.Is(err, rr.ErrNotImplementedError) {
 		t.Fatalf("o2 %v", err)
 	}
 }
 
 func TestPipe(t *testing.T) {
+	ctx := t.Context()
 	r := connect(t)
-	ep, err := r.P1().Connect(rr.AnyIndex)
+	ep, err := r.Get_p1().Connect(ctx, rr.AnyIndex)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer ep.Close()
-	if _, err := ep.SendPacket([]float64{1, 2}); err != nil {
+	if _, err := ep.SendPacket(ctx, []float64{1, 2}); err != nil {
 		t.Fatal(err)
 	}
-	v, err := ep.ReceivePacketWait(3 * time.Second)
+	v, err := ep.ReceivePacketWait(within(t, 3*time.Second))
 	if err != nil || !reflect.DeepEqual(v, []float64{1, 2}) {
 		t.Fatalf("pipe echo %v %v", v, err)
 	}
 }
 
 func TestWire(t *testing.T) {
+	ctx := t.Context()
 	r := connect(t)
-	c, err := r.W1().Connect()
+	c, err := r.Get_w1().Connect(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -225,8 +240,7 @@ func TestWire(t *testing.T) {
 	if err := c.SetOutValue([]float64{4, 5}); err != nil {
 		t.Fatal(err)
 	}
-	ok, err := c.WaitInValueValid(3 * time.Second)
-	if err != nil || !ok {
+	if err := c.WaitInValueValid(within(t, 3*time.Second)); err != nil {
 		t.Fatalf("wire in value not valid %v", err)
 	}
 	v, err := c.InValue()
@@ -237,7 +251,7 @@ func TestWire(t *testing.T) {
 
 func TestMemory(t *testing.T) {
 	r := connect(t)
-	m := r.M1()
+	m := r.Get_m1()
 	n, err := m.Length()
 	if err != nil || n != 100 {
 		t.Fatalf("length %v %v", n, err)
@@ -258,4 +272,11 @@ func TestMemory(t *testing.T) {
 	if err := m.Read(99, buf, 0, 5); !errors.Is(err, rr.ErrOutOfRange) {
 		t.Fatalf("expected out of range, got %v", err)
 	}
+}
+
+// within returns a context of t ending after d.
+func within(t testing.TB, d time.Duration) context.Context {
+	ctx, cancel := context.WithTimeout(t.Context(), d)
+	t.Cleanup(cancel)
+	return ctx
 }

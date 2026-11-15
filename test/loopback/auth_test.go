@@ -1,6 +1,7 @@
 package loopback
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"slices"
@@ -15,8 +16,8 @@ type authroot struct {
 	ts1.TestrootDefaultImpl
 }
 
-func (a *authroot) Func3(d1, d2 float64) (float64, error) {
-	u, err := rr.CurrentAuthenticatedUser()
+func (a *authroot) Func3(ctx context.Context, d1, d2 float64) (float64, error) {
+	u, err := rr.CurrentAuthenticatedUser(ctx)
 	if err != nil {
 		return 0, err
 	}
@@ -27,6 +28,7 @@ func (a *authroot) Func3(d1, d2 float64) (float64, error) {
 }
 
 func TestGoUserAuthenticator(t *testing.T) {
+	ctx := t.Context()
 	auth := rr.UserAuthenticatorFunc(func(username string, cred map[string]any, ctx *rr.ServerContext) (*rr.AuthenticatedUser, error) {
 		if ctx == nil {
 			return nil, errors.New("no context")
@@ -48,21 +50,21 @@ func TestGoUserAuthenticator(t *testing.T) {
 	url := fmt.Sprintf("rr+tcp://localhost:%d?service=go_auth", port)
 
 	for _, c := range []struct{ user, pass string }{{"alice", "wrong"}, {"bob", "secret"}, {"panic", ""}} {
-		_, err := node.ConnectService(url, rr.WithCredentials(c.user, map[string]any{"password": c.pass}))
+		_, err := node.ConnectService(ctx, url, rr.WithCredentials(c.user, map[string]any{"password": c.pass}))
 		if !errors.Is(err, rr.ErrAuthenticationError) {
 			t.Errorf("%s: expected AuthenticationError, got %v", c.user, err)
 		}
 	}
-	if _, err := node.ConnectService(url); err == nil {
+	if _, err := node.ConnectService(ctx, url); err == nil {
 		t.Error("expected error connecting without credentials")
 	}
 
-	o, err := node.ConnectService(url, rr.WithCredentials("alice", map[string]any{"password": "secret"}))
+	o, err := node.ConnectService(ctx, url, rr.WithCredentials("alice", map[string]any{"password": "secret"}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer node.DisconnectService(o)
-	v, err := o.(ts1.Testroot).Func3(1, 2)
+	v, err := o.(ts1.Testroot).Func3(ctx, 1, 2)
 	if err != nil || v != 3 {
 		t.Fatalf("Func3 %v %v", v, err)
 	}

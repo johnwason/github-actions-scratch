@@ -5,6 +5,7 @@
 package sim
 
 import (
+	"context"
 	"math"
 	"sync"
 	"time"
@@ -71,7 +72,7 @@ func (r *Reynard) run() {
 
 // SetState is called by the service skeleton when the service is
 // registered.
-func (r *Reynard) SetState(w *rr.Wire[*reynard.ReynardState]) {
+func (r *Reynard) Set_state(w *rr.Wire[*reynard.ReynardState]) {
 	b, err := rr.NewWireBroadcaster(w)
 	if err != nil {
 		return
@@ -127,7 +128,7 @@ func motionEnd(timeout float64) time.Time {
 	return time.Now().Add(time.Duration(timeout * float64(time.Second)))
 }
 
-func (r *Reynard) Teleport(x, y float64) error {
+func (r *Reynard) Teleport(ctx context.Context, x, y float64) error {
 	if err := finite(x, y); err != nil {
 		return err
 	}
@@ -137,7 +138,7 @@ func (r *Reynard) Teleport(x, y float64) error {
 	return nil
 }
 
-func (r *Reynard) Setf_arm_position(q1, q2, q3 float64) error {
+func (r *Reynard) Setf_arm_position(ctx context.Context, q1, q2, q3 float64) error {
 	if err := finite(q1, q2, q3); err != nil {
 		return err
 	}
@@ -148,19 +149,19 @@ func (r *Reynard) Setf_arm_position(q1, q2, q3 float64) error {
 	return nil
 }
 
-func (r *Reynard) Getf_arm_position() ([]float64, error) {
+func (r *Reynard) Getf_arm_position(ctx context.Context) ([]float64, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return append([]float64(nil), r.armPos[:]...), nil
 }
 
-func (r *Reynard) GetRobot_position() ([]float64, error) {
+func (r *Reynard) Get_robot_position(ctx context.Context) ([]float64, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return append([]float64(nil), r.robotPos[:]...), nil
 }
 
-func (r *Reynard) Drive_robot(vx, vy, timeout float64, wait bool) error {
+func (r *Reynard) Drive_robot(ctx context.Context, vx, vy, timeout float64, wait bool) error {
 	if err := finite(vx, vy, timeout); err != nil {
 		return err
 	}
@@ -178,7 +179,7 @@ func (r *Reynard) Drive_robot(vx, vy, timeout float64, wait bool) error {
 	return nil
 }
 
-func (r *Reynard) Drive_arm(q1, q2, q3, timeout float64, wait bool) error {
+func (r *Reynard) Drive_arm(ctx context.Context, q1, q2, q3, timeout float64, wait bool) error {
 	if err := finite(q1, q2, q3, timeout); err != nil {
 		return err
 	}
@@ -196,20 +197,20 @@ func (r *Reynard) Drive_arm(q1, q2, q3, timeout float64, wait bool) error {
 	return nil
 }
 
-func (r *Reynard) Say(message string) error {
-	for _, h := range r.New_message().Handlers() {
+func (r *Reynard) Say(ctx context.Context, message string) error {
+	for _, h := range r.Get_new_message().Handlers() {
 		h(message)
 	}
 	return nil
 }
 
-func (r *Reynard) GetColor() ([]float64, error) {
+func (r *Reynard) Get_color(ctx context.Context) ([]float64, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return append([]float64(nil), r.color...), nil
 }
 
-func (r *Reynard) SetColor(c []float64) error {
+func (r *Reynard) Set_color(ctx context.Context, c []float64) error {
 	if len(c) != 3 {
 		return rr.NewInvalidArgument("color must have 3 elements")
 	}

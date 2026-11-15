@@ -1,8 +1,8 @@
 package robotraconteur
 
 import (
+	"context"
 	"sync"
-	"time"
 
 	swig "github.com/robotraconteur/robotraconteur_go/robotraconteur/internal/swig"
 )
@@ -59,30 +59,21 @@ func (p *Pipe[T]) Direction() MemberDirection {
 }
 
 // Connect connects a pipe endpoint (client). Use AnyIndex for any index.
-func (p *Pipe[T]) Connect(index int32) (*PipeEndpoint[T], error) {
+func (p *Pipe[T]) Connect(ctx context.Context, index int32) (*PipeEndpoint[T], error) {
 	if p.client == nil {
 		return nil, NewInvalidOperation("pipe is not a client pipe")
 	}
-	ep, err := call(func() swig.WrappedPipeEndpoint { return p.client.Connect(index) })
-	if err != nil {
-		return nil, err
-	}
-	return newPipeEndpoint(ep, p.codec)
-}
-
-// AsyncConnect connects a pipe endpoint asynchronously (client).
-func (p *Pipe[T]) AsyncConnect(index int32, timeout time.Duration, handler func(*PipeEndpoint[T], error)) {
-	if p.client == nil {
-		go handler(nil, NewInvalidOperation("pipe is not a client pipe"))
-		return
-	}
-	impl := &asyncPipeEndpoint[T]{codec: p.codec, handler: handler}
-	d := swig.NewDirectorAsyncPipeEndpointReturnDirector(impl)
-	id := heapAdd(impl, func() { swig.DeleteDirectorAsyncPipeEndpointReturnDirector(d) })
-	if err := callVoid(func() { p.client.AsyncConnect(index, timeoutMs(timeout), d, id) }); err != nil {
-		heapRemove(id)
-		go handler(nil, err)
-	}
+	return await(ctx, func(done func(*PipeEndpoint[T], error)) error {
+		impl := &asyncPipeEndpoint[T]{codec: p.codec, handler: done}
+		d := swig.NewDirectorAsyncPipeEndpointReturnDirector(impl)
+		id := heapAdd(impl, func() { swig.DeleteDirectorAsyncPipeEndpointReturnDirector(d) })
+		t := DefaultNode().requestTimeoutMs(ctx)
+		err := startNative(func() error { p.client.AsyncConnect(index, t, d, id); return nil })
+		if err != nil {
+			heapRemove(id)
+		}
+		return err
+	}, func(ep *PipeEndpoint[T]) { _ = ep.Close() })
 }
 
 type asyncPipeEndpoint[T any] struct {
@@ -91,16 +82,16 @@ type asyncPipeEndpoint[T any] struct {
 }
 
 func (a *asyncPipeEndpoint[T]) Handler(ep swig.WrappedPipeEndpoint, info swig.HandlerErrorInfo) {
+	defer recoverDirector()
 	err := errorFromInfo(info)
 	if err != nil {
 		if ep != nil && ep.Swigcptr() != 0 {
 			swig.DeleteWrappedPipeEndpoint(ep)
 		}
-		go a.handler(nil, err)
+		a.handler(nil, err)
 		return
 	}
-	e, err := newPipeEndpoint(ep, a.codec)
-	go a.handler(e, err)
+	a.handler(newPipeEndpoint(ep, a.codec))
 }
 
 // PipeConnectCallback sets the function called when a client connects a
@@ -120,6 +111,8 @@ type PipeEndpoint[T any] struct {
 	ackReceived    Event[func(*PipeEndpoint[T], uint32)]
 	mu             sync.Mutex
 	closed         func(*PipeEndpoint[T])
+	isClosed       bool
+	changed        signal // packet received or endpoint closed
 }
 
 type pipeEndpointDirector[T any] struct{ ep *PipeEndpoint[T] }
@@ -128,7 +121,9 @@ func (d *pipeEndpointDirector[T]) PipeEndpointClosedCallback() {
 	defer recoverDirector()
 	d.ep.mu.Lock()
 	f := d.ep.closed
+	d.ep.isClosed = true
 	d.ep.mu.Unlock()
+	d.ep.changed.notify()
 	if f != nil {
 		f(d.ep)
 	}
@@ -136,6 +131,7 @@ func (d *pipeEndpointDirector[T]) PipeEndpointClosedCallback() {
 
 func (d *pipeEndpointDirector[T]) PacketReceivedEvent() {
 	defer recoverDirector()
+	d.ep.changed.notify()
 	for _, h := range d.ep.packetReceived.Handlers() {
 		h(d.ep)
 	}
@@ -204,55 +200,31 @@ func (e *PipeEndpoint[T]) SetPipeEndpointClosedCallback(f func(*PipeEndpoint[T])
 	e.mu.Unlock()
 }
 
-// SendPacket sends a packet and returns its packet number.
-func (e *PipeEndpoint[T]) SendPacket(v T) (uint32, error) {
+// SendPacket sends a packet and returns its packet number once the packet
+// has been sent.
+func (e *PipeEndpoint[T]) SendPacket(ctx context.Context, v T) (uint32, error) {
 	pe, err := e.codec.Pack("value", v)
 	if err != nil {
 		return 0, err
 	}
-	var cerr error
-	n, err := call(func() uint32 {
-		m, err := toNative(pe)
+	return await(ctx, func(done func(uint32, error)) error {
+		impl := &asyncUInt32{handler: done}
+		d := swig.NewDirectorAsyncUInt32ReturnDirector(impl)
+		id := heapAdd(impl, func() { swig.DeleteDirectorAsyncUInt32ReturnDirector(d) })
+		err := startNative(func() error {
+			m, err := toNative(pe)
+			if err != nil {
+				return err
+			}
+			defer swig.DeleteMessageElement(m)
+			e.native.AsyncSendPacket(m, d, id)
+			return nil
+		})
 		if err != nil {
-			cerr = err
-			return 0
+			heapRemove(id)
 		}
-		defer swig.DeleteMessageElement(m)
-		return e.native.SendPacket(m)
-	})
-	if cerr != nil {
-		return 0, cerr
-	}
-	return n, err
-}
-
-// AsyncSendPacket sends a packet asynchronously.
-func (e *PipeEndpoint[T]) AsyncSendPacket(v T, handler func(uint32, error)) {
-	pe, err := e.codec.Pack("value", v)
-	if err != nil {
-		go handler(0, err)
-		return
-	}
-	impl := &asyncUInt32{handler: handler}
-	d := swig.NewDirectorAsyncUInt32ReturnDirector(impl)
-	id := heapAdd(impl, func() { swig.DeleteDirectorAsyncUInt32ReturnDirector(d) })
-	var cerr error
-	err = callVoid(func() {
-		m, err := toNative(pe)
-		if err != nil {
-			cerr = err
-			return
-		}
-		defer swig.DeleteMessageElement(m)
-		e.native.AsyncSendPacket(m, d, id)
-	})
-	if cerr != nil {
-		err = cerr
-	}
-	if err != nil {
-		heapRemove(id)
-		go handler(0, err)
-	}
+		return err
+	}, nil)
 }
 
 func (e *PipeEndpoint[T]) unpackPacket(m swig.MessageElement) (T, error) {
@@ -295,56 +267,45 @@ func (e *PipeEndpoint[T]) PeekNextPacket() (T, error) {
 	return e.recv(func() swig.MessageElement { return e.native.PeekNextPacket() })
 }
 
-// ReceivePacketWait waits for and returns the next packet.
-func (e *PipeEndpoint[T]) ReceivePacketWait(timeout time.Duration) (T, error) {
-	t := timeoutMs(timeout)
-	return e.recv(func() swig.MessageElement {
-		return swig.SwigcptrWrappedPipeEndpoint(e.native.Swigcptr()).ReceivePacketWait__SWIG_0(t)
+func (e *PipeEndpoint[T]) waitPacket(ctx context.Context, peek bool) (T, error) {
+	return waitFor(ctx, &e.changed, func() (T, bool, error) {
+		var zero T
+		if e.Available() > 0 {
+			var v T
+			var err error
+			if peek {
+				v, err = e.PeekNextPacket()
+			} else {
+				v, err = e.ReceivePacket()
+			}
+			return v, true, err
+		}
+		e.mu.Lock()
+		closed := e.isClosed
+		e.mu.Unlock()
+		if closed {
+			return zero, false, NewConnectionError("pipe endpoint closed")
+		}
+		return zero, false, nil
 	})
+}
+
+// ReceivePacketWait waits for and returns the next packet.
+func (e *PipeEndpoint[T]) ReceivePacketWait(ctx context.Context) (T, error) {
+	return e.waitPacket(ctx, false)
 }
 
 // PeekNextPacketWait waits for the next packet without removing it.
-func (e *PipeEndpoint[T]) PeekNextPacketWait(timeout time.Duration) (T, error) {
-	t := timeoutMs(timeout)
-	return e.recv(func() swig.MessageElement {
-		return swig.SwigcptrWrappedPipeEndpoint(e.native.Swigcptr()).PeekNextPacketWait__SWIG_0(t)
-	})
+func (e *PipeEndpoint[T]) PeekNextPacketWait(ctx context.Context) (T, error) {
+	return e.waitPacket(ctx, true)
 }
 
-// TryReceivePacketWait waits for a packet; ok is false on timeout.
-func (e *PipeEndpoint[T]) TryReceivePacketWait(timeout time.Duration, peek bool) (v T, ok bool, err error) {
-	t := timeoutMs(timeout)
-	var cerr error
-	err = callVoid(func() {
-		r := swig.SwigcptrWrappedPipeEndpoint(e.native.Swigcptr()).TryReceivePacketWait__SWIG_0(t, peek)
-		if r == nil || r.Swigcptr() == 0 {
-			return
-		}
-		defer swig.DeleteWrappedTryReceivePacketWaitResult(r)
-		if !r.GetRes() {
-			return
-		}
-		ok = true
-		v, cerr = e.unpackPacket(r.GetPacket())
-	})
-	if err == nil {
-		err = cerr
-	}
-	return
-}
-
-// Close closes the endpoint.
+// Close closes the endpoint and waits for the close to complete (bounded by
+// the request timeout).
 func (e *PipeEndpoint[T]) Close() error {
-	return callVoid(func() { e.native.Close() })
-}
-
-// AsyncClose closes the endpoint asynchronously.
-func (e *PipeEndpoint[T]) AsyncClose(timeout time.Duration, handler func(error)) {
-	d, id := newAsyncVoid(handler)
-	if err := callVoid(func() { e.native.AsyncClose(timeoutMs(timeout), d, id) }); err != nil {
-		heapRemove(id)
-		go handler(err)
-	}
+	return awaitVoid(context.Background(), func(t int32, d swig.AsyncVoidReturnDirector, id int32) {
+		e.native.AsyncClose(t, d, id)
+	})
 }
 
 // ---- AsyncUInt32ReturnDirector ----
@@ -352,6 +313,5 @@ func (e *PipeEndpoint[T]) AsyncClose(timeout time.Duration, handler func(error))
 type asyncUInt32 struct{ handler func(uint32, error) }
 
 func (a *asyncUInt32) Handler(v uint32, info swig.HandlerErrorInfo) {
-	err := errorFromInfo(info)
-	go a.handler(v, err)
+	a.handler(v, errorFromInfo(info))
 }

@@ -72,12 +72,52 @@ Generated code:
 | `pod`, `namedarray` | value structs; fixed arrays are Go arrays |
 | `enum` | typed `int32` constants |
 | `exception` | `*Name` error type wrapping `*rr.Error` (use `errors.As`) |
-| `object` | interface `Name`, `AsyncName`, client stub, skel, `NameDefaultImpl` |
+| `object` | interface `Name`, client stub, skel, `NameDefaultImpl` |
 | `double[]`, `int32[*]`, `string{int32}`, `varvalue` | `[]float64`, `*rr.MultiDimArray[int32]`, `map[int32]string`, `any` |
-| `property`, `function` | `GetX()/SetX(v)`, `X(args) (ret, error)` |
-| `event`, `callback` | `*rr.Event[func(...)]`, `*rr.Callback[func(...) (..., error)]` |
-| `pipe`, `wire`, `memory` | `*rr.Pipe[T]`, `*rr.Wire[T]`, `rr.ArrayMemory[T]` / `MultiDimArrayMemory[T]` / pod memories |
-| generator functions | `rr.Generator1[R,P]`, `Generator2[R]`, `Generator3[P]` |
+| `property x` | `Get_x(ctx) (T, error)`, `Set_x(ctx, v) error` |
+| `function f` | `F(ctx, args...) (ret, error)` |
+| `objref o` | `Get_o(ctx[, index]) (Obj, error)` |
+| `event e`, `callback c` | `Get_e() *rr.Event[func(...)]`, `Get_c() *rr.Callback[func(...) (..., error)]` |
+| `pipe`, `wire`, `memory` | `Get_x()` returning `*rr.Pipe[T]`, `*rr.Wire[T]`, `rr.ArrayMemory[T]` / `MultiDimArrayMemory[T]` / pod memories |
+| generator functions | `rr.Generator1[R,P]`, `Generator2[R]`, `Generator3[P]` (`Next(ctx, ...)`) |
+
+Member names follow the C++ thunks: accessors are `get_`/`set_` plus the
+member name unchanged (`Get_`/`Set_` so Go exports them), and functions
+keep their name with the first letter upper case (`drive_robot` becomes
+`Drive_robot`). Robot Raconteur reserves member names starting with `get_`,
+`set_`, `async_` and `rr` (ignoring case), so these can't collide with each
+other. Nor can they collide with the generated and runtime helpers, which
+all start with `RR` (for example `RRBroadcaster_state` in a `DefaultImpl`).
+The generated parameter for the context is `rr_ctx`.
+
+## Concurrency model
+
+There is no separate asynchronous API. Every call that goes over the
+network is a synchronous Go call taking a `context.Context`. Internally it
+is the core's asynchronous operation awaited by the calling goroutine: the
+goroutine parks on a channel, so no OS thread is held while a request is in
+flight. Use goroutines for concurrency.
+
+- **Timeouts.** A ctx deadline bounds each request, together with the node
+  request timeout (`Node.SetRequestTimeout`).
+- **Cancellation.** Cancelling ctx returns `ctx.Err()` immediately. The core
+  can't cancel a request, so it finishes in the background. A late result
+  that holds a resource, such as a connection or a pipe endpoint, is released.
+- **Waits.** The `*Wait` methods (`ReceivePacketWait`, `WaitInValueValid`,
+  `DefaultClientWait`) also wait on the goroutine.
+- **Close.** `Close()` methods and `DisconnectService` take no ctx; they are
+  bounded by the request timeout.
+- **Service members run on their own goroutine.** The core's request
+  thread is released at once, so implementations can block and make calls.
+  `rr_ctx` describes the request (`rr.CurrentEndpoint`,
+  `rr.CurrentServicePath`, `rr.CurrentServerContext`,
+  `rr.CurrentAuthenticatedUser`). Objref lookups (`Get_o` on a service)
+  still run on the request thread.
+- **Inline callbacks.** Events, callbacks, wire and pipe notifications and
+  timers run on core threads. They should return quickly; requests made
+  from them hold that thread until they complete.
+- **Thread-pinning exceptions.** Memories and monitor locks
+  (`WithMonitorLock`) still hold an OS thread for their duration.
 
 ## Client
 
@@ -86,19 +126,17 @@ setup, err := rr.ClientNodeSetup(rr.WithServiceTypes(reynard.Factory))
 if err != nil { ... }
 defer setup.Close()
 
-obj, err := setup.Node.ConnectService("rr+tcp://localhost:29200?service=reynard")
+ctx := context.Background() // or a context with a deadline / cancellation
+obj, err := setup.Node.ConnectService(ctx, "rr+tcp://localhost:29200?service=reynard")
 if err != nil { ... }
 defer setup.Node.DisconnectService(obj)
 c := obj.(reynard.Reynard)
 
-c.New_message().Connect(func(msg string) { fmt.Println(msg) })
-if err := c.Teleport(0.1, -0.2); err != nil { ... }
-state, ts, err := c.State().PeekInValue()
+c.Get_new_message().Connect(func(msg string) { fmt.Println(msg) })
+if err := c.Teleport(ctx, 0.1, -0.2); err != nil { ... }
+state, ts, err := c.Get_state().PeekInValue(ctx)
 ```
 
-Every member also has an async form (`AsyncTeleport(x, y, timeout, func(error))`).
-This includes generator functions. Generators returned by stubs implement
-`rr.AsyncGenerator1/2/3` (`AsyncNext`, `AsyncAbort`, `AsyncClose`).
 Wires, pipes, memories, object locks (`Node.RequestObjectLock`, `WithMonitorLock`),
 subscriptions (`Node.SubscribeService`, `SubscribeServiceByType`,
 `SubscribeServiceInfo2`, and wire/pipe subscriptions) and local-transport
@@ -112,7 +150,7 @@ register the object:
 ```go
 type robot struct{ reynard.ReynardDefaultImpl }
 
-func (r *robot) Teleport(x, y float64) error { ... }
+func (r *robot) Teleport(ctx context.Context, x, y float64) error { ... }
 
 setup, err := rr.ServerNodeSetup("experimental.reynard_the_robot", 29200,
     rr.WithServiceTypes(reynard.Factory))
@@ -121,9 +159,8 @@ ctx, err := setup.Node.RegisterService("reynard", "experimental.reynard_the_robo
 
 Other service-side features:
 
-- **Readonly wires and pipes.** These get broadcasters in the `DefaultImpl` (`StateBroadcaster`). `rr.NewBroadcastDownsampler` adds per-client downsampling.
-- **Async implementations.** An object that implements the generated `Async<Object>` interface is served through the native async adapter.
-- **Security.** Pass `rr.WithSecurityPolicy(&rr.ServiceSecurityPolicy{Authenticator: rr.NewPasswordFileUserAuthenticator(data), Policies: ...})` to `RegisterService`. Authenticators can also be Go functions (`rr.UserAuthenticatorFunc`) that return an `*rr.AuthenticatedUser` or an error. Service members can call `rr.CurrentAuthenticatedUser` and `rr.CurrentServerContext`.
+- **Readonly wires and pipes.** These get broadcasters in the `DefaultImpl` (`RRBroadcaster_state`). `rr.NewBroadcastDownsampler` adds per-client downsampling.
+- **Security.** Pass `rr.WithSecurityPolicy(&rr.ServiceSecurityPolicy{Authenticator: rr.NewPasswordFileUserAuthenticator(data), Policies: ...})` to `RegisterService`. Authenticators can also be Go functions (`rr.UserAuthenticatorFunc`) that return an `*rr.AuthenticatedUser` or an error. Service members can call `rr.CurrentAuthenticatedUser(ctx)` and `rr.CurrentServerContext(ctx)`.
 
 ## Errors
 

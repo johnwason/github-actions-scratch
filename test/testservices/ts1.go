@@ -4,6 +4,7 @@ package testservices
 // (robotraconteur/test/cpp/service/ServiceTest.cpp).
 
 import (
+	"context"
 	"errors"
 	"sync"
 	"time"
@@ -61,72 +62,108 @@ func (t *Testroot) Shutdown() {
 
 // ---- numeric properties
 
-func (t *Testroot) GetD1() (float64, error)   { return 12.345, nil }
-func (t *Testroot) SetD1(v float64) error     { return check("d1", v, 3.456) }
-func (t *Testroot) GetD2() ([]float64, error) { return vec[float64]("ts1.d2.to_client"), nil }
-func (t *Testroot) SetD2(v []float64) error   { return check("d2", v, vec[float64]("ts1.d2.to_service")) }
-func (t *Testroot) GetD3() ([]float64, error) { return vec[float64]("ts1.d3.to_client"), nil }
-func (t *Testroot) SetD3(v []float64) error   { return check("d3", v, vec[float64]("ts1.d3.to_service")) }
-func (t *Testroot) GetD4() ([]float64, error) { return vec[float64]("ts1.d4.to_client"), nil }
-func (t *Testroot) SetD4(v []float64) error   { return check("d4", v, vec[float64]("ts1.d4.to_service")) }
-func (t *Testroot) GetD5() (*rr.MultiDimArray[float64], error) {
+func (t *Testroot) Get_d1(ctx context.Context) (float64, error) { return 12.345, nil }
+func (t *Testroot) Set_d1(ctx context.Context, v float64) error { return check("d1", v, 3.456) }
+func (t *Testroot) Get_d2(ctx context.Context) ([]float64, error) {
+	return vec[float64]("ts1.d2.to_client"), nil
+}
+func (t *Testroot) Set_d2(ctx context.Context, v []float64) error {
+	return check("d2", v, vec[float64]("ts1.d2.to_service"))
+}
+func (t *Testroot) Get_d3(ctx context.Context) ([]float64, error) {
+	return vec[float64]("ts1.d3.to_client"), nil
+}
+func (t *Testroot) Set_d3(ctx context.Context, v []float64) error {
+	return check("d3", v, vec[float64]("ts1.d3.to_service"))
+}
+func (t *Testroot) Get_d4(ctx context.Context) ([]float64, error) {
+	return vec[float64]("ts1.d4.to_client"), nil
+}
+func (t *Testroot) Set_d4(ctx context.Context, v []float64) error {
+	return check("d4", v, vec[float64]("ts1.d4.to_service"))
+}
+func (t *Testroot) Get_d5(ctx context.Context) (*rr.MultiDimArray[float64], error) {
 	return mdaVec("ts1.d5.to_client"), nil
 }
-func (t *Testroot) SetD5(v *rr.MultiDimArray[float64]) error {
+func (t *Testroot) Set_d5(ctx context.Context, v *rr.MultiDimArray[float64]) error {
 	return check("d5", v, mdaVec("ts1.d5.to_service"))
 }
-func (t *Testroot) GetD6() (*rr.MultiDimArray[float64], error) {
+func (t *Testroot) Get_d6(ctx context.Context) (*rr.MultiDimArray[float64], error) {
 	return mdaVec("ts1.d6.to_client"), nil
 }
-func (t *Testroot) SetD6(v *rr.MultiDimArray[float64]) error {
+func (t *Testroot) Set_d6(ctx context.Context, v *rr.MultiDimArray[float64]) error {
 	return check("d6", v, mdaVec("ts1.d6.to_service"))
 }
-func (t *Testroot) GetS1() (float32, error)   { return 7.8573, nil }
-func (t *Testroot) SetS1(v float32) error     { return check("s1", v, float32(3847.9283)) }
-func (t *Testroot) GetS2() ([]float32, error) { return vec[float32]("ts1.s2.to_client"), nil }
-func (t *Testroot) SetS2(v []float32) error   { return check("s2", v, vec[float32]("ts1.s2.to_service")) }
-func (t *Testroot) GetI8_1() (int8, error)    { return -66, nil }
-func (t *Testroot) SetI8_1(v int8) error      { return check("i8_1", v, int8(45)) }
-func (t *Testroot) GetI8_2() ([]int8, error)  { return vec[int8]("ts1.i8_2.to_client"), nil }
-func (t *Testroot) SetI8_2(v []int8) error    { return check("i8_2", v, vec[int8]("ts1.i8_2.to_service")) }
-func (t *Testroot) GetU8_1() (uint8, error)   { return 222, nil }
-func (t *Testroot) SetU8_1(v uint8) error     { return check("u8_1", v, uint8(232)) }
-func (t *Testroot) GetU8_2() ([]uint8, error) { return vec[uint8]("ts1.u8_2.to_client"), nil }
-func (t *Testroot) SetU8_2(v []uint8) error {
+func (t *Testroot) Get_s1(ctx context.Context) (float32, error) { return 7.8573, nil }
+func (t *Testroot) Set_s1(ctx context.Context, v float32) error {
+	return check("s1", v, float32(3847.9283))
+}
+func (t *Testroot) Get_s2(ctx context.Context) ([]float32, error) {
+	return vec[float32]("ts1.s2.to_client"), nil
+}
+func (t *Testroot) Set_s2(ctx context.Context, v []float32) error {
+	return check("s2", v, vec[float32]("ts1.s2.to_service"))
+}
+func (t *Testroot) Get_i8_1(ctx context.Context) (int8, error) { return -66, nil }
+func (t *Testroot) Set_i8_1(ctx context.Context, v int8) error { return check("i8_1", v, int8(45)) }
+func (t *Testroot) Get_i8_2(ctx context.Context) ([]int8, error) {
+	return vec[int8]("ts1.i8_2.to_client"), nil
+}
+func (t *Testroot) Set_i8_2(ctx context.Context, v []int8) error {
+	return check("i8_2", v, vec[int8]("ts1.i8_2.to_service"))
+}
+func (t *Testroot) Get_u8_1(ctx context.Context) (uint8, error) { return 222, nil }
+func (t *Testroot) Set_u8_1(ctx context.Context, v uint8) error { return check("u8_1", v, uint8(232)) }
+func (t *Testroot) Get_u8_2(ctx context.Context) ([]uint8, error) {
+	return vec[uint8]("ts1.u8_2.to_client"), nil
+}
+func (t *Testroot) Set_u8_2(ctx context.Context, v []uint8) error {
 	return check("u8_2", v, vec[uint8]("ts1.u8_2.to_service"))
 }
-func (t *Testroot) GetU8_3() (*rr.MultiDimArray[uint8], error) {
+func (t *Testroot) Get_u8_3(ctx context.Context) (*rr.MultiDimArray[uint8], error) {
 	return &rr.MultiDimArray[uint8]{Dims: vec[uint32]("ts1.u8_3.to_client.dims"), Array: vec[uint8]("ts1.u8_3.to_client")}, nil
 }
-func (t *Testroot) SetU8_3(v *rr.MultiDimArray[uint8]) error {
+func (t *Testroot) Set_u8_3(ctx context.Context, v *rr.MultiDimArray[uint8]) error {
 	return check("u8_3", v, &rr.MultiDimArray[uint8]{Dims: vec[uint32]("ts1.u8_3.to_service.dims"), Array: vec[uint8]("ts1.u8_3.to_service")})
 }
-func (t *Testroot) GetI16_1() (int16, error)   { return -13428, nil }
-func (t *Testroot) SetI16_1(v int16) error     { return check("i16_1", v, int16(2387)) }
-func (t *Testroot) GetI16_2() ([]int16, error) { return vec[int16]("ts1.i16_2.to_client"), nil }
-func (t *Testroot) SetI16_2(v []int16) error {
+func (t *Testroot) Get_i16_1(ctx context.Context) (int16, error) { return -13428, nil }
+func (t *Testroot) Set_i16_1(ctx context.Context, v int16) error {
+	return check("i16_1", v, int16(2387))
+}
+func (t *Testroot) Get_i16_2(ctx context.Context) ([]int16, error) {
+	return vec[int16]("ts1.i16_2.to_client"), nil
+}
+func (t *Testroot) Set_i16_2(ctx context.Context, v []int16) error {
 	return check("i16_2", v, vec[int16]("ts1.i16_2.to_service"))
 }
-func (t *Testroot) GetU16_1() (uint16, error)   { return 60981, nil }
-func (t *Testroot) SetU16_1(v uint16) error     { return check("u16_1", v, uint16(54732)) }
-func (t *Testroot) GetU16_2() ([]uint16, error) { return vec[uint16]("ts1.u16_2.to_client"), nil }
-func (t *Testroot) SetU16_2(v []uint16) error {
+func (t *Testroot) Get_u16_1(ctx context.Context) (uint16, error) { return 60981, nil }
+func (t *Testroot) Set_u16_1(ctx context.Context, v uint16) error {
+	return check("u16_1", v, uint16(54732))
+}
+func (t *Testroot) Get_u16_2(ctx context.Context) ([]uint16, error) {
+	return vec[uint16]("ts1.u16_2.to_client"), nil
+}
+func (t *Testroot) Set_u16_2(ctx context.Context, v []uint16) error {
 	return check("u16_2", v, vec[uint16]("ts1.u16_2.to_service"))
 }
-func (t *Testroot) GetI32_1() (int32, error)   { return 898734, nil }
-func (t *Testroot) SetI32_1(v int32) error     { return check("i32_1", v, int32(-9837284)) }
-func (t *Testroot) GetI32_2() ([]int32, error) { return vec[int32]("ts1.i32_2.to_client"), nil }
-func (t *Testroot) SetI32_2(v []int32) error {
+func (t *Testroot) Get_i32_1(ctx context.Context) (int32, error) { return 898734, nil }
+func (t *Testroot) Set_i32_1(ctx context.Context, v int32) error {
+	return check("i32_1", v, int32(-9837284))
+}
+func (t *Testroot) Get_i32_2(ctx context.Context) ([]int32, error) {
+	return vec[int32]("ts1.i32_2.to_client"), nil
+}
+func (t *Testroot) Set_i32_2(ctx context.Context, v []int32) error {
 	return check("i32_2", v, vec[int32]("ts1.i32_2.to_service"))
 }
-func (t *Testroot) GetI32_huge() ([]int32, error) {
+func (t *Testroot) Get_i32_huge(ctx context.Context) ([]int32, error) {
 	o := make([]int32, 2621440)
 	for i := range o {
 		o[i] = int32(i)
 	}
 	return o, nil
 }
-func (t *Testroot) SetI32_huge(v []int32) error {
+func (t *Testroot) Set_i32_huge(ctx context.Context, v []int32) error {
 	if len(v) != 2621440 {
 		return rr.NewOperationFailed("i32_huge: wrong length")
 	}
@@ -137,32 +174,46 @@ func (t *Testroot) SetI32_huge(v []int32) error {
 	}
 	return nil
 }
-func (t *Testroot) GetU32_1() (uint32, error)   { return 547919123, nil }
-func (t *Testroot) SetU32_1(v uint32) error     { return check("u32_1", v, uint32(1550099195)) }
-func (t *Testroot) GetU32_2() ([]uint32, error) { return vec[uint32]("ts1.u32_2.to_client"), nil }
-func (t *Testroot) SetU32_2(v []uint32) error {
+func (t *Testroot) Get_u32_1(ctx context.Context) (uint32, error) { return 547919123, nil }
+func (t *Testroot) Set_u32_1(ctx context.Context, v uint32) error {
+	return check("u32_1", v, uint32(1550099195))
+}
+func (t *Testroot) Get_u32_2(ctx context.Context) ([]uint32, error) {
+	return vec[uint32]("ts1.u32_2.to_client"), nil
+}
+func (t *Testroot) Set_u32_2(ctx context.Context, v []uint32) error {
 	return check("u32_2", v, vec[uint32]("ts1.u32_2.to_service"))
 }
-func (t *Testroot) GetI64_1() (int64, error)   { return -1357833931563696072, nil }
-func (t *Testroot) SetI64_1(v int64) error     { return check("i64_1", v, int64(8621740821050813024)) }
-func (t *Testroot) GetI64_2() ([]int64, error) { return vec[int64]("ts1.i64_2.to_client"), nil }
-func (t *Testroot) SetI64_2(v []int64) error {
+func (t *Testroot) Get_i64_1(ctx context.Context) (int64, error) { return -1357833931563696072, nil }
+func (t *Testroot) Set_i64_1(ctx context.Context, v int64) error {
+	return check("i64_1", v, int64(8621740821050813024))
+}
+func (t *Testroot) Get_i64_2(ctx context.Context) ([]int64, error) {
+	return vec[int64]("ts1.i64_2.to_client"), nil
+}
+func (t *Testroot) Set_i64_2(ctx context.Context, v []int64) error {
 	return check("i64_2", v, vec[int64]("ts1.i64_2.to_service"))
 }
-func (t *Testroot) GetU64_1() (uint64, error)   { return 13389861970863644378, nil }
-func (t *Testroot) SetU64_1(v uint64) error     { return check("u64_1", v, uint64(1465640522145789825)) }
-func (t *Testroot) GetU64_2() ([]uint64, error) { return vec[uint64]("ts1.u64_2.to_client"), nil }
-func (t *Testroot) SetU64_2(v []uint64) error {
+func (t *Testroot) Get_u64_1(ctx context.Context) (uint64, error) { return 13389861970863644378, nil }
+func (t *Testroot) Set_u64_1(ctx context.Context, v uint64) error {
+	return check("u64_1", v, uint64(1465640522145789825))
+}
+func (t *Testroot) Get_u64_2(ctx context.Context) ([]uint64, error) {
+	return vec[uint64]("ts1.u64_2.to_client"), nil
+}
+func (t *Testroot) Set_u64_2(ctx context.Context, v []uint64) error {
 	return check("u64_2", v, vec[uint64]("ts1.u64_2.to_service"))
 }
-func (t *Testroot) GetStr1() (string, error) { return "Hello Client!", nil }
-func (t *Testroot) SetStr1(v string) error   { return check("str1", v, "Hello Server!") }
+func (t *Testroot) Get_str1(ctx context.Context) (string, error) { return "Hello Client!", nil }
+func (t *Testroot) Set_str1(ctx context.Context, v string) error {
+	return check("str1", v, "Hello Server!")
+}
 
 // ---- structures
 
 func ts2s(name string) *ts1.Teststruct2 { return &ts1.Teststruct2{Mydat: vec[float64](name)} }
 
-func (t *Testroot) GetStruct1() (*ts1.Teststruct1, error) {
+func (t *Testroot) Get_struct1(ctx context.Context) (*ts1.Teststruct1, error) {
 	return &ts1.Teststruct1{
 		Dat1: vec[float64]("ts1.struct1.dat1.to_client"),
 		Str2: "Hello world!",
@@ -179,7 +230,7 @@ func (t *Testroot) GetStruct1() (*ts1.Teststruct1, error) {
 	}, nil
 }
 
-func (t *Testroot) SetStruct1(s *ts1.Teststruct1) error {
+func (t *Testroot) Set_struct1(ctx context.Context, s *ts1.Teststruct1) error {
 	if s == nil {
 		return rr.NewNullValue("struct1 is null")
 	}
@@ -198,175 +249,187 @@ func (t *Testroot) SetStruct1(s *ts1.Teststruct1) error {
 	)
 }
 
-func (t *Testroot) GetStruct2() (*ts1.Teststruct2, error) { return ts2s("ts1.struct2.to_client"), nil }
-func (t *Testroot) SetStruct2(v *ts1.Teststruct2) error {
+func (t *Testroot) Get_struct2(ctx context.Context) (*ts1.Teststruct2, error) {
+	return ts2s("ts1.struct2.to_client"), nil
+}
+func (t *Testroot) Set_struct2(ctx context.Context, v *ts1.Teststruct2) error {
 	return check("struct2", v, ts2s("ts1.struct2.to_service"))
 }
 
 // ---- maps
 
-func (t *Testroot) GetIs_d1() (map[int32]float64, error) {
+func (t *Testroot) Get_is_d1(ctx context.Context) (map[int32]float64, error) {
 	return map[int32]float64{9285: 1.643392e-01, 74822: 1.537133e+09, 4: 1.369505e-03}, nil
 }
-func (t *Testroot) SetIs_d1(v map[int32]float64) error {
+func (t *Testroot) Set_is_d1(ctx context.Context, v map[int32]float64) error {
 	return check("is_d1", v, map[int32]float64{928: 4.074501e-07, 394820: -4.535303e+05, 623: -2.956241e-20})
 }
-func (t *Testroot) GetIs_d2() (map[string]float64, error) {
+func (t *Testroot) Get_is_d2(ctx context.Context) (map[string]float64, error) {
 	return map[string]float64{"testval1": -1.079664e+16, "testval2": 2.224846e+00}, nil
 }
-func (t *Testroot) SetIs_d2(v map[string]float64) error {
+func (t *Testroot) Set_is_d2(ctx context.Context, v map[string]float64) error {
 	return check("is_d2", v, map[string]float64{"testval3": 5.242474e+10, "testval4": 2.208636e+08})
 }
-func (t *Testroot) GetIs_d3() (map[int32][]float64, error) {
+func (t *Testroot) Get_is_d3(ctx context.Context) (map[int32][]float64, error) {
 	return map[int32][]float64{12: vec[float64]("ts1.is_d3.to_client.a"), 832: vec[float64]("ts1.is_d3.to_client.b")}, nil
 }
-func (t *Testroot) SetIs_d3(v map[int32][]float64) error {
+func (t *Testroot) Set_is_d3(ctx context.Context, v map[int32][]float64) error {
 	return check("is_d3", v, map[int32][]float64{47: vec[float64]("ts1.is_d3.to_service.a"), 324: vec[float64]("ts1.is_d3.to_service.b")})
 }
-func (t *Testroot) GetIs_d4() (map[string][]float64, error) {
+func (t *Testroot) Get_is_d4(ctx context.Context) (map[string][]float64, error) {
 	return map[string][]float64{"testval1": vec[float64]("ts1.is_d4.to_client.a"), "testval2": vec[float64]("ts1.is_d4.to_client.b")}, nil
 }
-func (t *Testroot) SetIs_d4(v map[string][]float64) error {
+func (t *Testroot) Set_is_d4(ctx context.Context, v map[string][]float64) error {
 	return check("is_d4", v, map[string][]float64{"testval3": vec[float64]("ts1.is_d4.to_service.a"), "testval4": vec[float64]("ts1.is_d4.to_service.b")})
 }
-func (t *Testroot) GetIs_d5() (map[int32]*rr.MultiDimArray[float64], error) {
+func (t *Testroot) Get_is_d5(ctx context.Context) (map[int32]*rr.MultiDimArray[float64], error) {
 	return map[int32]*rr.MultiDimArray[float64]{564: mdaVec("ts1.is_d5.to_client")}, nil
 }
-func (t *Testroot) SetIs_d5(v map[int32]*rr.MultiDimArray[float64]) error {
+func (t *Testroot) Set_is_d5(ctx context.Context, v map[int32]*rr.MultiDimArray[float64]) error {
 	return check("is_d5", v, map[int32]*rr.MultiDimArray[float64]{328: mdaVec("ts1.is_d5.to_service")})
 }
-func (t *Testroot) GetIs_d6() (map[string]*rr.MultiDimArray[float64], error) {
+func (t *Testroot) Get_is_d6(ctx context.Context) (map[string]*rr.MultiDimArray[float64], error) {
 	return map[string]*rr.MultiDimArray[float64]{"testval1": mdaVec("ts1.is_d6.to_client")}, nil
 }
-func (t *Testroot) SetIs_d6(v map[string]*rr.MultiDimArray[float64]) error {
+func (t *Testroot) Set_is_d6(ctx context.Context, v map[string]*rr.MultiDimArray[float64]) error {
 	return check("is_d6", v, map[string]*rr.MultiDimArray[float64]{"testval2": mdaVec("ts1.is_d6.to_service")})
 }
-func (t *Testroot) GetIs_str1() (map[int32]string, error) {
+func (t *Testroot) Get_is_str1(ctx context.Context) (map[int32]string, error) {
 	return map[int32]string{23: "Hello server"}, nil
 }
-func (t *Testroot) SetIs_str1(v map[int32]string) error {
+func (t *Testroot) Set_is_str1(ctx context.Context, v map[int32]string) error {
 	return check("is_str1", v, map[int32]string{24: "Hello client"})
 }
-func (t *Testroot) GetIs_str2() (map[string]string, error) {
+func (t *Testroot) Get_is_str2(ctx context.Context) (map[string]string, error) {
 	return map[string]string{"testval1": "Hello server"}, nil
 }
-func (t *Testroot) SetIs_str2(v map[string]string) error {
+func (t *Testroot) Set_is_str2(ctx context.Context, v map[string]string) error {
 	return check("is_str2", v, map[string]string{"testval2": "Hello client"})
 }
-func (t *Testroot) GetIs_struct1() (map[int32]*ts1.Teststruct2, error) {
+func (t *Testroot) Get_is_struct1(ctx context.Context) (map[int32]*ts1.Teststruct2, error) {
 	return map[int32]*ts1.Teststruct2{748: ts2s("ts1.is_struct1.to_client")}, nil
 }
-func (t *Testroot) SetIs_struct1(v map[int32]*ts1.Teststruct2) error {
+func (t *Testroot) Set_is_struct1(ctx context.Context, v map[int32]*ts1.Teststruct2) error {
 	return check("is_struct1", v, map[int32]*ts1.Teststruct2{372: ts2s("ts1.is_struct1.to_service")})
 }
-func (t *Testroot) GetIs_struct2() (map[string]*ts1.Teststruct2, error) {
+func (t *Testroot) Get_is_struct2(ctx context.Context) (map[string]*ts1.Teststruct2, error) {
 	return map[string]*ts1.Teststruct2{"testval1": ts2s("ts1.is_struct2.to_client")}, nil
 }
-func (t *Testroot) SetIs_struct2(v map[string]*ts1.Teststruct2) error {
+func (t *Testroot) Set_is_struct2(ctx context.Context, v map[string]*ts1.Teststruct2) error {
 	return check("is_struct2", v, map[string]*ts1.Teststruct2{"testval2": ts2s("ts1.is_struct2.to_service")})
 }
 
 // ---- lists
 
-func (t *Testroot) GetList_d1() ([]float64, error) {
+func (t *Testroot) Get_list_d1(ctx context.Context) ([]float64, error) {
 	return []float64{1.643392e-01, 1.537133e+09, 1.369505e-03}, nil
 }
-func (t *Testroot) SetList_d1(v []float64) error {
+func (t *Testroot) Set_list_d1(ctx context.Context, v []float64) error {
 	return check("list_d1", v, []float64{4.074501e-07, -4.535303e+05, -2.956241e-20})
 }
-func (t *Testroot) GetList_d3() ([][]float64, error) {
+func (t *Testroot) Get_list_d3(ctx context.Context) ([][]float64, error) {
 	return [][]float64{vec[float64]("ts1.is_d3.to_client.a"), vec[float64]("ts1.is_d3.to_client.b")}, nil
 }
-func (t *Testroot) SetList_d3(v [][]float64) error {
+func (t *Testroot) Set_list_d3(ctx context.Context, v [][]float64) error {
 	return check("list_d3", v, [][]float64{vec[float64]("ts1.is_d3.to_service.a"), vec[float64]("ts1.is_d3.to_service.b")})
 }
-func (t *Testroot) GetList_d5() ([]*rr.MultiDimArray[float64], error) {
+func (t *Testroot) Get_list_d5(ctx context.Context) ([]*rr.MultiDimArray[float64], error) {
 	return []*rr.MultiDimArray[float64]{mdaVec("ts1.is_d5.to_client")}, nil
 }
-func (t *Testroot) SetList_d5(v []*rr.MultiDimArray[float64]) error {
+func (t *Testroot) Set_list_d5(ctx context.Context, v []*rr.MultiDimArray[float64]) error {
 	return check("list_d5", v, []*rr.MultiDimArray[float64]{mdaVec("ts1.is_d5.to_service")})
 }
-func (t *Testroot) GetList_str1() ([]string, error) { return []string{"Hello server"}, nil }
-func (t *Testroot) SetList_str1(v []string) error {
+func (t *Testroot) Get_list_str1(ctx context.Context) ([]string, error) {
+	return []string{"Hello server"}, nil
+}
+func (t *Testroot) Set_list_str1(ctx context.Context, v []string) error {
 	return check("list_str1", v, []string{"Hello client"})
 }
-func (t *Testroot) GetList_struct1() ([]*ts1.Teststruct2, error) {
+func (t *Testroot) Get_list_struct1(ctx context.Context) ([]*ts1.Teststruct2, error) {
 	return []*ts1.Teststruct2{ts2s("ts1.is_struct1.to_client")}, nil
 }
-func (t *Testroot) SetList_struct1(v []*ts1.Teststruct2) error {
+func (t *Testroot) Set_list_struct1(ctx context.Context, v []*ts1.Teststruct2) error {
 	return check("list_struct1", v, []*ts1.Teststruct2{ts2s("ts1.is_struct1.to_service")})
 }
 
-func (t *Testroot) GetStruct3() (*ts2.Ostruct2, error) {
+func (t *Testroot) Get_struct3(ctx context.Context) (*ts2.Ostruct2, error) {
 	return &ts2.Ostruct2{A1: vec[float64]("ts1.struct3.to_client")}, nil
 }
-func (t *Testroot) SetStruct3(v *ts2.Ostruct2) error {
+func (t *Testroot) Set_struct3(ctx context.Context, v *ts2.Ostruct2) error {
 	return check("struct3", v, &ts2.Ostruct2{A1: vec[float64]("ts1.struct3.to_service")})
 }
 
 // ---- varvalue
 
-func (t *Testroot) GetVar1() (any, error) {
+func (t *Testroot) Get_var1(ctx context.Context) (any, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	return t.var1, nil
 }
-func (t *Testroot) SetVar1(v any) error {
+func (t *Testroot) Set_var1(ctx context.Context, v any) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.var1 = v
 	return nil
 }
-func (t *Testroot) GetVar2() (map[int32]any, error) {
+func (t *Testroot) Get_var2(ctx context.Context) (map[int32]any, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	return t.var2, nil
 }
-func (t *Testroot) SetVar2(v map[int32]any) error {
+func (t *Testroot) Set_var2(ctx context.Context, v map[int32]any) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.var2 = v
 	return nil
 }
-func (t *Testroot) GetVar_num() (any, error) { return vec[int32]("ts1.var_num.to_client"), nil }
-func (t *Testroot) SetVar_num(v any) error {
+func (t *Testroot) Get_var_num(ctx context.Context) (any, error) {
+	return vec[int32]("ts1.var_num.to_client"), nil
+}
+func (t *Testroot) Set_var_num(ctx context.Context, v any) error {
 	return check("var_num", v, vec[int32]("ts1.var_num.to_service"))
 }
-func (t *Testroot) GetVar_str() (any, error) { return "Hello Client!", nil }
-func (t *Testroot) SetVar_str(v any) error   { return check("var_str", v, "Hello Server!") }
-func (t *Testroot) GetVar_struct() (any, error) {
+func (t *Testroot) Get_var_str(ctx context.Context) (any, error) { return "Hello Client!", nil }
+func (t *Testroot) Set_var_str(ctx context.Context, v any) error {
+	return check("var_str", v, "Hello Server!")
+}
+func (t *Testroot) Get_var_struct(ctx context.Context) (any, error) {
 	return ts2s("ts1.var_struct.to_client"), nil
 }
-func (t *Testroot) SetVar_struct(v any) error {
+func (t *Testroot) Set_var_struct(ctx context.Context, v any) error {
 	return check("var_struct", v, ts2s("ts1.var_struct.to_service"))
 }
-func (t *Testroot) GetVar_vector() (any, error) { return map[int32]any{10: "Hello Client!"}, nil }
-func (t *Testroot) SetVar_vector(v any) error {
+func (t *Testroot) Get_var_vector(ctx context.Context) (any, error) {
+	return map[int32]any{10: "Hello Client!"}, nil
+}
+func (t *Testroot) Set_var_vector(ctx context.Context, v any) error {
 	return check("var_vector", v, map[int32]any{11: "Hello Server!"})
 }
-func (t *Testroot) GetVar_dictionary() (any, error) {
+func (t *Testroot) Get_var_dictionary(ctx context.Context) (any, error) {
 	return map[string]any{"test1": "Hello Client!"}, nil
 }
-func (t *Testroot) SetVar_dictionary(v any) error {
+func (t *Testroot) Set_var_dictionary(ctx context.Context, v any) error {
 	return check("var_dictionary", v, map[string]any{"test2": "Hello Server!"})
 }
-func (t *Testroot) GetVar_list() (any, error) { return []any{"Hello Client!"}, nil }
-func (t *Testroot) SetVar_list(v any) error   { return check("var_list", v, []any{"Hello Server!"}) }
-func (t *Testroot) GetVar_multidimarray() (any, error) {
+func (t *Testroot) Get_var_list(ctx context.Context) (any, error) { return []any{"Hello Client!"}, nil }
+func (t *Testroot) Set_var_list(ctx context.Context, v any) error {
+	return check("var_list", v, []any{"Hello Server!"})
+}
+func (t *Testroot) Get_var_multidimarray(ctx context.Context) (any, error) {
 	return mdaVec("ts1.var_multidimarray.to_client"), nil
 }
-func (t *Testroot) SetVar_multidimarray(v any) error {
+func (t *Testroot) Set_var_multidimarray(ctx context.Context, v any) error {
 	return check("var_multidimarray", v, mdaVec("ts1.var_multidimarray.to_service"))
 }
 
-func (t *Testroot) GetErrtest() (float64, error) {
+func (t *Testroot) Get_errtest(ctx context.Context) (float64, error) {
 	return 0, rr.NewRemoteError("std::runtime_error", "This is a test")
 }
-func (t *Testroot) SetErrtest(float64) error {
+func (t *Testroot) Set_errtest(ctx context.Context, _ float64) error {
 	return rr.NewRemoteError("std::runtime_error", "This is a test")
 }
-func (t *Testroot) GetNulltest() (*ts1.Teststruct1, error) { return nil, nil }
-func (t *Testroot) SetNulltest(v *ts1.Teststruct1) error {
+func (t *Testroot) Get_nulltest(ctx context.Context) (*ts1.Teststruct1, error) { return nil, nil }
+func (t *Testroot) Set_nulltest(ctx context.Context, v *ts1.Teststruct1) error {
 	if v != nil {
 		return rr.NewOperationFailed("nulltest: expected null")
 	}
@@ -375,39 +438,45 @@ func (t *Testroot) SetNulltest(v *ts1.Teststruct1) error {
 
 // ---- functions and events
 
-func (t *Testroot) Func1() error {
+func (t *Testroot) Func1(ctx context.Context) error {
 	go func() {
 		time.Sleep(100 * time.Millisecond)
-		for _, h := range t.Ev1().Handlers() {
+		for _, h := range t.Get_ev1().Handlers() {
 			h()
 		}
 	}()
 	return nil
 }
 
-func (t *Testroot) Func2(d1, d2 float64) error {
+func (t *Testroot) Func2(ctx context.Context, d1, d2 float64) error {
 	go func() {
 		time.Sleep(200 * time.Millisecond)
 		s := &ts1.Teststruct2{Mydat: []float64{d2}}
-		for _, h := range t.Ev2().Handlers() {
+		for _, h := range t.Get_ev2().Handlers() {
 			h(d1, s)
 		}
 	}()
 	return nil
 }
 
-func (t *Testroot) Func3(d1, d2 float64) (float64, error) { return d1 + d2, nil }
-func (t *Testroot) Meaning_of_life() (int32, error)       { return 42, nil }
-func (t *Testroot) Func_errtest() error {
+func (t *Testroot) Func3(ctx context.Context, d1, d2 float64) (float64, error) { return d1 + d2, nil }
+func (t *Testroot) Meaning_of_life(ctx context.Context) (int32, error)         { return 42, nil }
+func (t *Testroot) Func_errtest(ctx context.Context) error {
 	return rr.NewRemoteError("std::runtime_error", "This is a test")
 }
-func (t *Testroot) Func_errtest1() error { return rr.NewDataTypeError("This is a test 1") }
-func (t *Testroot) Func_errtest2() error { return ts1.NewTestexception1("This is a test 2") }
-func (t *Testroot) Func_errtest3() error { return ts2.NewTestexception3("This is a test 3") }
+func (t *Testroot) Func_errtest1(ctx context.Context) error {
+	return rr.NewDataTypeError("This is a test 1")
+}
+func (t *Testroot) Func_errtest2(ctx context.Context) error {
+	return ts1.NewTestexception1("This is a test 2")
+}
+func (t *Testroot) Func_errtest3(ctx context.Context) error {
+	return ts2.NewTestexception3("This is a test 3")
+}
 
 // ---- objrefs
 
-func (t *Testroot) GetO1() (ts1.Sub1, error) { return t.o1, nil }
+func (t *Testroot) Get_o1(ctx context.Context) (ts1.Sub1, error) { return t.o1, nil }
 
 func getOrCreate[K comparable](mu *sync.Mutex, m map[K]*sub1Impl, k K, init func(*sub1Impl)) *sub1Impl {
 	mu.Lock()
@@ -421,28 +490,28 @@ func getOrCreate[K comparable](mu *sync.Mutex, m map[K]*sub1Impl, k K, init func
 	return o
 }
 
-func (t *Testroot) GetO2(ind int32) (ts1.Sub1, error) {
-	return getOrCreate(&t.mu, t.o2, ind, func(o *sub1Impl) { o.SetI_ind(ind) }), nil
+func (t *Testroot) Get_o2(ctx context.Context, ind int32) (ts1.Sub1, error) {
+	return getOrCreate(&t.mu, t.o2, ind, func(o *sub1Impl) { o.Set_i_ind(ctx, ind) }), nil
 }
-func (t *Testroot) GetO3(ind int32) (ts1.Sub1, error) {
-	return getOrCreate(&t.mu, t.o3, ind, func(o *sub1Impl) { o.SetI_ind(ind) }), nil
+func (t *Testroot) Get_o3(ctx context.Context, ind int32) (ts1.Sub1, error) {
+	return getOrCreate(&t.mu, t.o3, ind, func(o *sub1Impl) { o.Set_i_ind(ctx, ind) }), nil
 }
-func (t *Testroot) GetO4(ind string) (ts1.Sub1, error) {
-	return getOrCreate(&t.mu, t.o4, ind, func(o *sub1Impl) { o.SetS_ind(ind) }), nil
+func (t *Testroot) Get_o4(ctx context.Context, ind string) (ts1.Sub1, error) {
+	return getOrCreate(&t.mu, t.o4, ind, func(o *sub1Impl) { o.Set_s_ind(ctx, ind) }), nil
 }
-func (t *Testroot) GetO5() (ts2.Subobj, error) { return t.o5, nil }
-func (t *Testroot) GetO6() (any, error) {
+func (t *Testroot) Get_o5(ctx context.Context) (ts2.Subobj, error) { return t.o5, nil }
+func (t *Testroot) Get_o6(ctx context.Context) (any, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	return t.o6, nil
 }
 
-func (t *Testroot) O6_op(op int32) error {
+func (t *Testroot) O6_op(ctx context.Context, op int32) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if path, err := rr.CurrentServicePath(); err == nil {
-		if ctx, err := rr.CurrentServerContext(); err == nil {
-			_ = ctx.ReleaseServicePath(path + ".o6")
+	if path, err := rr.CurrentServicePath(ctx); err == nil {
+		if sc, err := rr.CurrentServerContext(ctx); err == nil {
+			_ = sc.ReleaseServicePath(path + ".o6")
 		}
 	}
 	switch op {
@@ -460,8 +529,8 @@ func (t *Testroot) O6_op(op int32) error {
 
 // ---- pipes
 
-func (t *Testroot) SetP1(p *rr.Pipe[[]float64]) {
-	t.TestrootDefaultImpl.SetP1(p)
+func (t *Testroot) Set_p1(p *rr.Pipe[[]float64]) {
+	t.TestrootDefaultImpl.Set_p1(p)
 	p.SetPipeConnectCallback(func(ep *rr.PipeEndpoint[[]float64]) {
 		ep.PacketReceivedEvent().Connect(func(ep *rr.PipeEndpoint[[]float64]) {
 			go func() {
@@ -473,7 +542,7 @@ func (t *Testroot) SetP1(p *rr.Pipe[[]float64]) {
 					if err != nil {
 						continue
 					}
-					n, err := ep.SendPacket(v)
+					n, err := ep.SendPacket(context.Background(), v)
 					if err == nil && !t.sent {
 						t.packetNum = n
 						t.sent = true
@@ -492,8 +561,8 @@ func (t *Testroot) SetP1(p *rr.Pipe[[]float64]) {
 	})
 }
 
-func (t *Testroot) SetP2(p *rr.Pipe[*ts1.Teststruct2]) {
-	t.TestrootDefaultImpl.SetP2(p)
+func (t *Testroot) Set_p2(p *rr.Pipe[*ts1.Teststruct2]) {
+	t.TestrootDefaultImpl.Set_p2(p)
 	var lock sync.Mutex
 	p.SetPipeConnectCallback(func(ep *rr.PipeEndpoint[*ts1.Teststruct2]) {
 		ep.PacketReceivedEvent().Connect(func(ep *rr.PipeEndpoint[*ts1.Teststruct2]) {
@@ -506,14 +575,14 @@ func (t *Testroot) SetP2(p *rr.Pipe[*ts1.Teststruct2]) {
 					if err != nil {
 						return
 					}
-					ep.SendPacket(v)
+					ep.SendPacket(context.Background(), v)
 				}
 			}()
 		})
 	})
 }
 
-func (t *Testroot) Pipe_check_error() error {
+func (t *Testroot) Pipe_check_error(ctx context.Context) error {
 	t.p1Lock.Lock()
 	defer t.p1Lock.Unlock()
 	if !t.ackRecv {
@@ -522,8 +591,8 @@ func (t *Testroot) Pipe_check_error() error {
 	return nil
 }
 
-func (t *Testroot) SetBroadcastpipe(p *rr.Pipe[float64]) {
-	t.TestrootDefaultImpl.SetBroadcastpipe(p)
+func (t *Testroot) Set_broadcastpipe(p *rr.Pipe[float64]) {
+	t.TestrootDefaultImpl.Set_broadcastpipe(p)
 	b, err := rr.NewPipeBroadcaster(p, 3)
 	if err != nil {
 		return
@@ -547,23 +616,23 @@ func (t *Testroot) SetBroadcastpipe(p *rr.Pipe[float64]) {
 
 // ---- callbacks
 
-func (t *Testroot) Test_callbacks() error {
-	ep, err := rr.CurrentEndpoint()
+func (t *Testroot) Test_callbacks(ctx context.Context) error {
+	ep, err := rr.CurrentEndpoint(ctx)
 	if err != nil {
 		return err
 	}
-	cb1, err := t.Cb1().GetClientFunction(ep)
+	cb1, err := t.Get_cb1().GetClientFunction(ep)
 	if err != nil {
 		return err
 	}
 	if err := cb1(); err != nil {
 		return err
 	}
-	cb2, _ := t.Cb2().GetClientFunction(ep)
+	cb2, _ := t.Get_cb2().GetClientFunction(ep)
 	if err := cb2(739.2, 0.392); err != nil {
 		return err
 	}
-	cb3, _ := t.Cb3().GetClientFunction(ep)
+	cb3, _ := t.Get_cb3().GetClientFunction(ep)
 	res, err := cb3(34, 45)
 	if err != nil {
 		return err
@@ -571,7 +640,7 @@ func (t *Testroot) Test_callbacks() error {
 	if err := check("cb3", res, 34+45+3.14); err != nil {
 		return err
 	}
-	mol, _ := t.Cb_meaning_of_life().GetClientFunction(ep)
+	mol, _ := t.Get_cb_meaning_of_life().GetClientFunction(ep)
 	v, err := mol()
 	if err != nil {
 		return err
@@ -579,7 +648,7 @@ func (t *Testroot) Test_callbacks() error {
 	if err := check("cb_meaning_of_life", v, int32(42)); err != nil {
 		return err
 	}
-	cbe, _ := t.Cb_errtest().GetClientFunction(ep)
+	cbe, _ := t.Get_cb_errtest().GetClientFunction(ep)
 	if err := cbe(); err == nil {
 		return rr.NewOperationFailed("cb_errtest: expected error")
 	}
@@ -598,23 +667,23 @@ func echoWire[T any](w *rr.Wire[T]) {
 	})
 }
 
-func (t *Testroot) SetW1(w *rr.Wire[[]float64]) {
-	t.TestrootDefaultImpl.SetW1(w)
+func (t *Testroot) Set_w1(w *rr.Wire[[]float64]) {
+	t.TestrootDefaultImpl.Set_w1(w)
 	echoWire(w)
 }
 
-func (t *Testroot) SetW2(w *rr.Wire[*ts1.Teststruct2]) {
-	t.TestrootDefaultImpl.SetW2(w)
+func (t *Testroot) Set_w2(w *rr.Wire[*ts1.Teststruct2]) {
+	t.TestrootDefaultImpl.Set_w2(w)
 	echoWire(w)
 }
 
-func (t *Testroot) SetW3(w *rr.Wire[*rr.MultiDimArray[int32]]) {
-	t.TestrootDefaultImpl.SetW3(w)
+func (t *Testroot) Set_w3(w *rr.Wire[*rr.MultiDimArray[int32]]) {
+	t.TestrootDefaultImpl.Set_w3(w)
 	echoWire(w)
 }
 
-func (t *Testroot) SetBroadcastwire(w *rr.Wire[float64]) {
-	t.TestrootDefaultImpl.SetBroadcastwire(w)
+func (t *Testroot) Set_broadcastwire(w *rr.Wire[float64]) {
+	t.TestrootDefaultImpl.Set_broadcastwire(w)
 	b, err := rr.NewWireBroadcaster(w)
 	if err != nil {
 		return
@@ -638,9 +707,9 @@ func (t *Testroot) SetBroadcastwire(w *rr.Wire[float64]) {
 
 // ---- memories
 
-func (t *Testroot) M1() rr.ArrayMemory[float64]         { return t.m1 }
-func (t *Testroot) M2() rr.MultiDimArrayMemory[float64] { return t.m2 }
-func (t *Testroot) M3() rr.MultiDimArrayMemory[uint8]   { return t.m3 }
+func (t *Testroot) Get_m1() rr.ArrayMemory[float64]         { return t.m1 }
+func (t *Testroot) Get_m2() rr.MultiDimArrayMemory[float64] { return t.m2 }
+func (t *Testroot) Get_m3() rr.MultiDimArrayMemory[uint8]   { return t.m3 }
 
 // ---- sub objects
 
@@ -656,26 +725,26 @@ func newSub1() *sub1Impl {
 	return &sub1Impl{o2_1: newSub2(), o2_2: map[int32]*sub2Impl{}, o2_3: map[string]*sub2Impl{}}
 }
 
-func (s *sub1Impl) GetO2_1() (ts1.Sub2, error) { return s.o2_1, nil }
-func (s *sub1Impl) GetO2_2(ind int32) (ts1.Sub2, error) {
+func (s *sub1Impl) Get_o2_1(ctx context.Context) (ts1.Sub2, error) { return s.o2_1, nil }
+func (s *sub1Impl) Get_o2_2(ctx context.Context, ind int32) (ts1.Sub2, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if o, ok := s.o2_2[ind]; ok {
 		return o, nil
 	}
 	o := newSub2()
-	o.SetI_ind(ind)
+	o.Set_i_ind(ctx, ind)
 	s.o2_2[ind] = o
 	return o, nil
 }
-func (s *sub1Impl) GetO2_3(ind string) (ts1.Sub2, error) {
+func (s *sub1Impl) Get_o2_3(ctx context.Context, ind string) (ts1.Sub2, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if o, ok := s.o2_3[ind]; ok {
 		return o, nil
 	}
 	o := newSub2()
-	o.SetS_ind(ind)
+	o.Set_s_ind(ctx, ind)
 	s.o2_3[ind] = o
 	return o, nil
 }
@@ -691,7 +760,7 @@ type sub2Impl struct {
 
 func newSub2() *sub2Impl { return &sub2Impl{o3_1: map[string]*sub3Impl{}} }
 
-func (s *sub2Impl) GetO3_1(ind string) (ts1.Sub3, error) {
+func (s *sub2Impl) Get_o3_1(ctx context.Context, ind string) (ts1.Sub3, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if o, ok := s.o3_1[ind]; ok {
@@ -709,14 +778,14 @@ type sub3Impl struct {
 	ind string
 }
 
-func (s *sub3Impl) GetInd() (string, error)        { return s.ind, nil }
-func (s *sub3Impl) SetInd(string) error            { return nil }
-func (s *sub3Impl) Add(d float64) (float64, error) { return d + 42, nil }
+func (s *sub3Impl) Get_ind(ctx context.Context) (string, error)         { return s.ind, nil }
+func (s *sub3Impl) Set_ind(ctx context.Context, _ string) error         { return nil }
+func (s *sub3Impl) Add(ctx context.Context, d float64) (float64, error) { return d + 42, nil }
 
 // TestService2SubObj implements com.robotraconteur.testing.TestService2.subobj.
 type TestService2SubObj struct{}
 
-func (TestService2SubObj) Add_val(v float64) (float64, error) { return v + 1, nil }
+func (TestService2SubObj) Add_val(ctx context.Context, v float64) (float64, error) { return v + 1, nil }
 func (TestService2SubObj) RRObjectType() string {
 	return "com.robotraconteur.testing.TestService2.subobj"
 }

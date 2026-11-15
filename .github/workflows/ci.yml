@@ -6,10 +6,10 @@ on:
 
 env:
   # Upstream core plus the fixes in gen/upstream_merge/core-patches (branch
-  # rr-go-core-fixes of this repository; its tip commit carries [skip ci] so the
+  # rr-go-green-sync of this repository; its tip commit carries [skip ci] so the
   # upstream workflows do not run on it).
   RR_REPO: johnwason/github-actions-scratch
-  RR_REF: 15906db63d9770024c90e803929941dd92026209
+  RR_REF: 5d20efc38eda98710318a50a1547108e4df213c8
 
 jobs:
   linux:

@@ -40,9 +40,10 @@ func TestMain(m *testing.M) {
 }
 
 func TestClient(t *testing.T) {
+	ctx := t.Context()
 	var out bytes.Buffer
 	url := fmt.Sprintf("rr+tcp://localhost:%d?service=reynard", testPort)
-	if err := run(node, url, &out); err != nil {
+	if err := run(ctx, node, url, &out); err != nil {
 		t.Fatal(err)
 	}
 	s := out.String()
@@ -52,23 +53,23 @@ func TestClient(t *testing.T) {
 		}
 	}
 
-	obj, err := node.ConnectService(url)
+	obj, err := node.ConnectService(ctx, url)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer node.DisconnectService(obj)
 	c := obj.(reynard.Reynard)
-	pos, err := c.GetRobot_position()
+	pos, err := c.Get_robot_position(ctx)
 	// teleported to (0.1,-0.2), then drove at (0.5,-0.2) for about 1 s
 	if err != nil || len(pos) != 2 || pos[0] < 0.4 || pos[0] > 0.8 || pos[1] > -0.3 {
 		t.Errorf("robot position %v %v", pos, err)
 	}
-	q, err := c.Getf_arm_position()
+	q, err := c.Getf_arm_position(ctx)
 	// drove the arm at (10,-30,-15) deg/s for 1.5 s from (100,-30,-70) deg
 	if err != nil || len(q) != 3 || q[0] < deg(110) || q[0] > deg(120) {
 		t.Errorf("arm position %v %v", q, err)
 	}
-	err = c.Drive_robot(1, 0, -1, true)
+	err = c.Drive_robot(ctx, 1, 0, -1, true)
 	if !errors.Is(err, rr.ErrInvalidArgument) {
 		t.Errorf("expected InvalidArgument, got %v", err)
 	}

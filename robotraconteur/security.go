@@ -153,26 +153,6 @@ func (f UserAuthenticatorFunc) nativeAuthenticator() (swig.NativeUserAuthenticat
 	})
 }
 
-// CurrentAuthenticatedUser returns the user authenticated on the client
-// connection of the current request (service member implementations only).
-func CurrentAuthenticatedUser() (*AuthenticatedUser, error) {
-	u, err := call(func() swig.AuthenticatedUser { return swig.ServerEndpointGetCurrentAuthenticatedUser() })
-	if err != nil {
-		return nil, err
-	}
-	if u == nil || u.Swigcptr() == 0 {
-		return nil, NewAuthenticationError("no authenticated user")
-	}
-	defer swig.DeleteAuthenticatedUser(u)
-	return &AuthenticatedUser{
-		Username:       u.GetUsername(),
-		Privileges:     vectorStrings(u.GetPrivileges()),
-		Properties:     vectorStrings(u.GetProperties()),
-		LoginTime:      timeFromMicros(u.GetLoginTime()),
-		LastAccessTime: timeFromMicros(u.GetLastAccessTime()),
-	}, nil
-}
-
 func vectorStrings(v swig.Vectorstring) []string {
 	defer swig.DeleteVectorstring(v)
 	n := int(v.Size())

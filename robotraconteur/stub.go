@@ -1,7 +1,7 @@
 package robotraconteur
 
 import (
-	"time"
+	"context"
 
 	swig "github.com/robotraconteur/robotraconteur_go/robotraconteur/internal/swig"
 )
@@ -87,166 +87,87 @@ func (b *StubBase) RRInit(obj StubImpl) error {
 	return callVoid(func() { b.inner.SetRRDirector(b.director, id) })
 }
 
-// PropertyGet reads a property.
-func (b *StubBase) PropertyGet(name string) (*Element, error) {
-	var out *Element
-	var cerr error
-	err := callVoid(func() {
-		m := b.inner.PropertyGet(name)
-		if m == nil || m.Swigcptr() == 0 {
-			return
+// awaitRequest starts a request that completes with a message element.
+func (b *StubBase) awaitRequest(ctx context.Context, start func(timeout int32, d swig.AsyncRequestDirector, id int32) error) (*Element, error) {
+	return await(ctx, func(done func(*Element, error)) error {
+		d, id := newAsyncRequest(done)
+		if err := start(b.node.requestTimeoutMs(ctx), d, id); err != nil {
+			heapRemove(id)
+			return err
 		}
-		defer swig.DeleteMessageElement(m)
-		out, cerr = fromNative(m)
+		return nil
+	}, nil)
+}
+
+// RRPropertyGet reads a property.
+func (b *StubBase) RRPropertyGet(ctx context.Context, name string) (*Element, error) {
+	return b.awaitRequest(ctx, func(t int32, d swig.AsyncRequestDirector, id int32) error {
+		return startNative(func() error { b.inner.Async_PropertyGet(name, t, d, id); return nil })
 	})
-	if err != nil {
-		return nil, err
-	}
-	return out, cerr
 }
 
-// PropertySet writes a property.
-func (b *StubBase) PropertySet(name string, value *Element) error {
-	var cerr error
-	err := callVoid(func() {
-		m, err := toNative(value)
-		if err != nil {
-			cerr = err
-			return
-		}
-		defer swig.DeleteMessageElement(m)
-		b.inner.PropertySet(name, m)
+// RRPropertySet writes a property.
+func (b *StubBase) RRPropertySet(ctx context.Context, name string, value *Element) error {
+	_, err := b.awaitRequest(ctx, func(t int32, d swig.AsyncRequestDirector, id int32) error {
+		return startNative(func() error {
+			m, err := toNative(value)
+			if err != nil {
+				return err
+			}
+			defer swig.DeleteMessageElement(m)
+			b.inner.Async_PropertySet(name, m, t, d, id)
+			return nil
+		})
 	})
-	if err != nil {
-		return err
-	}
-	return cerr
+	return err
 }
 
-// FunctionCall calls a function. The returned element is nil for void functions.
-func (b *StubBase) FunctionCall(name string, args []*Element) (*Element, error) {
-	var out *Element
-	var cerr error
-	err := callVoid(func() {
-		vec, err := elementsToNative(args)
-		if err != nil {
-			cerr = err
-			return
-		}
-		defer swig.DeleteVectorptr_messageelement(vec)
-		m := b.inner.FunctionCall(name, vec)
-		if m == nil || m.Swigcptr() == 0 {
-			return
-		}
-		defer swig.DeleteMessageElement(m)
-		out, cerr = fromNative(m)
+// RRFunctionCall calls a function. The returned element is nil for void functions.
+func (b *StubBase) RRFunctionCall(ctx context.Context, name string, args []*Element) (*Element, error) {
+	return b.awaitRequest(ctx, func(t int32, d swig.AsyncRequestDirector, id int32) error {
+		return startNative(func() error {
+			vec, err := elementsToNative(args)
+			if err != nil {
+				return err
+			}
+			defer swig.DeleteVectorptr_messageelement(vec)
+			b.inner.Async_FunctionCall(name, vec, t, d, id)
+			return nil
+		})
 	})
-	if err != nil {
-		return nil, err
-	}
-	return out, cerr
 }
 
-// AsyncPropertyGet reads a property asynchronously.
-func (b *StubBase) AsyncPropertyGet(name string, timeout time.Duration, handler func(*Element, error)) {
-	d, id := newAsyncRequest(handler)
-	if err := callVoid(func() { b.inner.Async_PropertyGet(name, timeoutMs(timeout), d, id) }); err != nil {
-		heapRemove(id)
-		go handler(nil, err)
-	}
-}
-
-// AsyncPropertySet writes a property asynchronously.
-func (b *StubBase) AsyncPropertySet(name string, value *Element, timeout time.Duration, handler func(error)) {
-	d, id := newAsyncRequest(func(_ *Element, err error) { handler(err) })
-	var cerr error
-	err := callVoid(func() {
-		m, err := toNative(value)
-		if err != nil {
-			cerr = err
-			return
-		}
-		defer swig.DeleteMessageElement(m)
-		b.inner.Async_PropertySet(name, m, timeoutMs(timeout), d, id)
-	})
-	if cerr != nil {
-		err = cerr
-	}
-	if err != nil {
-		heapRemove(id)
-		go handler(err)
-	}
-}
-
-// AsyncFunctionCall calls a function asynchronously.
-func (b *StubBase) AsyncFunctionCall(name string, args []*Element, timeout time.Duration, handler func(*Element, error)) {
-	d, id := newAsyncRequest(handler)
-	var cerr error
-	err := callVoid(func() {
-		vec, err := elementsToNative(args)
-		if err != nil {
-			cerr = err
-			return
-		}
-		defer swig.DeleteVectorptr_messageelement(vec)
-		b.inner.Async_FunctionCall(name, vec, timeoutMs(timeout), d, id)
-	})
-	if cerr != nil {
-		err = cerr
-	}
-	if err != nil {
-		heapRemove(id)
-		go handler(nil, err)
-	}
-}
-
-// FindObjRef returns the object reference for an objref member. index is
+// RRFindObjRef returns the object reference for an objref member. index is
 // empty for non-indexed objrefs; objectType optionally requests a type.
-func (b *StubBase) FindObjRef(name, index, objectType string) (any, error) {
-	ws, err := call(func() swig.WrappedServiceStub {
-		switch {
-		case index == "" && objectType == "":
-			return swig.SwigcptrWrappedServiceStub(b.inner.Swigcptr()).FindObjRef__SWIG_0(name)
-		case objectType == "":
-			return swig.SwigcptrWrappedServiceStub(b.inner.Swigcptr()).FindObjRef__SWIG_1(name, index)
-		case index == "":
-			return swig.SwigcptrWrappedServiceStub(b.inner.Swigcptr()).FindObjRefTyped__SWIG_0(name, objectType)
-		default:
-			return swig.SwigcptrWrappedServiceStub(b.inner.Swigcptr()).FindObjRefTyped__SWIG_1(name, index, objectType)
+func (b *StubBase) RRFindObjRef(ctx context.Context, name, index, objectType string) (any, error) {
+	return await(ctx, func(done func(any, error)) error {
+		d, id := newAsyncStub(b.node, done)
+		t := b.node.requestTimeoutMs(ctx)
+		s := swig.SwigcptrWrappedServiceStub(b.inner.Swigcptr())
+		err := startNative(func() error {
+			switch {
+			case index == "" && objectType == "":
+				s.Async_FindObjRef__SWIG_0(name, t, d, id)
+			case objectType == "":
+				s.Async_FindObjRef__SWIG_1(name, index, t, d, id)
+			case index == "":
+				s.Async_FindObjRefTyped__SWIG_0(name, objectType, t, d, id)
+			default:
+				s.Async_FindObjRefTyped__SWIG_1(name, index, objectType, t, d, id)
+			}
+			return nil
+		})
+		if err != nil {
+			heapRemove(id)
 		}
-	})
-	if err != nil {
-		return nil, err
-	}
-	return b.node.stubFromNative(ws)
-}
-
-// AsyncFindObjRef returns an object reference asynchronously.
-func (b *StubBase) AsyncFindObjRef(name, index, objectType string, timeout time.Duration, handler func(any, error)) {
-	d, id := newAsyncStub(b.node, handler)
-	t := timeoutMs(timeout)
-	err := callVoid(func() {
-		switch {
-		case index == "" && objectType == "":
-			swig.SwigcptrWrappedServiceStub(b.inner.Swigcptr()).Async_FindObjRef__SWIG_0(name, t, d, id)
-		case objectType == "":
-			swig.SwigcptrWrappedServiceStub(b.inner.Swigcptr()).Async_FindObjRef__SWIG_1(name, index, t, d, id)
-		case index == "":
-			swig.SwigcptrWrappedServiceStub(b.inner.Swigcptr()).Async_FindObjRefTyped__SWIG_0(name, objectType, t, d, id)
-		default:
-			swig.SwigcptrWrappedServiceStub(b.inner.Swigcptr()).Async_FindObjRefTyped__SWIG_1(name, index, objectType, t, d, id)
-		}
-	})
-	if err != nil {
-		heapRemove(id)
-		go handler(nil, err)
-	}
+		return err
+	}, nil)
 }
 
 // FindObjRefTyped is a typed helper for generated objref accessors.
-func FindObjRefTyped[T any](b *StubBase, name, index, objectType string) (T, error) {
+func FindObjRefTyped[T any](ctx context.Context, b *StubBase, name, index, objectType string) (T, error) {
 	var zero T
-	o, err := b.FindObjRef(name, index, objectType)
+	o, err := b.RRFindObjRef(ctx, name, index, objectType)
 	if err != nil {
 		return zero, err
 	}

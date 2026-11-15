@@ -1,82 +1,81 @@
 package testservices
 
-// Go port of asynctestroot_impl (robotraconteur/test/cpp/service/ServiceTest3.cpp):
-// a service implemented with asynchronous member functions.
+// Go port of asynctestroot_impl (robotraconteur/test/cpp/service/ServiceTest3.cpp).
+// The C++ service implements its members asynchronously; in Go every service
+// member already runs on its own goroutine, so the port is a plain blocking
+// implementation (the sleeps stand in for the C++ deferred completions).
 
 import (
+	"context"
 	"time"
 
 	rr "github.com/robotraconteur/robotraconteur_go/robotraconteur"
 	ts5 "github.com/robotraconteur/robotraconteur_go/test/gen/com__robotraconteur__testing__testservice5"
 )
 
-// Asynctestroot implements com.robotraconteur.testing.TestService5.asynctestroot
-// through the AsyncAsynctestroot interface.
+// Asynctestroot implements com.robotraconteur.testing.TestService5.asynctestroot.
 type Asynctestroot struct {
 	ts5.AsynctestrootDefaultImpl
 }
 
-var _ ts5.AsyncAsynctestroot = (*Asynctestroot)(nil)
+var _ ts5.Asynctestroot = (*Asynctestroot)(nil)
 
 func notImpl() error { return rr.NewNotImplementedError("") }
 
-func (a *Asynctestroot) AsyncGetD1(_ time.Duration, h func(float64, error)) { go h(8.5515, nil) }
-func (a *Asynctestroot) AsyncSetD1(v float64, _ time.Duration, h func(error)) {
-	if v == 3.0819 {
-		go h(nil)
-		return
-	}
-	go h(rr.NewInvalidArgument(""))
-}
-func (a *Asynctestroot) AsyncGetS1(_ time.Duration, h func(string, error))      { h("", notImpl()) }
-func (a *Asynctestroot) AsyncSetS1(string, time.Duration, func(error))          {}
-func (a *Asynctestroot) AsyncGetD2(_ time.Duration, h func([]float64, error))   { h(nil, notImpl()) }
-func (a *Asynctestroot) AsyncSetD2(_ []float64, _ time.Duration, h func(error)) { h(notImpl()) }
-func (a *Asynctestroot) AsyncGetS2(_ time.Duration, h func([]string, error))    { h(nil, notImpl()) }
-func (a *Asynctestroot) AsyncSetS2(_ []string, _ time.Duration, h func(error))  { h(notImpl()) }
-func (a *Asynctestroot) AsyncGetS3(_ time.Duration, h func(*ts5.Teststruct4, error)) {
-	h(nil, notImpl())
-}
-func (a *Asynctestroot) AsyncSetS3(_ *ts5.Teststruct4, _ time.Duration, h func(error)) { h(notImpl()) }
-func (a *Asynctestroot) AsyncGetErr(_ time.Duration, h func(float64, error)) {
-	go h(0, rr.NewInvalidArgument("Test message 1"))
-}
-func (a *Asynctestroot) AsyncSetErr(_ float64, _ time.Duration, h func(error)) {
-	go h(rr.NewInvalidOperation("Test message 2"))
-}
-func (a *Asynctestroot) AsyncF1(_ time.Duration, h func(error)) { go h(nil) }
-func (a *Asynctestroot) AsyncF2(v int32, _ time.Duration, h func(error)) {
-	if v == 247 {
-		go h(nil)
-		return
-	}
-	go h(rr.NewInvalidArgument(""))
-}
-func (a *Asynctestroot) AsyncF3(x, y float64, _ time.Duration, h func(int32, error)) {
-	go h(int32(x+y), nil)
-}
-func (a *Asynctestroot) AsyncErr_func(_ time.Duration, h func(error)) {
-	go h(rr.NewInvalidOperation(""))
-}
-func (a *Asynctestroot) AsyncErr_func2(_ time.Duration, h func(float64, error)) {
-	go h(0, ts5.NewAsynctestexp(""))
-}
+// deferred simulates a completion from another thread.
+func deferred() { time.Sleep(time.Millisecond) }
 
-// Async generator functions are not used by the service skeleton (it calls
-// the synchronous ones, as in C++); NotImplemented as in ServiceTest3.cpp.
-func (a *Asynctestroot) AsyncF4(_ time.Duration, h func(rr.Generator2[float64], error)) {
-	go h(nil, rr.NewNotImplementedError(""))
+func (a *Asynctestroot) Get_d1(ctx context.Context) (float64, error) {
+	deferred()
+	return 8.5515, nil
 }
-func (a *Asynctestroot) AsyncF5(_ float64, _ time.Duration, h func(rr.Generator3[float64], error)) {
-	go h(nil, rr.NewNotImplementedError(""))
+func (a *Asynctestroot) Set_d1(ctx context.Context, v float64) error {
+	deferred()
+	if v == 3.0819 {
+		return nil
+	}
+	return rr.NewInvalidArgument("")
 }
-func (a *Asynctestroot) AsyncF6(_ float64, _ time.Duration, h func(rr.Generator1[*ts5.Teststruct4, *ts5.Teststruct5], error)) {
-	go h(nil, rr.NewNotImplementedError(""))
+func (a *Asynctestroot) Get_s1(ctx context.Context) (string, error)           { return "", notImpl() }
+func (a *Asynctestroot) Set_s1(ctx context.Context, _ string) error           { return notImpl() }
+func (a *Asynctestroot) Get_d2(ctx context.Context) ([]float64, error)        { return nil, notImpl() }
+func (a *Asynctestroot) Set_d2(ctx context.Context, _ []float64) error        { return notImpl() }
+func (a *Asynctestroot) Get_s2(ctx context.Context) ([]string, error)         { return nil, notImpl() }
+func (a *Asynctestroot) Set_s2(ctx context.Context, _ []string) error         { return notImpl() }
+func (a *Asynctestroot) Get_s3(ctx context.Context) (*ts5.Teststruct4, error) { return nil, notImpl() }
+func (a *Asynctestroot) Set_s3(ctx context.Context, _ *ts5.Teststruct4) error { return notImpl() }
+func (a *Asynctestroot) Get_err(ctx context.Context) (float64, error) {
+	deferred()
+	return 0, rr.NewInvalidArgument("Test message 1")
 }
-func (a *Asynctestroot) AsyncErr_func3(_ time.Duration, h func(rr.Generator2[float64], error)) {
-	go h(nil, rr.NewNotImplementedError(""))
+func (a *Asynctestroot) Set_err(ctx context.Context, _ float64) error {
+	deferred()
+	return rr.NewInvalidOperation("Test message 2")
 }
-func (a *Asynctestroot) Err_func3() (rr.Generator2[float64], error) {
+func (a *Asynctestroot) F1(ctx context.Context) error {
+	deferred()
+	return nil
+}
+func (a *Asynctestroot) F2(ctx context.Context, v int32) error {
+	deferred()
+	if v == 247 {
+		return nil
+	}
+	return rr.NewInvalidArgument("")
+}
+func (a *Asynctestroot) F3(ctx context.Context, x, y float64) (int32, error) {
+	deferred()
+	return int32(x + y), nil
+}
+func (a *Asynctestroot) Err_func(ctx context.Context) error {
+	deferred()
+	return rr.NewInvalidOperation("")
+}
+func (a *Asynctestroot) Err_func2(ctx context.Context) (float64, error) {
+	deferred()
+	return 0, ts5.NewAsynctestexp("")
+}
+func (a *Asynctestroot) Err_func3(ctx context.Context) (rr.Generator2[float64], error) {
 	return nil, rr.NewInvalidOperation("")
 }
 

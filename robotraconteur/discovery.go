@@ -1,6 +1,7 @@
 package robotraconteur
 
 import (
+	"context"
 	"time"
 
 	swig "github.com/robotraconteur/robotraconteur_go/robotraconteur/internal/swig"
@@ -76,64 +77,82 @@ func schemesOrDefault(s []string) []string {
 	return s
 }
 
+// discoveryTimeout bounds discovery operations without a ctx deadline.
+const discoveryTimeout = 5 * time.Second
+
 // FindServiceByType finds services implementing serviceType (fully qualified
-// object type) using discovery on the given transport schemes.
-func (n *Node) FindServiceByType(serviceType string, schemes ...string) ([]ServiceInfo2, error) {
-	return call(func() []ServiceInfo2 {
-		sv := stringsToNative(schemesOrDefault(schemes))
-		defer swig.DeleteVectorstring(sv)
-		r := swig.WrappedFindServiceByType(n.native, serviceType, sv)
-		if r == nil || r.Swigcptr() == 0 {
+// object type) using discovery on the given transport schemes. It waits up
+// to the ctx deadline, or 5 seconds, for candidates to respond.
+func (n *Node) FindServiceByType(ctx context.Context, serviceType string, schemes ...string) ([]ServiceInfo2, error) {
+	return await(ctx, func(done func([]ServiceInfo2, error)) error {
+		impl := &asyncServiceInfo2{handler: done}
+		d := swig.NewDirectorAsyncServiceInfo2VectorReturnDirector(impl)
+		id := heapAdd(impl, func() { swig.DeleteDirectorAsyncServiceInfo2VectorReturnDirector(d) })
+		t := ctxTimeoutMs(ctx, discoveryTimeout)
+		err := startNative(func() error {
+			sv := stringsToNative(schemesOrDefault(schemes))
+			defer swig.DeleteVectorstring(sv)
+			swig.AsyncWrappedFindServiceByType(n.native, serviceType, sv, t, d, id)
 			return nil
+		})
+		if err != nil {
+			heapRemove(id)
 		}
-		defer swig.DeleteVectorserviceinfo2wrapped(r)
-		o := make([]ServiceInfo2, r.Size())
-		for i := range o {
-			o[i] = serviceInfo2FromNative(r.Get(i))
-		}
-		return o
-	})
+		return err
+	}, nil)
 }
 
-func nodeInfos(r swig.Vectornodeinfo2) []NodeInfo2 {
-	if r == nil || r.Swigcptr() == 0 {
-		return nil
-	}
-	defer swig.DeleteVectornodeinfo2(r)
-	o := make([]NodeInfo2, r.Size())
-	for i := range o {
-		o[i] = nodeInfo2FromNative(r.Get(i))
-	}
-	return o
+func (n *Node) awaitNodeInfos(ctx context.Context, start func(t int32, d swig.AsyncNodeInfo2VectorReturnDirector, id int32)) ([]NodeInfo2, error) {
+	return await(ctx, func(done func([]NodeInfo2, error)) error {
+		impl := &asyncNodeInfo2{handler: done}
+		d := swig.NewDirectorAsyncNodeInfo2VectorReturnDirector(impl)
+		id := heapAdd(impl, func() { swig.DeleteDirectorAsyncNodeInfo2VectorReturnDirector(d) })
+		t := ctxTimeoutMs(ctx, discoveryTimeout)
+		err := startNative(func() error { start(t, d, id); return nil })
+		if err != nil {
+			heapRemove(id)
+		}
+		return err
+	}, nil)
 }
 
 // FindNodeByID finds nodes by id using discovery.
-func (n *Node) FindNodeByID(id NodeID, schemes ...string) ([]NodeInfo2, error) {
-	return call(func() []NodeInfo2 {
+func (n *Node) FindNodeByID(ctx context.Context, id NodeID, schemes ...string) ([]NodeInfo2, error) {
+	return n.awaitNodeInfos(ctx, func(t int32, d swig.AsyncNodeInfo2VectorReturnDirector, hid int32) {
 		sv := stringsToNative(schemesOrDefault(schemes))
 		defer swig.DeleteVectorstring(sv)
 		nid := id.toNative()
 		defer swig.DeleteNodeID(nid)
-		return nodeInfos(swig.WrappedFindNodeByID(n.native, nid, sv))
+		swig.AsyncWrappedFindNodeByID(n.native, nid, sv, t, d, hid)
 	})
 }
 
 // FindNodeByName finds nodes by name using discovery.
-func (n *Node) FindNodeByName(name string, schemes ...string) ([]NodeInfo2, error) {
-	return call(func() []NodeInfo2 {
+func (n *Node) FindNodeByName(ctx context.Context, name string, schemes ...string) ([]NodeInfo2, error) {
+	return n.awaitNodeInfos(ctx, func(t int32, d swig.AsyncNodeInfo2VectorReturnDirector, hid int32) {
 		sv := stringsToNative(schemesOrDefault(schemes))
 		defer swig.DeleteVectorstring(sv)
-		return nodeInfos(swig.WrappedFindNodeByName(n.native, name, sv))
+		swig.AsyncWrappedFindNodeByName(n.native, name, sv, t, d, hid)
 	})
 }
 
 // UpdateDetectedNodes refreshes the detected node cache.
-func (n *Node) UpdateDetectedNodes(schemes ...string) error {
-	return callVoid(func() {
-		sv := stringsToNative(schemesOrDefault(schemes))
-		defer swig.DeleteVectorstring(sv)
-		swig.WrappedUpdateDetectedNodes(n.native, sv)
-	})
+func (n *Node) UpdateDetectedNodes(ctx context.Context, schemes ...string) error {
+	_, err := await(ctx, func(done func(struct{}, error)) error {
+		d, id := newAsyncVoidNoErr(func() { done(struct{}{}, nil) })
+		t := ctxTimeoutMs(ctx, discoveryTimeout)
+		err := startNative(func() error {
+			sv := stringsToNative(schemesOrDefault(schemes))
+			defer swig.DeleteVectorstring(sv)
+			swig.AsyncWrappedUpdateDetectedNodes(n.native, sv, t, d, id)
+			return nil
+		})
+		if err != nil {
+			heapRemove(id)
+		}
+		return err
+	}, nil)
+	return err
 }
 
 // DetectedNodes returns the ids of detected nodes.
@@ -153,29 +172,28 @@ func (n *Node) DetectedNodes() ([]NodeID, error) {
 
 type asyncServiceInfo2 struct{ handler func([]ServiceInfo2, error) }
 
+// Handler receives a vector owned by C++ (valid during the call only).
 func (a *asyncServiceInfo2) Handler(r swig.Vectorserviceinfo2wrapped) {
 	defer recoverDirector()
 	o := make([]ServiceInfo2, r.Size())
 	for i := range o {
 		o[i] = serviceInfo2FromNative(r.Get(i))
 	}
-	go a.handler(o, nil)
-}
-
-// AsyncFindServiceByType finds services asynchronously.
-func (n *Node) AsyncFindServiceByType(serviceType string, timeout time.Duration, handler func([]ServiceInfo2, error), schemes ...string) {
-	impl := &asyncServiceInfo2{handler: handler}
-	d := swig.NewDirectorAsyncServiceInfo2VectorReturnDirector(impl)
-	id := heapAdd(impl, func() { swig.DeleteDirectorAsyncServiceInfo2VectorReturnDirector(d) })
-	err := callVoid(func() {
-		sv := stringsToNative(schemesOrDefault(schemes))
-		defer swig.DeleteVectorstring(sv)
-		swig.AsyncWrappedFindServiceByType(n.native, serviceType, sv, timeoutMs(timeout), d, id)
-	})
-	if err != nil {
-		heapRemove(id)
-		go handler(nil, err)
-	}
+	a.handler(o, nil)
 }
 
 var _ swig.AsyncServiceInfo2VectorReturnDirectorMethods = (*asyncServiceInfo2)(nil)
+
+type asyncNodeInfo2 struct{ handler func([]NodeInfo2, error) }
+
+// Handler receives a vector owned by C++ (valid during the call only).
+func (a *asyncNodeInfo2) Handler(r swig.Vectornodeinfo2) {
+	defer recoverDirector()
+	o := make([]NodeInfo2, r.Size())
+	for i := range o {
+		o[i] = nodeInfo2FromNative(r.Get(i))
+	}
+	a.handler(o, nil)
+}
+
+var _ swig.AsyncNodeInfo2VectorReturnDirectorMethods = (*asyncNodeInfo2)(nil)

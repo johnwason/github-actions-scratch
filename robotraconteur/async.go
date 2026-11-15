@@ -6,9 +6,9 @@ import (
 	swig "github.com/robotraconteur/robotraconteur_go/robotraconteur/internal/swig"
 )
 
-// Async operations take a handler func that is called exactly once. Handlers
-// are invoked on a new goroutine, never on a Robot Raconteur thread pool
-// thread, so they may block or make synchronous calls.
+// Completion directors for native asynchronous operations. Their handlers
+// run on Robot Raconteur thread pool threads and must not block; the only
+// handlers used are await completions (a non-blocking channel send).
 
 // TimeoutInfinite disables a timeout.
 const TimeoutInfinite time.Duration = -1
@@ -46,7 +46,7 @@ func (d *asyncRequest) Handler(ret swig.MessageElement, info swig.HandlerErrorIn
 	if err == nil && ret != nil && ret.Swigcptr() != 0 {
 		e, err = fromNative(ret)
 	}
-	go d.handler(e, err)
+	d.handler(e, err)
 }
 
 // newAsyncRequest creates a director and heap id for an async request.
@@ -63,7 +63,7 @@ type asyncVoid struct{ handler func(error) }
 
 func (d *asyncVoid) Handler(info swig.HandlerErrorInfo) {
 	err := errorFromInfo(info)
-	go d.handler(err)
+	d.handler(err)
 }
 
 func newAsyncVoid(handler func(error)) (swig.AsyncVoidReturnDirector, int32) {
@@ -77,7 +77,7 @@ func newAsyncVoid(handler func(error)) (swig.AsyncVoidReturnDirector, int32) {
 
 type asyncVoidNoErr struct{ handler func() }
 
-func (d *asyncVoidNoErr) Handler() { go d.handler() }
+func (d *asyncVoidNoErr) Handler() { d.handler() }
 
 func newAsyncVoidNoErr(handler func()) (swig.AsyncVoidNoErrReturnDirector, int32) {
 	impl := &asyncVoidNoErr{handler: handler}
@@ -92,7 +92,7 @@ type asyncString struct{ handler func(string, error) }
 
 func (d *asyncString) Handler(ret string, info swig.HandlerErrorInfo) {
 	err := errorFromInfo(info)
-	go d.handler(ret, err)
+	d.handler(ret, err)
 }
 
 func newAsyncString(handler func(string, error)) (swig.AsyncStringReturnDirector, int32) {
@@ -117,7 +117,7 @@ func (d *asyncStub) Handler(stub swig.WrappedServiceStub, info swig.HandlerError
 	} else if stub != nil && stub.Swigcptr() != 0 {
 		swig.DeleteWrappedServiceStub(stub)
 	}
-	go d.handler(obj, err)
+	d.handler(obj, err)
 }
 
 func newAsyncStub(node *Node, handler func(any, error)) (swig.AsyncStubReturnDirector, int32) {

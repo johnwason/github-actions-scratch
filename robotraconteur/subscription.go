@@ -1,6 +1,7 @@
 package robotraconteur
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -284,44 +285,16 @@ func (s *ServiceSubscription) DefaultClient() (any, error) {
 }
 
 // DefaultClientWait waits for a connected client.
-func (s *ServiceSubscription) DefaultClientWait(timeout time.Duration) (any, error) {
-	t := timeoutMs(timeout)
-	st, err := call(func() swig.WrappedServiceStub { return s.nat().GetDefaultClientWait__SWIG_0(t) })
-	if err != nil {
-		return nil, err
-	}
-	return s.node.stubFromNative(st)
-}
-
-// TryDefaultClientWait waits for a connected client; ok is false on timeout.
-func (s *ServiceSubscription) TryDefaultClientWait(timeout time.Duration) (client any, ok bool, err error) {
-	t := timeoutMs(timeout)
-	var st swig.WrappedServiceStub
-	err = callVoid(func() {
-		r := s.nat().TryGetDefaultClientWait__SWIG_0(t)
-		if r == nil || r.Swigcptr() == 0 {
-			return
+func (s *ServiceSubscription) DefaultClientWait(ctx context.Context) (any, error) {
+	return await(ctx, func(done func(any, error)) error {
+		d, id := newAsyncStub(s.node, done)
+		t := ctxTimeoutMs(ctx, -1)
+		err := startNative(func() error { s.native.AsyncGetDefaultClient(t, d, id); return nil })
+		if err != nil {
+			heapRemove(id)
 		}
-		defer swig.DeleteWrappedServiceSubscription_TryDefaultClientRes(r)
-		ok = r.GetRes()
-		if ok {
-			st = r.GetClient()
-		}
-	})
-	if err != nil || !ok {
-		return nil, false, err
-	}
-	client, err = s.node.stubFromNative(st)
-	return client, err == nil, err
-}
-
-// AsyncDefaultClient waits for a connected client asynchronously.
-func (s *ServiceSubscription) AsyncDefaultClient(timeout time.Duration, handler func(any, error)) {
-	d, id := newAsyncStub(s.node, handler)
-	if err := callVoid(func() { s.native.AsyncGetDefaultClient(timeoutMs(timeout), d, id) }); err != nil {
-		heapRemove(id)
-		go handler(nil, err)
-	}
+		return err
+	}, nil)
 }
 
 // ConnectRetryDelay returns the delay between connection attempts.
@@ -417,9 +390,10 @@ func (s *ServiceSubscription) Close() error { return callVoid(func() { s.native.
 // WireSubscription receives the latest value of a wire member from all
 // clients of a service subscription.
 type WireSubscription[T any] struct {
-	native  swig.WrappedWireSubscription
-	codec   Codec[T]
-	changed Event[func(s *WireSubscription[T], value T, ts TimeSpec)]
+	native   swig.WrappedWireSubscription
+	codec    Codec[T]
+	changed  Event[func(s *WireSubscription[T], value T, ts TimeSpec)]
+	received signal
 }
 
 type wireSubscriptionDirector[T any] struct{ s *WireSubscription[T] }
@@ -429,6 +403,7 @@ func (d *wireSubscriptionDirector[T]) WireValueChanged(sub swig.WrappedWireSubsc
 	if sub != nil && sub.Swigcptr() != 0 {
 		swig.DeleteWrappedWireSubscription(sub)
 	}
+	defer d.s.received.notify()
 	hs := d.s.changed.Handlers()
 	if len(hs) == 0 {
 		return
@@ -512,12 +487,13 @@ func (s *WireSubscription[T]) InValue() (T, TimeSpec, error) {
 	return out, ts, err
 }
 
-// WaitInValueValid waits for a value.
-func (s *WireSubscription[T]) WaitInValueValid(timeout time.Duration) (bool, error) {
-	t := timeoutMs(timeout)
-	return call(func() bool {
-		return swig.SwigcptrWrappedWireSubscription(s.native.Swigcptr()).WaitInValueValid__SWIG_0(t)
+// WaitInValueValid waits until a value has been received.
+func (s *WireSubscription[T]) WaitInValueValid(ctx context.Context) error {
+	_, err := waitFor(ctx, &s.received, func() (struct{}, bool, error) {
+		_, _, err := s.InValue()
+		return struct{}{}, err == nil, nil
 	})
+	return err
 }
 
 // ActiveWireConnectionCount returns the number of connected wires.
@@ -546,6 +522,7 @@ type PipeSubscription[T any] struct {
 	native   swig.WrappedPipeSubscription
 	codec    Codec[T]
 	received Event[func(s *PipeSubscription[T])]
+	arrived  signal
 }
 
 type pipeSubscriptionDirector[T any] struct{ s *PipeSubscription[T] }
@@ -555,6 +532,7 @@ func (d *pipeSubscriptionDirector[T]) PipePacketReceived(sub swig.WrappedPipeSub
 	if sub != nil && sub.Swigcptr() != 0 {
 		swig.DeleteWrappedPipeSubscription(sub)
 	}
+	d.s.arrived.notify()
 	for _, h := range d.s.received.Handlers() {
 		h(d.s)
 	}
@@ -620,23 +598,16 @@ func (s *PipeSubscription[T]) ReceivePacket() (T, error) {
 	return out, err
 }
 
-// TryReceivePacketWait waits for a packet; ok is false on timeout.
-func (s *PipeSubscription[T]) TryReceivePacketWait(timeout time.Duration, peek bool) (v T, ok bool, err error) {
-	t := timeoutMs(timeout)
-	var cerr error
-	err = callVoid(func() {
-		p := swig.NewWrappedService_typed_packet()
-		defer swig.DeleteWrappedService_typed_packet(p)
-		ok = swig.SwigcptrWrappedPipeSubscription(s.native.Swigcptr()).TryReceivePacketWait__SWIG_0(p, t, peek)
-		if !ok || swig.Rrgo_error_pending() {
-			return
+// ReceivePacketWait waits for and returns the next packet.
+func (s *PipeSubscription[T]) ReceivePacketWait(ctx context.Context) (T, error) {
+	return waitFor(ctx, &s.arrived, func() (T, bool, error) {
+		if s.Available() > 0 {
+			v, err := s.ReceivePacket()
+			return v, true, err
 		}
-		v, cerr = unpackTypedPacket(p, s.codec)
+		var zero T
+		return zero, false, nil
 	})
-	if err == nil {
-		err = cerr
-	}
-	return
 }
 
 // Close closes the pipe subscription.

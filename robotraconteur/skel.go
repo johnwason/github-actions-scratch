@@ -1,6 +1,7 @@
 package robotraconteur
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -15,14 +16,14 @@ type ServiceSkel interface {
 	// RRInit is called when the skeleton is attached to the service. It
 	// creates pipe/wire servers, connects events and attaches callbacks.
 	RRInit(b *SkelBase) error
-	// The async adapter is non-nil when the call may be completed
-	// asynchronously (see AsyncAdapter).
-	RRCallGetProperty(name string, async *AsyncAdapter) (*Element, error)
-	RRCallSetProperty(name string, value *Element, async *AsyncAdapter) error
-	RRCallFunction(name string, args []*Element, async *AsyncAdapter) (*Element, error)
+	// Requests run on their own goroutine with a ctx describing the request
+	// (see CurrentEndpoint).
+	RRCallGetProperty(ctx context.Context, name string) (*Element, error)
+	RRCallSetProperty(ctx context.Context, name string, value *Element) error
+	RRCallFunction(ctx context.Context, name string, args []*Element) (*Element, error)
 	// RRGetSubObj returns the object for an objref member and its fully
 	// qualified object type.
-	RRGetSubObj(name, index string) (obj any, objectType string, err error)
+	RRGetSubObj(ctx context.Context, name, index string) (obj any, objectType string, err error)
 	RRGetMemory(name string) (*MemoryServer, error)
 }
 
@@ -138,48 +139,75 @@ func (d *skelDirector) Init(skel swig.WrappedServiceSkel) {
 	}
 }
 
+// serve handles a request. With an async adapter (always provided by the
+// core for properties and functions) the request completes from a new
+// goroutine, so the core's thread is released at once and the
+// implementation may block. Returns the element for inline completion.
+func (d *skelDirector) serve(async swig.WrappedServiceSkelAsyncAdapter, f func(ctx context.Context) (*Element, error)) swig.MessageElement {
+	a := newAsyncAdapter(async)
+	r := captureRequest(d.b.node, a)
+	if a == nil {
+		defer r.release()
+		e, err := runRequest(r.context(), f)
+		return d.returnElement(e, err)
+	}
+	a.makeAsync()
+	go func() {
+		defer r.release()
+		a.end(runRequest(r.context(), f))
+	}()
+	return nil
+}
+
+// runRequest calls a service implementation, converting a panic into an
+// UnknownError returned to the client.
+func runRequest(ctx context.Context, f func(ctx context.Context) (*Element, error)) (e *Element, err error) {
+	defer func() {
+		if p := recover(); p != nil {
+			e, err = nil, panicError(p)
+		}
+	}()
+	return f(ctx)
+}
+
 func (d *skelDirector) X_CallGetProperty(name string, async swig.WrappedServiceSkelAsyncAdapter) swig.MessageElement {
 	defer recoverDirector()
-	a := newAsyncAdapter(async)
-	defer a.release()
-	e, err := d.b.impl.RRCallGetProperty(name, a)
-	if a.IsAsync() {
-		return nil
-	}
-	return d.returnElement(e, err)
+	return d.serve(async, func(ctx context.Context) (*Element, error) {
+		return d.b.impl.RRCallGetProperty(ctx, name)
+	})
 }
 
 func (d *skelDirector) X_CallSetProperty(name string, m swig.MessageElement, async swig.WrappedServiceSkelAsyncAdapter) {
 	defer recoverDirector()
-	a := newAsyncAdapter(async)
-	defer a.release()
 	if m != nil && m.Swigcptr() != 0 {
 		defer swig.DeleteMessageElement(m)
 	}
 	e, err := fromNative(m)
 	if err != nil {
+		if async != nil && async.Swigcptr() != 0 {
+			swig.DeleteWrappedServiceSkelAsyncAdapter(async)
+		}
 		setDirectorError(err)
 		return
 	}
-	if err := d.b.impl.RRCallSetProperty(name, e, a); err != nil && !a.IsAsync() {
-		setDirectorError(err)
-	}
+	d.serve(async, func(ctx context.Context) (*Element, error) {
+		return nil, d.b.impl.RRCallSetProperty(ctx, name, e)
+	})
 }
 
 func (d *skelDirector) X_CallFunction(name string, args swig.Vectorptr_messageelement, async swig.WrappedServiceSkelAsyncAdapter) swig.MessageElement {
 	defer recoverDirector()
-	a := newAsyncAdapter(async)
-	defer a.release()
 	elems, err := elementsFromNative(args)
 	if err != nil {
+		if async != nil && async.Swigcptr() != 0 {
+			swig.DeleteWrappedServiceSkelAsyncAdapter(async)
+		}
 		setDirectorError(err)
 		return nil
 	}
-	e, err := d.b.impl.RRCallFunction(name, elems, a)
-	if a.IsAsync() {
-		return nil
-	}
-	return d.returnElement(e, err)
+	return d.serve(async, func(ctx context.Context) (*Element, error) {
+		return d.b.impl.RRCallFunction(ctx, name, elems)
+	})
 }
 
 func (d *skelDirector) returnElement(e *Element, err error) swig.MessageElement {
@@ -198,9 +226,12 @@ func (d *skelDirector) returnElement(e *Element, err error) swig.MessageElement 
 	return m // transferred to C++
 }
 
+// X_GetSubObj runs inline: the core has no asynchronous objref lookup.
 func (d *skelDirector) X_GetSubObj(name, index string) swig.WrappedRRObject {
 	defer recoverDirector()
-	obj, objType, err := d.b.impl.RRGetSubObj(name, index)
+	r := captureRequest(d.b.node, nil)
+	defer r.release()
+	obj, objType, err := d.b.impl.RRGetSubObj(r.context(), name, index)
 	if err != nil {
 		setDirectorError(err)
 		return nil
@@ -393,11 +424,21 @@ func (n *Node) RegisterService(name, objectType string, obj any, opts ...Service
 	if err != nil {
 		return nil, err
 	}
-	return &ServerContext{node: n, name: name, native: ctx}, nil
+	sc := &ServerContext{node: n, name: name, native: ctx}
+	n.mu.Lock()
+	if n.services == nil {
+		n.services = make(map[string]*ServerContext)
+	}
+	n.services[name] = sc
+	n.mu.Unlock()
+	return sc, nil
 }
 
 // CloseService closes a registered service.
 func (n *Node) CloseService(name string) error {
+	n.mu.Lock()
+	delete(n.services, name)
+	n.mu.Unlock()
 	return callVoid(func() { n.native.CloseService(name) })
 }
 
@@ -413,10 +454,5 @@ func WithSecurityPolicy(p *ServiceSecurityPolicy) ServiceOption {
 	return func(o *serviceOptions) { o.policy = p }
 }
 
-// CurrentEndpoint returns the client endpoint of the current request (only
-// valid inside a service member call).
-func CurrentEndpoint() (uint32, error) {
-	return call(func() uint32 { return swig.ServerEndpointGetCurrentEndpoint() })
-}
 
 var _ = fmt.Sprintf

@@ -2,24 +2,6 @@ package robotraconteur
 
 import swig "github.com/robotraconteur/robotraconteur_go/robotraconteur/internal/swig"
 
-// CurrentServicePath returns the service path of the object handling the
-// current request (only valid inside a service member call).
-func CurrentServicePath() (string, error) {
-	return call(func() string { return swig.ServerContextGetCurrentServicePath() })
-}
-
-// CurrentServerContext returns the service handling the current request.
-func CurrentServerContext() (*ServerContext, error) {
-	c, err := call(func() swig.ServerContext { return swig.ServerContextGetCurrentServerContext() })
-	if err != nil {
-		return nil, err
-	}
-	if c == nil || c.Swigcptr() == 0 {
-		return nil, NewInvalidOperation("no current server context")
-	}
-	return &ServerContext{node: DefaultNode(), native: c}, nil
-}
-
 func (c *ServerContext) nativeCtx() (swig.SwigcptrServerContext, error) {
 	if c.native == nil || c.native.Swigcptr() == 0 {
 		return 0, NewInvalidOperation("server context not available")

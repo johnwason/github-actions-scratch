@@ -169,7 +169,12 @@ func setDirectorError(err error) {
 // UnknownError reported to C++, so panics never unwind through C++ frames.
 func recoverDirector() {
 	if r := recover(); r != nil {
-		setDirectorError(&Error{Code: CodeUnknownError, Name: "RobotRaconteur.UnknownError",
-			Message: fmt.Sprintf("panic in Go callback: %v", r)})
+		setDirectorError(panicError(r))
 	}
+}
+
+// panicError converts a recovered panic in user code to an UnknownError.
+func panicError(r any) *Error {
+	return &Error{Code: CodeUnknownError, Name: "RobotRaconteur.UnknownError",
+		Message: fmt.Sprintf("panic in Go callback: %v", r)}
 }

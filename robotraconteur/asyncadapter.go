@@ -2,34 +2,29 @@ package robotraconteur
 
 import swig "github.com/robotraconteur/robotraconteur_go/robotraconteur/internal/swig"
 
-// AsyncAdapter lets a generated skeleton complete a service call
-// asynchronously (for service objects implementing the Async<Object>
-// interface).
-type AsyncAdapter struct {
+// asyncAdapter completes a service request from another goroutine.
+type asyncAdapter struct {
 	native swig.WrappedServiceSkelAsyncAdapter
-	async  bool
 }
 
-// MakeAsync marks the current call as asynchronous; End must be called.
-func (a *AsyncAdapter) MakeAsync() {
-	if a == nil || a.native == nil {
-		return
+func newAsyncAdapter(n swig.WrappedServiceSkelAsyncAdapter) *asyncAdapter {
+	if n == nil || n.Swigcptr() == 0 {
+		return nil
 	}
-	a.native.MakeAsync()
-	a.async = true
+	return &asyncAdapter{native: n}
 }
 
-// IsAsync reports whether MakeAsync was called.
-func (a *AsyncAdapter) IsAsync() bool { return a != nil && a.async }
+// makeAsync tells the core the request completes later through end.
+func (a *asyncAdapter) makeAsync() { a.native.MakeAsync() }
 
-// End completes an asynchronous call with a return element (nil for void)
-// or an error.
-func (a *AsyncAdapter) End(ret *Element, err error) {
+// end completes the request with a return element (nil for void) or an
+// error, and releases the adapter.
+func (a *asyncAdapter) end(ret *Element, err error) {
 	if a == nil || a.native == nil {
 		return
 	}
 	n := swig.SwigcptrWrappedServiceSkelAsyncAdapter(a.native.Swigcptr())
-	callVoid(func() {
+	_ = callVoid(func() {
 		info := newErrorInfo(err)
 		defer swig.DeleteHandlerErrorInfo(info)
 		if err == nil && ret != nil {
@@ -55,19 +50,4 @@ func (a *AsyncAdapter) End(ret *Element, err error) {
 	})
 	swig.DeleteWrappedServiceSkelAsyncAdapter(a.native)
 	a.native = nil
-}
-
-func newAsyncAdapter(n swig.WrappedServiceSkelAsyncAdapter) *AsyncAdapter {
-	if n == nil || n.Swigcptr() == 0 {
-		return nil
-	}
-	return &AsyncAdapter{native: n}
-}
-
-// release deletes the native adapter unless the call was made asynchronous.
-func (a *AsyncAdapter) release() {
-	if a != nil && !a.async && a.native != nil {
-		swig.DeleteWrappedServiceSkelAsyncAdapter(a.native)
-		a.native = nil
-	}
 }

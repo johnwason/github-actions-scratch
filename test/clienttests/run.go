@@ -1,7 +1,9 @@
 package clienttests
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	rr "github.com/robotraconteur/robotraconteur_go/robotraconteur"
 )
@@ -26,5 +28,13 @@ func RunTestService1(t *testing.T, n *rr.Node, baseURL string) {
 	run("Authentication", func(t *testing.T) { TestAuthentication(t, n, authURL) })
 	run("ObjectLock", func(t *testing.T) { TestObjectLock(t, n, authURL) })
 	run("MonitorLock", func(t *testing.T) { TestMonitorLock(t, n, url) })
-	run("Async", func(t *testing.T) { r := Connect(t, n, url); defer n.DisconnectService(r); TestAsync(t, r) })
+	run("Concurrent", func(t *testing.T) { r := Connect(t, n, url); defer n.DisconnectService(r); TestConcurrent(t, r) })
+}
+
+// within returns a context of t ending after d.
+func within(t testing.TB, d time.Duration) context.Context {
+	ctx := t.Context()
+	ctx, cancel := context.WithTimeout(t.Context(), d)
+	t.Cleanup(cancel)
+	return ctx
 }

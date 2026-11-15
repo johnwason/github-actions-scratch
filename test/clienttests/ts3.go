@@ -5,6 +5,7 @@ package clienttests
 import (
 	"errors"
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 	"unsafe"
@@ -25,8 +26,9 @@ func cs(v []float32) []complex64 {
 
 // Connect3 connects to the TestService3 root.
 func Connect3(t testing.TB, n *rr.Node, url string) ts3.Testroot3 {
+	ctx := t.Context()
 	t.Helper()
-	o, err := n.ConnectService(url)
+	o, err := n.ConnectService(ctx, url)
 	if err != nil {
 		t.Fatalf("ConnectService(%s): %v", url, err)
 	}
@@ -39,41 +41,43 @@ func Connect3(t testing.TB, n *rr.Node, url string) ts3.Testroot3 {
 
 // TestWirePeekPoke ports ServiceTestClient2::TestWirePeekPoke.
 func TestWirePeekPoke(t *testing.T, r ts3.Testroot3) {
-	v, _, err := r.Peekwire().PeekInValue()
+	ctx := t.Context()
+	v, _, err := r.Get_peekwire().PeekInValue(ctx)
 	expectNoErr(t, "peek in", err)
 	eq(t, "peekwire", v, int32(56295674))
-	expectNoErr(t, "poke out", r.Pokewire().PokeOutValue(75738265))
-	v2, _, err := r.Pokewire().PeekOutValue()
+	expectNoErr(t, "poke out", r.Get_pokewire().PokeOutValue(ctx, 75738265))
+	v2, _, err := r.Get_pokewire().PeekOutValue(ctx)
 	expectNoErr(t, "peek out", err)
 	eq(t, "pokewire", v2, int32(75738265))
-	w, err := r.Pokewire().Connect()
+	w, err := r.Get_pokewire().Connect(ctx)
 	must(t, err)
 	defer w.Close()
 	for i := 0; i < 3; i++ {
 		expectNoErr(t, "set out", w.SetOutValue(8638356))
 	}
 	time.Sleep(100 * time.Millisecond)
-	v3, _, err := r.Pokewire().PeekOutValue()
+	v3, _, err := r.Get_pokewire().PeekOutValue(ctx)
 	expectNoErr(t, "peek out 2", err)
 	eq(t, "pokewire unicast", v3, int32(8638356))
 }
 
 // TestEnumsPods ports TestEnums and TestPods.
 func TestEnumsPods(t *testing.T, r ts3.Testroot3) {
-	eq(t, "testenum1_prop", get(t, "enum", r.GetTestenum1_prop), ts3.Testenum1_anothervalue)
-	expectNoErr(t, "set enum", r.SetTestenum1_prop(ts3.Testenum1_hexval1))
-	eq(t, "testpod1_prop", get(t, "pod", r.GetTestpod1_prop), ts.FillTestpod1(563921043))
-	expectNoErr(t, "set pod", r.SetTestpod1_prop(ts.FillTestpod1(85932659)))
-	eq(t, "testpod1_func2", get(t, "pod func2", r.Testpod1_func2), ts.FillTestpod1(95836295))
-	expectNoErr(t, "testpod1_func1", r.Testpod1_func1(ts.FillTestpod1(29546592)))
-	s3 := get(t, "teststruct3", r.GetTeststruct3_prop)
+	ctx := t.Context()
+	eq(t, "testenum1_prop", getc(t, "enum", r.Get_testenum1_prop), ts3.Testenum1_anothervalue)
+	expectNoErr(t, "set enum", r.Set_testenum1_prop(ctx, ts3.Testenum1_hexval1))
+	eq(t, "testpod1_prop", getc(t, "pod", r.Get_testpod1_prop), ts.FillTestpod1(563921043))
+	expectNoErr(t, "set pod", r.Set_testpod1_prop(ctx, ts.FillTestpod1(85932659)))
+	eq(t, "testpod1_func2", getc(t, "pod func2", r.Testpod1_func2), ts.FillTestpod1(95836295))
+	expectNoErr(t, "testpod1_func1", r.Testpod1_func1(ctx, ts.FillTestpod1(29546592)))
+	s3 := getc(t, "teststruct3", r.Get_teststruct3_prop)
 	want := ts.FillTeststruct3(16483675)
 	if s3 != nil {
 		s3c := *s3
 		s3c.T4, s3c.T5 = want.T4, want.T5
 		eq(t, "teststruct3", &s3c, want)
 	}
-	expectNoErr(t, "set teststruct3", r.SetTeststruct3_prop(ts.FillTeststruct3(858362)))
+	expectNoErr(t, "set teststruct3", r.Set_teststruct3_prop(ctx, ts.FillTeststruct3(858362)))
 }
 
 // TestPodMemories ports ServiceTestClient2::TestMemories.
@@ -82,7 +86,7 @@ func TestPodMemories(t *testing.T, r ts3.Testroot3) {
 	for i := range s {
 		s[i] = ts.FillTestpod2(uint32(59174 + i))
 	}
-	m1 := r.Pod_m1()
+	m1 := r.Get_pod_m1()
 	eq(t, "pod_m1 length", get(t, "length", m1.Length), uint64(1024))
 	expectNoErr(t, "pod_m1 write", m1.Write(52, s, 3, 17))
 	s2 := make([]ts3.Testpod2, 32)
@@ -95,127 +99,99 @@ func TestPodMemories(t *testing.T, r ts3.Testroot3) {
 		md.PodArray[i] = ts.FillTestpod2(uint32(75721 + i))
 	}
 	z, c := []uint64{0, 0}, []uint64{3, 3}
-	expectNoErr(t, "pod_m2 write", r.Pod_m2().Write(z, md, z, c))
+	expectNoErr(t, "pod_m2 write", r.Get_pod_m2().Write(z, md, z, c))
 	md2 := &rr.PodMultiDimArray[ts3.Testpod2]{Dims: []uint32{3, 3}, PodArray: make([]ts3.Testpod2, 9)}
-	expectNoErr(t, "pod_m2 read", r.Pod_m2().Read(z, md2, z, c))
+	expectNoErr(t, "pod_m2 read", r.Get_pod_m2().Read(z, md2, z, c))
 	eq(t, "pod_m2", md2.PodArray, md.PodArray)
 }
 
 // TestGenerators ports ServiceTestClient2::TestGenerators.
 func TestGenerators(t *testing.T, r ts3.Testroot3) {
+	ctx := t.Context()
 	a := []uint8{2, 3, 4}
-	g, err := r.Gen_func4()
+	g, err := r.Gen_func4(ctx)
 	must(t, err)
 	for i := 0; i < 6; i++ {
-		_, err := g.Next(a)
+		_, err := g.Next(ctx, a)
 		expectNoErr(t, "gen next", err)
 	}
-	b, err := g.Next(a)
+	b, err := g.Next(ctx, a)
 	expectNoErr(t, "gen next 7", err)
 	eq(t, "gen value", b, []uint8{8, 9, 10})
-	expectNoErr(t, "gen abort", g.Abort())
-	if _, err := g.Next(a); !errors.Is(err, rr.ErrOperationAborted) {
+	expectNoErr(t, "gen abort", g.Abort(ctx))
+	if _, err := g.Next(ctx, a); !errors.Is(err, rr.ErrOperationAborted) {
 		t.Errorf("expected OperationAborted, got %v", err)
 	}
-	g1, err := r.Gen_func1()
+	g1, err := r.Gen_func1(ctx)
 	must(t, err)
-	all, err := g1.(*rr.Generator2Client[float64]).NextAll()
+	all, err := rr.NextAll(ctx, g1)
 	expectNoErr(t, "next all", err)
 	eq(t, "gen_func1", len(all), 16)
-	g2, err := r.Gen_func4()
+	g2, err := r.Gen_func4(ctx)
 	must(t, err)
-	_, err = g2.Next(a)
+	_, err = g2.Next(ctx, a)
 	expectNoErr(t, "gen2 next", err)
-	expectNoErr(t, "gen2 close", g2.Close())
-	if _, err := g2.Next(a); !rr.IsStopIteration(err) {
+	expectNoErr(t, "gen2 close", g2.Close(ctx))
+	if _, err := g2.Next(ctx, a); !rr.IsStopIteration(err) {
 		t.Errorf("expected StopIteration, got %v", err)
 	}
-	g3, err := r.Gen_func2("x")
+	g3, err := r.Gen_func2(ctx, "x")
 	must(t, err)
 	for i := 0; i < 16; i++ {
-		v, err := g3.Next()
+		v, err := g3.Next(ctx)
 		expectNoErr(t, "gen_func2", err)
 		eq(t, "gen_func2 value", v, []uint8{uint8(i)})
 	}
-	if _, err := g3.Next(); !rr.IsStopIteration(err) {
+	if _, err := g3.Next(ctx); !rr.IsStopIteration(err) {
 		t.Errorf("gen_func2: expected StopIteration, got %v", err)
 	}
-	testAsyncGenerators(t, r)
+	testGeneratorsConcurrent(t, r)
 }
 
-// testAsyncGenerators covers the asynchronous generator client API (Go only).
-func testAsyncGenerators(t *testing.T, r ts3.Testroot3) {
-	ar, ok := r.(ts3.AsyncTestroot3)
-	if !ok {
-		t.Fatal("stub does not implement AsyncTestroot3")
+// testGeneratorsConcurrent steps two generators from goroutines (Go only).
+func testGeneratorsConcurrent(t *testing.T, r ts3.Testroot3) {
+	ctx := t.Context()
+	var wg sync.WaitGroup
+	for k := 0; k < 2; k++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			g, err := r.Gen_func2(ctx, "x")
+			if err != nil {
+				t.Errorf("gen_func2: %v", err)
+				return
+			}
+			for i := 0; i < 4; i++ {
+				v, err := g.Next(ctx)
+				if err != nil || !reflect.DeepEqual(v, []uint8{uint8(i)}) {
+					t.Errorf("gen_func2 next %d: %v %v", i, v, err)
+				}
+			}
+			expectNoErr(t, "gen_func2 abort", g.Abort(ctx))
+		}()
 	}
-	type res struct {
-		g   rr.Generator1[[]uint8, []uint8]
-		err error
-	}
-	ch := make(chan res, 1)
-	ar.AsyncGen_func4(5*time.Second, func(g rr.Generator1[[]uint8, []uint8], err error) { ch <- res{g, err} })
-	gr := <-ch
-	must(t, gr.err)
-	g, ok := gr.g.(rr.AsyncGenerator1[[]uint8, []uint8])
-	if !ok {
-		t.Fatal("generator does not implement AsyncGenerator1")
-	}
-	type next struct {
-		v   []uint8
-		err error
-	}
-	nch := make(chan next, 1)
-	a := []uint8{2, 3, 4}
-	for i := 0; i < 7; i++ {
-		g.AsyncNext(a, 5*time.Second, func(v []uint8, err error) { nch <- next{v, err} })
-		n := <-nch
-		expectNoErr(t, "async gen next", n.err)
-		if i == 6 {
-			eq(t, "async gen value", n.v, []uint8{8, 9, 10})
-		}
-	}
-	ech := make(chan error, 1)
-	g.AsyncClose(5*time.Second, func(err error) { ech <- err })
-	expectNoErr(t, "async gen close", <-ech)
-	g.AsyncNext(a, 5*time.Second, func(v []uint8, err error) { nch <- next{v, err} })
-	if n := <-nch; !rr.IsStopIteration(n.err) {
-		t.Errorf("expected StopIteration after close, got %v", n.err)
-	}
-
-	gch := make(chan rr.Generator2[[]uint8], 1)
-	ar.AsyncGen_func2("x", 5*time.Second, func(g rr.Generator2[[]uint8], err error) {
-		expectNoErr(t, "async gen_func2", err)
-		gch <- g
-	})
-	g2 := (<-gch).(rr.AsyncGenerator2[[]uint8])
-	v2 := make(chan next, 1)
-	g2.AsyncNext(5*time.Second, func(v []uint8, err error) { v2 <- next{v, err} })
-	n := <-v2
-	expectNoErr(t, "async gen_func2 next", n.err)
-	eq(t, "async gen_func2 value", n.v, []uint8{0})
-	g2.AsyncAbort(5*time.Second, func(err error) { ech <- err })
-	expectNoErr(t, "async gen_func2 abort", <-ech)
+	wg.Wait()
 }
 
 // TestNamedArrays ports ServiceTestClient2::TestNamedArrays.
 func TestNamedArrays(t *testing.T, r ts3.Testroot3) {
-	expectNoErr(t, "set na1", r.SetTestnamedarray1(ts.FillTransform(3956378).Translation))
-	eq(t, "na1", get(t, "na1", r.GetTestnamedarray1), ts.FillTransform(74637).Translation)
-	expectNoErr(t, "set na2", r.SetTestnamedarray2(ts.FillTransform(827635)))
-	eq(t, "na2", get(t, "na2", r.GetTestnamedarray2), ts.FillTransform(1294))
-	expectNoErr(t, "set na3", r.SetTestnamedarray3(ts.FillTransformArray(6, 19274)))
-	eq(t, "na3", get(t, "na3", r.GetTestnamedarray3), ts.FillTransformArray(8, 837512))
-	expectNoErr(t, "set na4", r.SetTestnamedarray4(ts.FillTransformMultiDimArray(5, 2, 6385)))
-	eq(t, "na4", get(t, "na4", r.GetTestnamedarray4), ts.FillTransformMultiDimArray(7, 2, 66134))
-	expectNoErr(t, "set na5", r.SetTestnamedarray5(ts.FillTransformMultiDimArray(3, 2, 7732)))
-	eq(t, "na5", get(t, "na5", r.GetTestnamedarray5), ts.FillTransformMultiDimArray(3, 2, 773142))
+	ctx := t.Context()
+	expectNoErr(t, "set na1", r.Set_testnamedarray1(ctx, ts.FillTransform(3956378).Translation))
+	eq(t, "na1", getc(t, "na1", r.Get_testnamedarray1), ts.FillTransform(74637).Translation)
+	expectNoErr(t, "set na2", r.Set_testnamedarray2(ctx, ts.FillTransform(827635)))
+	eq(t, "na2", getc(t, "na2", r.Get_testnamedarray2), ts.FillTransform(1294))
+	expectNoErr(t, "set na3", r.Set_testnamedarray3(ctx, ts.FillTransformArray(6, 19274)))
+	eq(t, "na3", getc(t, "na3", r.Get_testnamedarray3), ts.FillTransformArray(8, 837512))
+	expectNoErr(t, "set na4", r.Set_testnamedarray4(ctx, ts.FillTransformMultiDimArray(5, 2, 6385)))
+	eq(t, "na4", getc(t, "na4", r.Get_testnamedarray4), ts.FillTransformMultiDimArray(7, 2, 66134))
+	expectNoErr(t, "set na5", r.Set_testnamedarray5(ctx, ts.FillTransformMultiDimArray(3, 2, 7732)))
+	eq(t, "na5", getc(t, "na5", r.Get_testnamedarray5), ts.FillTransformMultiDimArray(3, 2, 773142))
 
 	s := make([]ts3.Transform, 32)
 	for i := range s {
 		s[i] = ts.FillTransform(uint32(79174 + i))
 	}
-	m1 := r.Namedarray_m1()
+	m1 := r.Get_namedarray_m1()
 	eq(t, "namedarray_m1 length", get(t, "length", m1.Length), uint64(512))
 	expectNoErr(t, "namedarray_m1 write", m1.Write(23, s, 3, 21))
 	s2 := make([]ts3.Transform, 32)
@@ -228,75 +204,78 @@ func TestNamedArrays(t *testing.T, r ts3.Testroot3) {
 		md.NamedArrayArray[i] = ts.FillTransform(uint32(15721 + i))
 	}
 	z, c := []uint64{0, 0}, []uint64{3, 3}
-	expectNoErr(t, "namedarray_m2 write", r.Namedarray_m2().Write(z, md, z, c))
+	expectNoErr(t, "namedarray_m2 write", r.Get_namedarray_m2().Write(z, md, z, c))
 	md2 := &rr.NamedMultiDimArray[ts3.Transform]{Dims: []uint32{3, 3}, NamedArrayArray: make([]ts3.Transform, 9)}
-	expectNoErr(t, "namedarray_m2 read", r.Namedarray_m2().Read(z, md2, z, c))
+	expectNoErr(t, "namedarray_m2 read", r.Get_namedarray_m2().Read(z, md2, z, c))
 	eq(t, "namedarray_m2", md2.NamedArrayArray, md.NamedArrayArray)
 }
 
 // TestComplex ports ServiceTestClient2::TestComplex and TestComplexMemories.
 func TestComplex(t *testing.T, r ts3.Testroot3) {
+	ctx := t.Context()
 	v := tv.MustGet[float64]
 	f := tv.MustGet[float32]
 	u := tv.MustGet[uint32]
-	eq(t, "c1", get(t, "c1", r.GetC1), complex(5.708705e+01, -2.328294e-03))
-	expectNoErr(t, "set c1", r.SetC1(complex(5.708705e+01, -2.328294e-03)))
-	eq(t, "c2", get(t, "c2", r.GetC2), cd(v("ts3.c2.to_client")))
-	expectNoErr(t, "set c2", r.SetC2(cd(v("ts3.c2.to_service"))))
-	eq(t, "c3", get(t, "c3", r.GetC3), &rr.MultiDimArray[complex128]{Dims: u("ts3.c3.to_client.dims"), Array: cd(v("ts3.c3.to_client"))})
-	expectNoErr(t, "set c3", r.SetC3(&rr.MultiDimArray[complex128]{Dims: u("ts3.c3.to_service.dims"), Array: cd(v("ts3.c3.to_service"))}))
-	eq(t, "c5", get(t, "c5", r.GetC5), [][]complex128{cd(v("ts3.c5.to_client"))})
-	expectNoErr(t, "set c5", r.SetC5([][]complex128{cd(v("ts3.c5.to_service"))}))
-	eq(t, "c7", get(t, "c7", r.GetC7), complex64(complex(-5.527021e-18, -9.848457e+03)))
-	expectNoErr(t, "set c7", r.SetC7(complex64(complex(9.303345e-12, -3.865684e-05))))
-	eq(t, "c8", get(t, "c8", r.GetC8), cs(f("ts3.c8.to_client")))
-	expectNoErr(t, "set c8", r.SetC8(cs(f("ts3.c8.to_service"))))
-	eq(t, "c9", get(t, "c9", r.GetC9), &rr.MultiDimArray[complex64]{Dims: u("ts3.c9.to_client.dims"), Array: cs(f("ts3.c9.to_client"))})
-	expectNoErr(t, "set c9", r.SetC9(&rr.MultiDimArray[complex64]{Dims: u("ts3.c9.to_service.dims"), Array: cs(f("ts3.c9.to_service"))}))
+	eq(t, "c1", getc(t, "c1", r.Get_c1), complex(5.708705e+01, -2.328294e-03))
+	expectNoErr(t, "set c1", r.Set_c1(ctx, complex(5.708705e+01, -2.328294e-03)))
+	eq(t, "c2", getc(t, "c2", r.Get_c2), cd(v("ts3.c2.to_client")))
+	expectNoErr(t, "set c2", r.Set_c2(ctx, cd(v("ts3.c2.to_service"))))
+	eq(t, "c3", getc(t, "c3", r.Get_c3), &rr.MultiDimArray[complex128]{Dims: u("ts3.c3.to_client.dims"), Array: cd(v("ts3.c3.to_client"))})
+	expectNoErr(t, "set c3", r.Set_c3(ctx, &rr.MultiDimArray[complex128]{Dims: u("ts3.c3.to_service.dims"), Array: cd(v("ts3.c3.to_service"))}))
+	eq(t, "c5", getc(t, "c5", r.Get_c5), [][]complex128{cd(v("ts3.c5.to_client"))})
+	expectNoErr(t, "set c5", r.Set_c5(ctx, [][]complex128{cd(v("ts3.c5.to_service"))}))
+	eq(t, "c7", getc(t, "c7", r.Get_c7), complex64(complex(-5.527021e-18, -9.848457e+03)))
+	expectNoErr(t, "set c7", r.Set_c7(ctx, complex64(complex(9.303345e-12, -3.865684e-05))))
+	eq(t, "c8", getc(t, "c8", r.Get_c8), cs(f("ts3.c8.to_client")))
+	expectNoErr(t, "set c8", r.Set_c8(ctx, cs(f("ts3.c8.to_service"))))
+	eq(t, "c9", getc(t, "c9", r.Get_c9), &rr.MultiDimArray[complex64]{Dims: u("ts3.c9.to_client.dims"), Array: cs(f("ts3.c9.to_client"))})
+	expectNoErr(t, "set c9", r.Set_c9(ctx, &rr.MultiDimArray[complex64]{Dims: u("ts3.c9.to_service.dims"), Array: cs(f("ts3.c9.to_service"))}))
 
 	cm1 := cd(v("ts3.client.c_m1_1"))
-	expectNoErr(t, "c_m1 write", r.C_m1().Write(10, cm1, 0, 8))
+	expectNoErr(t, "c_m1 write", r.Get_c_m1().Write(10, cm1, 0, 8))
 	cm1b := make([]complex128, 8)
-	expectNoErr(t, "c_m1 read", r.C_m1().Read(10, cm1b, 0, 8))
+	expectNoErr(t, "c_m1 read", r.Get_c_m1().Read(10, cm1b, 0, 8))
 	eq(t, "c_m1", cm1b, cm1[:8])
 	cm2 := &rr.MultiDimArray[complex128]{Dims: u("ts3.client.c_m2_2.dims"), Array: cd(v("ts3.client.c_m2_2"))}
 	z, c := []uint64{0, 0}, []uint64{3, 3}
-	expectNoErr(t, "c_m2 write", r.C_m2().Write(z, cm2, z, c))
+	expectNoErr(t, "c_m2 write", r.Get_c_m2().Write(z, cm2, z, c))
 	cm2b := &rr.MultiDimArray[complex128]{Dims: cm2.Dims, Array: make([]complex128, 9)}
-	expectNoErr(t, "c_m2 read", r.C_m2().Read(z, cm2b, z, c))
+	expectNoErr(t, "c_m2 read", r.Get_c_m2().Read(z, cm2b, z, c))
 	eq(t, "c_m2", cm2b, cm2)
 }
 
 // TestBools ports ServiceTestClient2::TestBools and TestBoolMemories.
 func TestBools(t *testing.T, r ts3.Testroot3) {
-	eq(t, "b1", get(t, "b1", r.GetB1), true)
-	expectNoErr(t, "set b1", r.SetB1(true))
-	eq(t, "b2", get(t, "b2", r.GetB2), []bool{true, false, true, true, false, true, false})
-	expectNoErr(t, "set b2", r.SetB2([]bool{true, false, false, true, true, true, false, true}))
-	eq(t, "b3", get(t, "b3", r.GetB3), &rr.MultiDimArray[bool]{Dims: []uint32{2, 2}, Array: []bool{false, true, true, false}})
-	expectNoErr(t, "set b3", r.SetB3(&rr.MultiDimArray[bool]{Dims: []uint32{2, 1}, Array: []bool{true, false}}))
-	eq(t, "b4", get(t, "b4", r.GetB4), []bool{true})
-	expectNoErr(t, "set b4", r.SetB4([]bool{true}))
-	eq(t, "b5", get(t, "b5", r.GetB5), [][]bool{{false, true, false, false}})
-	expectNoErr(t, "set b5", r.SetB5([][]bool{{true, false}}))
-	eq(t, "b6", get(t, "b6", r.GetB6), []*rr.MultiDimArray[bool]{{Dims: []uint32{2, 2}, Array: []bool{false, true, true, false}}})
-	expectNoErr(t, "set b6", r.SetB6([]*rr.MultiDimArray[bool]{{Dims: []uint32{2, 1}, Array: []bool{true, false}}}))
+	ctx := t.Context()
+	eq(t, "b1", getc(t, "b1", r.Get_b1), true)
+	expectNoErr(t, "set b1", r.Set_b1(ctx, true))
+	eq(t, "b2", getc(t, "b2", r.Get_b2), []bool{true, false, true, true, false, true, false})
+	expectNoErr(t, "set b2", r.Set_b2(ctx, []bool{true, false, false, true, true, true, false, true}))
+	eq(t, "b3", getc(t, "b3", r.Get_b3), &rr.MultiDimArray[bool]{Dims: []uint32{2, 2}, Array: []bool{false, true, true, false}})
+	expectNoErr(t, "set b3", r.Set_b3(ctx, &rr.MultiDimArray[bool]{Dims: []uint32{2, 1}, Array: []bool{true, false}}))
+	eq(t, "b4", getc(t, "b4", r.Get_b4), []bool{true})
+	expectNoErr(t, "set b4", r.Set_b4(ctx, []bool{true}))
+	eq(t, "b5", getc(t, "b5", r.Get_b5), [][]bool{{false, true, false, false}})
+	expectNoErr(t, "set b5", r.Set_b5(ctx, [][]bool{{true, false}}))
+	eq(t, "b6", getc(t, "b6", r.Get_b6), []*rr.MultiDimArray[bool]{{Dims: []uint32{2, 2}, Array: []bool{false, true, true, false}}})
+	expectNoErr(t, "set b6", r.Set_b6(ctx, []*rr.MultiDimArray[bool]{{Dims: []uint32{2, 1}, Array: []bool{true, false}}}))
 	b := []bool{true, false, true, true, false, true, false, true}
-	expectNoErr(t, "c_m5 write", r.C_m5().Write(100, b, 1, 6))
+	expectNoErr(t, "c_m5 write", r.Get_c_m5().Write(100, b, 1, 6))
 	b2 := make([]bool, 8)
-	expectNoErr(t, "c_m5 read", r.C_m5().Read(100, b2, 0, 6))
+	expectNoErr(t, "c_m5 read", r.Get_c_m5().Read(100, b2, 0, 6))
 	eq(t, "c_m5", b2[:6], b[1:7])
 	md := &rr.MultiDimArray[bool]{Dims: []uint32{2, 2}, Array: []bool{true, false, false, true}}
 	z, c := []uint64{0, 0}, []uint64{2, 2}
-	expectNoErr(t, "c_m6 write", r.C_m6().Write(z, md, z, c))
+	expectNoErr(t, "c_m6 write", r.Get_c_m6().Write(z, md, z, c))
 	md2 := &rr.MultiDimArray[bool]{Dims: []uint32{2, 2}, Array: make([]bool, 4)}
-	expectNoErr(t, "c_m6 read", r.C_m6().Read(z, md2, z, c))
+	expectNoErr(t, "c_m6 read", r.Get_c_m6().Read(z, md2, z, c))
 	eq(t, "c_m6", md2, md)
 }
 
 // TestNoLock ports ServiceTestClient2::TestNoLock.
 func TestNoLock(t *testing.T, r ts3.Testroot3) {
-	o5, err := r.GetNolock_test()
+	ctx := t.Context()
+	o5, err := r.Get_nolock_test(ctx)
 	must(t, err)
 	locked := func(name string, err error) {
 		t.Helper()
@@ -304,46 +283,47 @@ func TestNoLock(t *testing.T, r ts3.Testroot3) {
 			t.Errorf("%s: expected ObjectLockedError, got %v", name, err)
 		}
 	}
-	_, err = o5.GetP1()
+	_, err = o5.Get_p1(ctx)
 	locked("p1", err)
-	_, err = o5.GetP2()
+	_, err = o5.Get_p2(ctx)
 	expectNoErr(t, "p2", err)
-	expectNoErr(t, "set p2", o5.SetP2(0))
-	_, err = o5.GetP3()
+	expectNoErr(t, "set p2", o5.Set_p2(ctx, 0))
+	_, err = o5.Get_p3(ctx)
 	expectNoErr(t, "p3", err)
-	locked("set p1", o5.SetP1(0))
-	_, err = o5.F1()
+	locked("set p1", o5.Set_p1(ctx, 0))
+	_, err = o5.F1(ctx)
 	locked("f1", err)
-	_, err = o5.F2()
+	_, err = o5.F2(ctx)
 	expectNoErr(t, "f2", err)
-	_, err = o5.Q1().Connect(-1)
+	_, err = o5.Get_q1().Connect(ctx, -1)
 	locked("q1", err)
-	q2, err := o5.Q2().Connect(-1)
+	q2, err := o5.Get_q2().Connect(ctx, -1)
 	expectNoErr(t, "q2", err)
 	if q2 != nil {
 		q2.Close()
 	}
-	_, err = o5.W1().Connect()
+	_, err = o5.Get_w1().Connect(ctx)
 	locked("w1", err)
-	w2, err := o5.W2().Connect()
+	w2, err := o5.Get_w2().Connect(ctx)
 	expectNoErr(t, "w2", err)
 	if w2 != nil {
 		w2.Close()
 	}
-	_, err = o5.M1().Length()
+	_, err = o5.Get_m1().Length()
 	locked("m1", err)
 	b := make([]int32, 100)
-	_, err = o5.M2().Length()
+	_, err = o5.Get_m2().Length()
 	expectNoErr(t, "m2 length", err)
-	expectNoErr(t, "m2 read", o5.M2().Read(0, b, 0, 10))
-	expectNoErr(t, "m2 write", o5.M2().Write(0, b, 0, 10))
-	expectNoErr(t, "m3 read", o5.M3().Read(0, b, 0, 10))
-	locked("m3 write", o5.M3().Write(0, b, 0, 10))
+	expectNoErr(t, "m2 read", o5.Get_m2().Read(0, b, 0, 10))
+	expectNoErr(t, "m2 write", o5.Get_m2().Write(0, b, 0, 10))
+	expectNoErr(t, "m3 read", o5.Get_m3().Read(0, b, 0, 10))
+	locked("m3 write", o5.Get_m3().Write(0, b, 0, 10))
 }
 
 // TestExceptionParams ports ServiceTestClient2::TestExceptionParams.
 func TestExceptionParams(t *testing.T, r ts3.Testroot3) {
-	err := r.Test_exception_params1()
+	ctx := t.Context()
+	err := r.Test_exception_params1(ctx)
 	var e *rr.Error
 	if !errors.Is(err, rr.ErrInvalidOperation) || !errors.As(err, &e) {
 		t.Fatalf("expected InvalidOperation, got %v", err)
@@ -351,7 +331,7 @@ func TestExceptionParams(t *testing.T, r ts3.Testroot3) {
 	eq(t, "message", e.Message, "test error")
 	eq(t, "subname", e.SubName, "my_error")
 	eq(t, "param", e.Param, any(map[string]any{"param1": []int32{10}, "param2": "20"}))
-	err = r.Test_exception_params2()
+	err = r.Test_exception_params2(ctx)
 	var e4 *ts3.Test_exception4
 	if !errors.As(err, &e4) {
 		t.Fatalf("expected test_exception4, got %T %v", err, err)

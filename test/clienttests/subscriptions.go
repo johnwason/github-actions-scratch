@@ -11,18 +11,19 @@ import (
 // RunSubscriptions tests service, wire and pipe subscriptions by URL and
 // subscription/discovery by type (local transport) for the node nodeName.
 func RunSubscriptions(t *testing.T, n *rr.Node, baseURL, nodeName string) {
+	ctx := t.Context()
 	url := baseURL + "?service=RobotRaconteurTestService"
 	t.Run("ByURL", func(t *testing.T) {
 		sub, err := n.SubscribeService([]string{url})
 		must(t, err)
 		defer sub.Close()
-		c, err := sub.DefaultClientWait(10 * time.Second)
+		c, err := sub.DefaultClientWait(within(t, 10*time.Second))
 		must(t, err)
 		r, ok := c.(ts1.Testroot)
 		if !ok {
 			t.Fatalf("unexpected client type %T", c)
 		}
-		eq(t, "func3", get(t, "func3", func() (float64, error) { return r.Func3(1, 2) }), 3.0)
+		eq(t, "func3", get(t, "func3", func() (float64, error) { return r.Func3(ctx, 1, 2) }), 3.0)
 		clients, err := sub.ConnectedClients()
 		must(t, err)
 		if len(clients) != 1 {
@@ -39,8 +40,7 @@ func RunSubscriptions(t *testing.T, n *rr.Node, baseURL, nodeName string) {
 			default:
 			}
 		})
-		ok2, err := ws.WaitInValueValid(10 * time.Second)
-		if err != nil || !ok2 {
+		if err := ws.WaitInValueValid(within(t, 10*time.Second)); err != nil {
 			t.Fatalf("wire subscription value not valid: %v", err)
 		}
 		if _, _, err := ws.InValue(); err != nil {
@@ -55,8 +55,8 @@ func RunSubscriptions(t *testing.T, n *rr.Node, baseURL, nodeName string) {
 		ps, err := rr.SubscribePipe[float64](sub, "broadcastpipe", "", -1)
 		must(t, err)
 		defer ps.Close()
-		v, ok3, err := ps.TryReceivePacketWait(10*time.Second, false)
-		if err != nil || !ok3 {
+		v, err := ps.ReceivePacketWait(within(t, 10*time.Second))
+		if err != nil {
 			t.Fatalf("pipe subscription: no packet (%v)", err)
 		}
 		if v < 0 || v >= 100 {
@@ -74,9 +74,9 @@ func RunSubscriptions(t *testing.T, n *rr.Node, baseURL, nodeName string) {
 		sub, err := n.SubscribeServiceByType([]string{"com.robotraconteur.testing.TestService1.testroot"}, filter)
 		must(t, err)
 		defer sub.Close()
-		c, err := sub.DefaultClientWait(20 * time.Second)
+		c, err := sub.DefaultClientWait(within(t, 20*time.Second))
 		must(t, err)
-		if _, err := c.(ts1.Testroot).GetD1(); err != nil {
+		if _, err := c.(ts1.Testroot).Get_d1(ctx); err != nil {
 			t.Errorf("by type client: %v", err)
 		}
 		deadline := time.Now().Add(10 * time.Second)
@@ -95,7 +95,7 @@ func RunSubscriptions(t *testing.T, n *rr.Node, baseURL, nodeName string) {
 			}
 			time.Sleep(100 * time.Millisecond)
 		}
-		found, err := n.FindServiceByType("com.robotraconteur.testing.TestService1.testroot", "rr+local")
+		found, err := n.FindServiceByType(ctx, "com.robotraconteur.testing.TestService1.testroot", "rr+local")
 		must(t, err)
 		ok := false
 		for _, f := range found {

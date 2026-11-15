@@ -86,8 +86,15 @@ which CI checks out:
   - Declares `FileLogRecordHandler : public LogRecordHandler` in `Logging.i`, so it can be passed
     to `SetLogRecordHandler`.
 
-The Go bindings need `0002` to build: they use `NewAuthenticatedUser` and the
-`FileLogRecordHandler` upcast.
+- **`0003`: SWIG binding (`RobotRaconteurWrapped`).** `WrappedServiceSkelAsyncAdapter` captures the client
+  endpoint on the request thread, and `RegisterGeneratorServer` gets an overload taking the adapter. Go
+  service members run on their own goroutine and complete requests through the adapter, so a generator
+  function can register its generator from that goroutine. This is binding code only.
+
+None of the patches change the C++ library ABI. `0001` only touches a `.cpp` file; its class is declared in
+a private header and the exported symbols are identical. The Go bindings need `0002` and `0003` to build.
+Drop the `[skip ci]` line, which is only there for the CI repository, from the commit messages when
+upstreaming.
 
 Still open:
 

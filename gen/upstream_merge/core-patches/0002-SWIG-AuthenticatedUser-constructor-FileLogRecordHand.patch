@@ -1,7 +1,7 @@
 From 15906db63d9770024c90e803929941dd92026209 Mon Sep 17 00:00:00 2001
 From: John Wason <wason@wasontech.com>
 Date: Sun, 15 Nov 2026 09:44:03 -0500
-Subject: [PATCH 2/2] SWIG: AuthenticatedUser constructor; FileLogRecordHandler
+Subject: [PATCH 2/3] SWIG: AuthenticatedUser constructor; FileLogRecordHandler
  derives from LogRecordHandler
 
 [skip ci] (pushed to github-actions-scratch for the Go bindings CI only)

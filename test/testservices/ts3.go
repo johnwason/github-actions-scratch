@@ -3,6 +3,7 @@ package testservices
 // Go port of testroot3_impl (robotraconteur/test/cpp/service/ServiceTest2.cpp).
 
 import (
+	"context"
 	"sync"
 	"time"
 	"unsafe"
@@ -238,9 +239,9 @@ func (t *Testroot3) Shutdown() {
 	}
 }
 
-func (t *Testroot3) SetPeekwire(w *rr.Wire[int32]) {
-	t.Testroot3DefaultImpl.SetPeekwire(w)
-	b := t.PeekwireBroadcaster
+func (t *Testroot3) Set_peekwire(w *rr.Wire[int32]) {
+	t.Testroot3DefaultImpl.Set_peekwire(w)
+	b := t.RRBroadcaster_peekwire
 	if b == nil {
 		return
 	}
@@ -259,33 +260,37 @@ func (t *Testroot3) SetPeekwire(w *rr.Wire[int32]) {
 	}()
 }
 
-func (t *Testroot3) GetUnknown_modifier() (int32, error) { return 0, nil }
-func (t *Testroot3) SetUnknown_modifier(int32) error     { return nil }
-func (t *Testroot3) GetReadme() (int32, error)           { return 0, nil }
-func (t *Testroot3) SetWriteme(int32) error              { return nil }
-func (t *Testroot3) Readmem() rr.ArrayMemory[float64]    { return nil }
-func (t *Testroot3) GetO4() (ts3.Obj4, error)            { return &obj4Impl{}, nil }
+func (t *Testroot3) GetUnknown_modifier() (int32, error)            { return 0, nil }
+func (t *Testroot3) SetUnknown_modifier(int32) error                { return nil }
+func (t *Testroot3) Get_readme(ctx context.Context) (int32, error)  { return 0, nil }
+func (t *Testroot3) Set_writeme(ctx context.Context, _ int32) error { return nil }
+func (t *Testroot3) Get_readmem() rr.ArrayMemory[float64]           { return nil }
+func (t *Testroot3) Get_o4(ctx context.Context) (ts3.Obj4, error)   { return &obj4Impl{}, nil }
 
-func (t *Testroot3) GetTestenum1_prop() (ts3.Testenum1, error) {
+func (t *Testroot3) Get_testenum1_prop(ctx context.Context) (ts3.Testenum1, error) {
 	return ts3.Testenum1_anothervalue, nil
 }
-func (t *Testroot3) SetTestenum1_prop(v ts3.Testenum1) error {
+func (t *Testroot3) Set_testenum1_prop(ctx context.Context, v ts3.Testenum1) error {
 	return check("testenum1_prop", v, ts3.Testenum1_hexval1)
 }
 
-func (t *Testroot3) GetTestpod1_prop() (ts3.Testpod1, error) { return FillTestpod1(563921043), nil }
-func (t *Testroot3) SetTestpod1_prop(v ts3.Testpod1) error {
+func (t *Testroot3) Get_testpod1_prop(ctx context.Context) (ts3.Testpod1, error) {
+	return FillTestpod1(563921043), nil
+}
+func (t *Testroot3) Set_testpod1_prop(ctx context.Context, v ts3.Testpod1) error {
 	return check("testpod1_prop", v, FillTestpod1(85932659))
 }
-func (t *Testroot3) Testpod1_func1(s ts3.Testpod1) error {
+func (t *Testroot3) Testpod1_func1(ctx context.Context, s ts3.Testpod1) error {
 	return check("testpod1_func1", s, FillTestpod1(29546592))
 }
-func (t *Testroot3) Testpod1_func2() (ts3.Testpod1, error) { return FillTestpod1(95836295), nil }
+func (t *Testroot3) Testpod1_func2(ctx context.Context) (ts3.Testpod1, error) {
+	return FillTestpod1(95836295), nil
+}
 
-func (t *Testroot3) GetTeststruct3_prop() (*ts3.Teststruct3, error) {
+func (t *Testroot3) Get_teststruct3_prop(ctx context.Context) (*ts3.Teststruct3, error) {
 	return FillTeststruct3(16483675), nil
 }
-func (t *Testroot3) SetTeststruct3_prop(v *ts3.Teststruct3) error {
+func (t *Testroot3) Set_teststruct3_prop(ctx context.Context, v *ts3.Teststruct3) error {
 	want := FillTeststruct3(858362)
 	if v == nil {
 		return rr.NewNullValue("teststruct3 is null")
@@ -296,8 +301,8 @@ func (t *Testroot3) SetTeststruct3_prop(v *ts3.Teststruct3) error {
 	return check("teststruct3_prop", &v2, want)
 }
 
-func (t *Testroot3) Pod_m1() rr.PodArrayMemory[ts3.Testpod2]         { return t.podM1 }
-func (t *Testroot3) Pod_m2() rr.PodMultiDimArrayMemory[ts3.Testpod2] { return t.podM2 }
+func (t *Testroot3) Get_pod_m1() rr.PodArrayMemory[ts3.Testpod2]         { return t.podM1 }
+func (t *Testroot3) Get_pod_m2() rr.PodMultiDimArrayMemory[ts3.Testpod2] { return t.podM2 }
 
 type func4Gen struct {
 	mu      sync.Mutex
@@ -305,7 +310,7 @@ type func4Gen struct {
 	aborted bool
 }
 
-func (g *func4Gen) Next(v []uint8) ([]uint8, error) {
+func (g *func4Gen) Next(_ context.Context, v []uint8) ([]uint8, error) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	if g.aborted {
@@ -321,10 +326,17 @@ func (g *func4Gen) Next(v []uint8) ([]uint8, error) {
 	g.j++
 	return a, nil
 }
-func (g *func4Gen) Abort() error { g.mu.Lock(); g.aborted = true; g.mu.Unlock(); return nil }
-func (g *func4Gen) Close() error { g.mu.Lock(); g.j = 1000; g.mu.Unlock(); return nil }
+func (g *func4Gen) Abort(context.Context) error {
+	g.mu.Lock()
+	g.aborted = true
+	g.mu.Unlock()
+	return nil
+}
+func (g *func4Gen) Close(context.Context) error { g.mu.Lock(); g.j = 1000; g.mu.Unlock(); return nil }
 
-func (t *Testroot3) Gen_func4() (rr.Generator1[[]uint8, []uint8], error) { return &func4Gen{}, nil }
+func (t *Testroot3) Gen_func4(ctx context.Context) (rr.Generator1[[]uint8, []uint8], error) {
+	return &func4Gen{}, nil
+}
 
 type func1Gen struct {
 	mu      sync.Mutex
@@ -332,7 +344,7 @@ type func1Gen struct {
 	aborted bool
 }
 
-func (g *func1Gen) Next() (float64, error) {
+func (g *func1Gen) Next(context.Context) (float64, error) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	if g.aborted {
@@ -345,154 +357,169 @@ func (g *func1Gen) Next() (float64, error) {
 	g.j++
 	return v, nil
 }
-func (g *func1Gen) Abort() error { g.mu.Lock(); g.aborted = true; g.mu.Unlock(); return nil }
-func (g *func1Gen) Close() error { g.mu.Lock(); g.j = 1000; g.mu.Unlock(); return nil }
+func (g *func1Gen) Abort(context.Context) error {
+	g.mu.Lock()
+	g.aborted = true
+	g.mu.Unlock()
+	return nil
+}
+func (g *func1Gen) Close(context.Context) error { g.mu.Lock(); g.j = 1000; g.mu.Unlock(); return nil }
 
-func (t *Testroot3) Gen_func1() (rr.Generator2[float64], error) { return &func1Gen{}, nil }
-func (t *Testroot3) Gen_func2(name string) (rr.Generator2[[]uint8], error) {
+func (t *Testroot3) Gen_func1(ctx context.Context) (rr.Generator2[float64], error) {
+	return &func1Gen{}, nil
+}
+func (t *Testroot3) Gen_func2(ctx context.Context, name string) (rr.Generator2[[]uint8], error) {
 	r := make([][]uint8, 16)
 	for i := range r {
 		r[i] = []uint8{uint8(i)}
 	}
 	return rr.NewSliceGenerator2(r), nil
 }
-func (t *Testroot3) Gen_func3(name string) (rr.Generator3[[]uint8], error) { return nil, nil }
-func (t *Testroot3) Gen_func5() (rr.Generator1[*ts1.Teststruct2, *ts1.Teststruct2], error) {
+func (t *Testroot3) Gen_func3(ctx context.Context, name string) (rr.Generator3[[]uint8], error) {
+	return nil, nil
+}
+func (t *Testroot3) Gen_func5(ctx context.Context) (rr.Generator1[*ts1.Teststruct2, *ts1.Teststruct2], error) {
 	return nil, nil
 }
 
-func (t *Testroot3) GetTestnamedarray1() (ts3.Vector3, error) {
+func (t *Testroot3) Get_testnamedarray1(ctx context.Context) (ts3.Vector3, error) {
 	return FillTransform(74637).Translation, nil
 }
-func (t *Testroot3) SetTestnamedarray1(v ts3.Vector3) error {
+func (t *Testroot3) Set_testnamedarray1(ctx context.Context, v ts3.Vector3) error {
 	return check("testnamedarray1", v, FillTransform(3956378).Translation)
 }
-func (t *Testroot3) GetTestnamedarray2() (ts3.Transform, error) { return FillTransform(1294), nil }
-func (t *Testroot3) SetTestnamedarray2(v ts3.Transform) error {
+func (t *Testroot3) Get_testnamedarray2(ctx context.Context) (ts3.Transform, error) {
+	return FillTransform(1294), nil
+}
+func (t *Testroot3) Set_testnamedarray2(ctx context.Context, v ts3.Transform) error {
 	return check("testnamedarray2", v, FillTransform(827635))
 }
-func (t *Testroot3) GetTestnamedarray3() ([]ts3.Transform, error) {
+func (t *Testroot3) Get_testnamedarray3(ctx context.Context) ([]ts3.Transform, error) {
 	return FillTransformArray(8, 837512), nil
 }
-func (t *Testroot3) SetTestnamedarray3(v []ts3.Transform) error {
+func (t *Testroot3) Set_testnamedarray3(ctx context.Context, v []ts3.Transform) error {
 	return check("testnamedarray3", v, FillTransformArray(6, 19274))
 }
-func (t *Testroot3) GetTestnamedarray4() (*rr.NamedMultiDimArray[ts3.Transform], error) {
+func (t *Testroot3) Get_testnamedarray4(ctx context.Context) (*rr.NamedMultiDimArray[ts3.Transform], error) {
 	return FillTransformMultiDimArray(7, 2, 66134), nil
 }
-func (t *Testroot3) SetTestnamedarray4(v *rr.NamedMultiDimArray[ts3.Transform]) error {
+func (t *Testroot3) Set_testnamedarray4(ctx context.Context, v *rr.NamedMultiDimArray[ts3.Transform]) error {
 	return check("testnamedarray4", v, FillTransformMultiDimArray(5, 2, 6385))
 }
-func (t *Testroot3) GetTestnamedarray5() (*rr.NamedMultiDimArray[ts3.Transform], error) {
+func (t *Testroot3) Get_testnamedarray5(ctx context.Context) (*rr.NamedMultiDimArray[ts3.Transform], error) {
 	return FillTransformMultiDimArray(3, 2, 773142), nil
 }
-func (t *Testroot3) SetTestnamedarray5(v *rr.NamedMultiDimArray[ts3.Transform]) error {
+func (t *Testroot3) Set_testnamedarray5(ctx context.Context, v *rr.NamedMultiDimArray[ts3.Transform]) error {
 	return check("testnamedarray5", v, FillTransformMultiDimArray(3, 2, 7732))
 }
-func (t *Testroot3) Namedarray_m1() rr.NamedArrayMemory[ts3.Transform]         { return t.namedM1 }
-func (t *Testroot3) Namedarray_m2() rr.NamedMultiDimArrayMemory[ts3.Transform] { return t.namedM2 }
+func (t *Testroot3) Get_namedarray_m1() rr.NamedArrayMemory[ts3.Transform]         { return t.namedM1 }
+func (t *Testroot3) Get_namedarray_m2() rr.NamedMultiDimArrayMemory[ts3.Transform] { return t.namedM2 }
 
-func (t *Testroot3) GetC1() (complex128, error) { return complex(5.708705e+01, -2.328294e-03), nil }
-func (t *Testroot3) SetC1(v complex128) error {
+func (t *Testroot3) Get_c1(ctx context.Context) (complex128, error) {
+	return complex(5.708705e+01, -2.328294e-03), nil
+}
+func (t *Testroot3) Set_c1(ctx context.Context, v complex128) error {
 	return check("c1", v, complex(5.708705e+01, -2.328294e-03))
 }
-func (t *Testroot3) GetC2() ([]complex128, error) {
+func (t *Testroot3) Get_c2(ctx context.Context) ([]complex128, error) {
 	return cdoubles(vec[float64]("ts3.c2.to_client")), nil
 }
-func (t *Testroot3) SetC2(v []complex128) error {
+func (t *Testroot3) Set_c2(ctx context.Context, v []complex128) error {
 	return check("c2", v, cdoubles(vec[float64]("ts3.c2.to_service")))
 }
-func (t *Testroot3) GetC3() (*rr.MultiDimArray[complex128], error) {
+func (t *Testroot3) Get_c3(ctx context.Context) (*rr.MultiDimArray[complex128], error) {
 	return &rr.MultiDimArray[complex128]{Dims: vec[uint32]("ts3.c3.to_client.dims"), Array: cdoubles(vec[float64]("ts3.c3.to_client"))}, nil
 }
-func (t *Testroot3) SetC3(v *rr.MultiDimArray[complex128]) error {
+func (t *Testroot3) Set_c3(ctx context.Context, v *rr.MultiDimArray[complex128]) error {
 	return check("c3", v, &rr.MultiDimArray[complex128]{Dims: vec[uint32]("ts3.c3.to_service.dims"), Array: cdoubles(vec[float64]("ts3.c3.to_service"))})
 }
-func (t *Testroot3) GetC5() ([][]complex128, error) {
+func (t *Testroot3) Get_c5(ctx context.Context) ([][]complex128, error) {
 	return [][]complex128{cdoubles(vec[float64]("ts3.c5.to_client"))}, nil
 }
-func (t *Testroot3) SetC5(v [][]complex128) error {
+func (t *Testroot3) Set_c5(ctx context.Context, v [][]complex128) error {
 	return check("c5", v, [][]complex128{cdoubles(vec[float64]("ts3.c5.to_service"))})
 }
-func (t *Testroot3) GetC7() (complex64, error) {
+func (t *Testroot3) Get_c7(ctx context.Context) (complex64, error) {
 	return complex64(complex(-5.527021e-18, -9.848457e+03)), nil
 }
-func (t *Testroot3) SetC7(v complex64) error {
+func (t *Testroot3) Set_c7(ctx context.Context, v complex64) error {
 	return check("c7", v, complex64(complex(9.303345e-12, -3.865684e-05)))
 }
-func (t *Testroot3) GetC8() ([]complex64, error) {
+func (t *Testroot3) Get_c8(ctx context.Context) ([]complex64, error) {
 	return csingles(vec[float32]("ts3.c8.to_client")), nil
 }
-func (t *Testroot3) SetC8(v []complex64) error {
+func (t *Testroot3) Set_c8(ctx context.Context, v []complex64) error {
 	return check("c8", v, csingles(vec[float32]("ts3.c8.to_service")))
 }
-func (t *Testroot3) GetC9() (*rr.MultiDimArray[complex64], error) {
+func (t *Testroot3) Get_c9(ctx context.Context) (*rr.MultiDimArray[complex64], error) {
 	return &rr.MultiDimArray[complex64]{Dims: vec[uint32]("ts3.c9.to_client.dims"), Array: csingles(vec[float32]("ts3.c9.to_client"))}, nil
 }
-func (t *Testroot3) SetC9(v *rr.MultiDimArray[complex64]) error {
+func (t *Testroot3) Set_c9(ctx context.Context, v *rr.MultiDimArray[complex64]) error {
 	return check("c9", v, &rr.MultiDimArray[complex64]{Dims: vec[uint32]("ts3.c9.to_service.dims"), Array: csingles(vec[float32]("ts3.c9.to_service"))})
 }
-func (t *Testroot3) C_m1() rr.ArrayMemory[complex128]         { return t.cM1 }
-func (t *Testroot3) C_m2() rr.MultiDimArrayMemory[complex128] { return t.cM2 }
-func (t *Testroot3) C_m5() rr.ArrayMemory[bool]               { return t.cM5 }
-func (t *Testroot3) C_m6() rr.MultiDimArrayMemory[bool]       { return t.cM6 }
+func (t *Testroot3) Get_c_m1() rr.ArrayMemory[complex128]         { return t.cM1 }
+func (t *Testroot3) Get_c_m2() rr.MultiDimArrayMemory[complex128] { return t.cM2 }
+func (t *Testroot3) Get_c_m5() rr.ArrayMemory[bool]               { return t.cM5 }
+func (t *Testroot3) Get_c_m6() rr.MultiDimArrayMemory[bool]       { return t.cM6 }
 
-func (t *Testroot3) GetNolock_test() (ts3.Obj5, error) { return t.obj5, nil }
+func (t *Testroot3) Get_nolock_test(ctx context.Context) (ts3.Obj5, error) { return t.obj5, nil }
 
-func (t *Testroot3) GetB1() (bool, error) { return true, nil }
-func (t *Testroot3) SetB1(v bool) error   { return check("b1", v, true) }
-func (t *Testroot3) GetB2() ([]bool, error) {
+func (t *Testroot3) Get_b1(ctx context.Context) (bool, error) { return true, nil }
+func (t *Testroot3) Set_b1(ctx context.Context, v bool) error { return check("b1", v, true) }
+func (t *Testroot3) Get_b2(ctx context.Context) ([]bool, error) {
 	return []bool{true, false, true, true, false, true, false}, nil
 }
-func (t *Testroot3) SetB2(v []bool) error {
+func (t *Testroot3) Set_b2(ctx context.Context, v []bool) error {
 	return check("b2", v, []bool{true, false, false, true, true, true, false, true})
 }
-func (t *Testroot3) GetB3() (*rr.MultiDimArray[bool], error) {
+func (t *Testroot3) Get_b3(ctx context.Context) (*rr.MultiDimArray[bool], error) {
 	return &rr.MultiDimArray[bool]{Dims: []uint32{2, 2}, Array: []bool{false, true, true, false}}, nil
 }
-func (t *Testroot3) SetB3(v *rr.MultiDimArray[bool]) error {
+func (t *Testroot3) Set_b3(ctx context.Context, v *rr.MultiDimArray[bool]) error {
 	return check("b3", v, &rr.MultiDimArray[bool]{Dims: []uint32{2, 1}, Array: []bool{true, false}})
 }
-func (t *Testroot3) GetB4() ([]bool, error) { return []bool{true}, nil }
-func (t *Testroot3) SetB4(v []bool) error   { return check("b4", v, []bool{true}) }
-func (t *Testroot3) GetB5() ([][]bool, error) {
+func (t *Testroot3) Get_b4(ctx context.Context) ([]bool, error) { return []bool{true}, nil }
+func (t *Testroot3) Set_b4(ctx context.Context, v []bool) error { return check("b4", v, []bool{true}) }
+func (t *Testroot3) Get_b5(ctx context.Context) ([][]bool, error) {
 	return [][]bool{{false, true, false, false}}, nil
 }
-func (t *Testroot3) SetB5(v [][]bool) error { return check("b5", v, [][]bool{{true, false}}) }
-func (t *Testroot3) GetB6() ([]*rr.MultiDimArray[bool], error) {
+func (t *Testroot3) Set_b5(ctx context.Context, v [][]bool) error {
+	return check("b5", v, [][]bool{{true, false}})
+}
+func (t *Testroot3) Get_b6(ctx context.Context) ([]*rr.MultiDimArray[bool], error) {
 	return []*rr.MultiDimArray[bool]{{Dims: []uint32{2, 2}, Array: []bool{false, true, true, false}}}, nil
 }
-func (t *Testroot3) SetB6(v []*rr.MultiDimArray[bool]) error {
+func (t *Testroot3) Set_b6(ctx context.Context, v []*rr.MultiDimArray[bool]) error {
 	return check("b6", v, []*rr.MultiDimArray[bool]{{Dims: []uint32{2, 1}, Array: []bool{true, false}}})
 }
 
-func (t *Testroot3) Test_exception_params1() error {
+func (t *Testroot3) Test_exception_params1(ctx context.Context) error {
 	e := rr.NewInvalidOperation("test error")
 	e.SubName = "my_error"
 	e.Param = map[string]any{"param1": int32(10), "param2": "20"}
 	return e
 }
 
-func (t *Testroot3) Test_exception_params2() error {
+func (t *Testroot3) Test_exception_params2(ctx context.Context) error {
 	e := ts3.NewTest_exception4("test error2")
 	e.E.SubName = "my_error2"
 	e.E.Param = map[string]any{"param1": int32(30), "param2": "40"}
 	return e
 }
 
-func (t *Testroot3) Enum_generator1() (rr.Generator2[ts3.Testenum1], error) {
+func (t *Testroot3) Enum_generator1(ctx context.Context) (rr.Generator2[ts3.Testenum1], error) {
 	return rr.NewSliceGenerator2([]ts3.Testenum1{ts3.Testenum1_anothervalue, ts3.Testenum1_hexval1}), nil
 }
 
-func (t *Testroot3) Enum_generator2(a, b int32) (rr.Generator1[ts3.Testenum1, ts3.Testenum1], error) {
-	return &rr.Generator1Func[ts3.Testenum1, ts3.Testenum1]{NextFunc: func(v ts3.Testenum1) (ts3.Testenum1, error) { return v, nil }}, nil
+func (t *Testroot3) Enum_generator2(ctx context.Context, a, b int32) (rr.Generator1[ts3.Testenum1, ts3.Testenum1], error) {
+	return &rr.Generator1Func[ts3.Testenum1, ts3.Testenum1]{NextFunc: func(_ context.Context, v ts3.Testenum1) (ts3.Testenum1, error) { return v, nil }}, nil
 }
 
 type obj4Impl struct{ ts3.Obj4DefaultImpl }
 
-func (o *obj4Impl) GetS_ind() (string, error) { return "", nil }
-func (o *obj4Impl) GetI_ind() (int32, error)  { return 0, nil }
-func (o *obj4Impl) GetData() (string, error)  { return "", nil }
+func (o *obj4Impl) Get_s_ind(ctx context.Context) (string, error) { return "", nil }
+func (o *obj4Impl) Get_i_ind(ctx context.Context) (int32, error)  { return 0, nil }
+func (o *obj4Impl) Get_data(ctx context.Context) (string, error)  { return "", nil }
 
 type obj5Impl struct {
 	ts3.Obj5DefaultImpl
@@ -504,11 +531,11 @@ func newObj5() *obj5Impl {
 		m3: rr.NewArrayMemory(make([]int32, 100))}
 }
 
-func (o *obj5Impl) M1() rr.ArrayMemory[int32] { return o.m1 }
-func (o *obj5Impl) M2() rr.ArrayMemory[int32] { return o.m2 }
-func (o *obj5Impl) M3() rr.ArrayMemory[int32] { return o.m3 }
-func (o *obj5Impl) F1() (int32, error)        { return 10, nil }
-func (o *obj5Impl) F2() (int32, error)        { return 11, nil }
+func (o *obj5Impl) Get_m1() rr.ArrayMemory[int32]         { return o.m1 }
+func (o *obj5Impl) Get_m2() rr.ArrayMemory[int32]         { return o.m2 }
+func (o *obj5Impl) Get_m3() rr.ArrayMemory[int32]         { return o.m3 }
+func (o *obj5Impl) F1(ctx context.Context) (int32, error) { return 10, nil }
+func (o *obj5Impl) F2(ctx context.Context) (int32, error) { return 11, nil }
 
 // RegisterTestService3 registers RobotRaconteurTestService2 (TestService3)
 // as the C++ RobotRaconteurTestService2Support.

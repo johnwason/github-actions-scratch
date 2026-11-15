@@ -1,6 +1,7 @@
 package robotraconteur
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -50,30 +51,21 @@ func (w *Wire[T]) Direction() MemberDirection {
 }
 
 // Connect connects the wire (client).
-func (w *Wire[T]) Connect() (*WireConnection[T], error) {
+func (w *Wire[T]) Connect(ctx context.Context) (*WireConnection[T], error) {
 	if w.client == nil {
 		return nil, NewInvalidOperation("wire is not a client wire")
 	}
-	c, err := call(func() swig.WrappedWireConnection { return w.client.Connect() })
-	if err != nil {
-		return nil, err
-	}
-	return newWireConnection(c, w.codec)
-}
-
-// AsyncConnect connects the wire asynchronously (client).
-func (w *Wire[T]) AsyncConnect(timeout time.Duration, handler func(*WireConnection[T], error)) {
-	if w.client == nil {
-		go handler(nil, NewInvalidOperation("wire is not a client wire"))
-		return
-	}
-	impl := &asyncWireConnection[T]{codec: w.codec, handler: handler}
-	d := swig.NewDirectorAsyncWireConnectionReturnDirector(impl)
-	id := heapAdd(impl, func() { swig.DeleteDirectorAsyncWireConnectionReturnDirector(d) })
-	if err := callVoid(func() { w.client.AsyncConnect(timeoutMs(timeout), d, id) }); err != nil {
-		heapRemove(id)
-		go handler(nil, err)
-	}
+	return await(ctx, func(done func(*WireConnection[T], error)) error {
+		impl := &asyncWireConnection[T]{codec: w.codec, handler: done}
+		d := swig.NewDirectorAsyncWireConnectionReturnDirector(impl)
+		id := heapAdd(impl, func() { swig.DeleteDirectorAsyncWireConnectionReturnDirector(d) })
+		t := DefaultNode().requestTimeoutMs(ctx)
+		err := startNative(func() error { w.client.AsyncConnect(t, d, id); return nil })
+		if err != nil {
+			heapRemove(id)
+		}
+		return err
+	}, func(c *WireConnection[T]) { _ = c.Close() })
 }
 
 type asyncWireConnection[T any] struct {
@@ -82,16 +74,16 @@ type asyncWireConnection[T any] struct {
 }
 
 func (a *asyncWireConnection[T]) Handler(c swig.WrappedWireConnection, info swig.HandlerErrorInfo) {
+	defer recoverDirector()
 	err := errorFromInfo(info)
 	if err != nil {
 		if c != nil && c.Swigcptr() != 0 {
 			swig.DeleteWrappedWireConnection(c)
 		}
-		go a.handler(nil, err)
+		a.handler(nil, err)
 		return
 	}
-	wc, err := newWireConnection(c, a.codec)
-	go a.handler(wc, err)
+	a.handler(newWireConnection(c, a.codec))
 }
 
 func (w *Wire[T]) unpack(m swig.MessageElement) (T, error) {
@@ -107,47 +99,64 @@ func (w *Wire[T]) unpack(m swig.MessageElement) (T, error) {
 	return w.codec.Unpack(e)
 }
 
-func (w *Wire[T]) peek(f func(swig.TimeSpec) swig.MessageElement) (T, TimeSpec, error) {
-	var out T
-	var ts TimeSpec
-	var cerr error
-	err := callVoid(func() {
-		t := swig.NewTimeSpec__SWIG_0()
-		defer swig.DeleteTimeSpec(t)
-		m := f(t)
-		if swig.Rrgo_error_pending() {
-			return
+type wirePeekValue[T any] struct {
+	v  T
+	ts TimeSpec
+}
+
+type asyncWirePeek[T any] struct {
+	w       *Wire[T]
+	handler func(wirePeekValue[T], error)
+}
+
+// Handler owns value (a Go handle); ts is owned by C++.
+func (a *asyncWirePeek[T]) Handler(value swig.MessageElement, ts swig.TimeSpec, info swig.HandlerErrorInfo) {
+	defer recoverDirector()
+	if err := errorFromInfo(info); err != nil {
+		if value != nil && value.Swigcptr() != 0 {
+			swig.DeleteMessageElement(value)
 		}
-		ts = timeSpecFromNative(t)
-		out, cerr = w.unpack(m)
-	})
-	if err != nil {
-		var zero T
-		return zero, TimeSpec{}, err
+		a.handler(wirePeekValue[T]{}, err)
+		return
 	}
-	return out, ts, cerr
+	v, err := a.w.unpack(value)
+	a.handler(wirePeekValue[T]{v: v, ts: timeSpecFromNative(ts)}, err)
+}
+
+func (w *Wire[T]) peek(ctx context.Context, out bool) (T, TimeSpec, error) {
+	if w.client == nil {
+		var zero T
+		return zero, TimeSpec{}, NewInvalidOperation("wire is not a client wire")
+	}
+	r, err := await(ctx, func(done func(wirePeekValue[T], error)) error {
+		impl := &asyncWirePeek[T]{w: w, handler: done}
+		d := swig.NewDirectorAsyncWirePeekReturnDirector(impl)
+		id := heapAdd(impl, func() { swig.DeleteDirectorAsyncWirePeekReturnDirector(d) })
+		t := DefaultNode().requestTimeoutMs(ctx)
+		err := startNative(func() error {
+			if out {
+				w.client.AsyncPeekOutValue(t, d, id)
+			} else {
+				w.client.AsyncPeekInValue(t, d, id)
+			}
+			return nil
+		})
+		if err != nil {
+			heapRemove(id)
+		}
+		return err
+	}, nil)
+	return r.v, r.ts, err
 }
 
 // PeekInValue reads the current in value without connecting (client).
-func (w *Wire[T]) PeekInValue() (T, TimeSpec, error) {
-	if w.client == nil {
-		var zero T
-		return zero, TimeSpec{}, NewInvalidOperation("wire is not a client wire")
-	}
-	return w.peek(func(t swig.TimeSpec) swig.MessageElement { return w.client.PeekInValue(t) })
-}
+func (w *Wire[T]) PeekInValue(ctx context.Context) (T, TimeSpec, error) { return w.peek(ctx, false) }
 
 // PeekOutValue reads the current out value without connecting (client).
-func (w *Wire[T]) PeekOutValue() (T, TimeSpec, error) {
-	if w.client == nil {
-		var zero T
-		return zero, TimeSpec{}, NewInvalidOperation("wire is not a client wire")
-	}
-	return w.peek(func(t swig.TimeSpec) swig.MessageElement { return w.client.PeekOutValue(t) })
-}
+func (w *Wire[T]) PeekOutValue(ctx context.Context) (T, TimeSpec, error) { return w.peek(ctx, true) }
 
 // PokeOutValue writes the out value without connecting (client).
-func (w *Wire[T]) PokeOutValue(v T) error {
+func (w *Wire[T]) PokeOutValue(ctx context.Context, v T) error {
 	if w.client == nil {
 		return NewInvalidOperation("wire is not a client wire")
 	}
@@ -155,20 +164,24 @@ func (w *Wire[T]) PokeOutValue(v T) error {
 	if err != nil {
 		return err
 	}
-	var cerr error
-	err = callVoid(func() {
-		m, err := toNative(e)
+	_, err = await(ctx, func(done func(struct{}, error)) error {
+		d, id := newAsyncVoid(func(err error) { done(struct{}{}, err) })
+		t := DefaultNode().requestTimeoutMs(ctx)
+		err := startNative(func() error {
+			m, err := toNative(e)
+			if err != nil {
+				return err
+			}
+			defer swig.DeleteMessageElement(m)
+			w.client.AsyncPokeOutValue(m, t, d, id)
+			return nil
+		})
 		if err != nil {
-			cerr = err
-			return
+			heapRemove(id)
 		}
-		defer swig.DeleteMessageElement(m)
-		w.client.PokeOutValue(m)
-	})
-	if err != nil {
 		return err
-	}
-	return cerr
+	}, nil)
+	return err
 }
 
 // WireConnection is a connected wire.
@@ -179,12 +192,15 @@ type WireConnection[T any] struct {
 	valueChanged Event[func(c *WireConnection[T], value T, ts TimeSpec)]
 	mu           sync.Mutex
 	closed       func(*WireConnection[T])
+	isClosed     bool
+	changed      signal // value received, out value set or connection closed
 }
 
 type wireConnectionDirector[T any] struct{ c *WireConnection[T] }
 
 func (d *wireConnectionDirector[T]) WireValueChanged(value swig.MessageElement, ts swig.TimeSpec) {
 	defer recoverDirector()
+	defer d.c.changed.notify()
 	if value != nil && value.Swigcptr() != 0 {
 		defer swig.DeleteMessageElement(value)
 	}
@@ -210,7 +226,9 @@ func (d *wireConnectionDirector[T]) WireConnectionClosedCallback() {
 	defer recoverDirector()
 	d.c.mu.Lock()
 	f := d.c.closed
+	d.c.isClosed = true
 	d.c.mu.Unlock()
+	d.c.changed.notify()
 	if f != nil {
 		f(d.c)
 	}
@@ -285,6 +303,7 @@ func (c *WireConnection[T]) SetOutValue(v T) error {
 		defer swig.DeleteMessageElement(m)
 		c.native.SetOutValue(m)
 	})
+	c.changed.notify()
 	if err != nil {
 		return err
 	}
@@ -338,20 +357,30 @@ func (c *WireConnection[T]) InValueValid() bool { return c.native.GetInValueVali
 // OutValueValid reports whether the out value is valid.
 func (c *WireConnection[T]) OutValueValid() bool { return c.native.GetOutValueValid() }
 
-// WaitInValueValid waits for the in value to become valid.
-func (c *WireConnection[T]) WaitInValueValid(timeout time.Duration) (bool, error) {
-	t := timeoutMs(timeout)
-	return call(func() bool {
-		return swig.SwigcptrWrappedWireConnection(c.native.Swigcptr()).WaitInValueValid__SWIG_0(t)
+func (c *WireConnection[T]) waitValid(ctx context.Context, valid func() bool) error {
+	_, err := waitFor(ctx, &c.changed, func() (struct{}, bool, error) {
+		if valid() {
+			return struct{}{}, true, nil
+		}
+		c.mu.Lock()
+		closed := c.isClosed
+		c.mu.Unlock()
+		if closed {
+			return struct{}{}, false, NewConnectionError("wire connection closed")
+		}
+		return struct{}{}, false, nil
 	})
+	return err
+}
+
+// WaitInValueValid waits for the in value to become valid.
+func (c *WireConnection[T]) WaitInValueValid(ctx context.Context) error {
+	return c.waitValid(ctx, c.InValueValid)
 }
 
 // WaitOutValueValid waits for the out value to become valid.
-func (c *WireConnection[T]) WaitOutValueValid(timeout time.Duration) (bool, error) {
-	t := timeoutMs(timeout)
-	return call(func() bool {
-		return swig.SwigcptrWrappedWireConnection(c.native.Swigcptr()).WaitOutValueValid__SWIG_0(t)
-	})
+func (c *WireConnection[T]) WaitOutValueValid(ctx context.Context) error {
+	return c.waitValid(ctx, c.OutValueValid)
 }
 
 // LastValueReceivedTime returns the timestamp of the last received value.
@@ -416,16 +445,10 @@ func (c *WireConnection[T]) SetWireConnectionClosedCallback(f func(*WireConnecti
 	c.mu.Unlock()
 }
 
-// Close closes the connection.
+// Close closes the connection and waits for the close to complete (bounded
+// by the request timeout).
 func (c *WireConnection[T]) Close() error {
-	return callVoid(func() { c.native.Close() })
-}
-
-// AsyncClose closes the connection asynchronously.
-func (c *WireConnection[T]) AsyncClose(timeout time.Duration, handler func(error)) {
-	d, id := newAsyncVoid(handler)
-	if err := callVoid(func() { c.native.AsyncClose(timeoutMs(timeout), d, id) }); err != nil {
-		heapRemove(id)
-		go handler(err)
-	}
+	return awaitVoid(context.Background(), func(t int32, d swig.AsyncVoidReturnDirector, id int32) {
+		c.native.AsyncClose(t, d, id)
+	})
 }

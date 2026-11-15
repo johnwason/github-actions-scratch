@@ -8,6 +8,7 @@ import (
 )
 
 func TestBroadcastDownsampler(t *testing.T) {
+	ctx := t.Context()
 	if _, err := rr.NewBroadcastDownsampler(nil, 1); err == nil {
 		t.Error("expected error for nil context")
 	}
@@ -28,7 +29,7 @@ func TestBroadcastDownsampler(t *testing.T) {
 	}
 
 	r := connect(t)
-	c, err := r.Broadcastwire().Connect()
+	c, err := r.Get_broadcastwire().Connect(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,7 +42,7 @@ func TestBroadcastDownsampler(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if ok, _ := c.WaitInValueValid(100 * time.Millisecond); ok {
+		if c.WaitInValueValid(within(t, 100*time.Millisecond)) == nil {
 			v, err := c.InValue()
 			if err != nil || v != 42 {
 				t.Fatalf("in value %v %v", v, err)

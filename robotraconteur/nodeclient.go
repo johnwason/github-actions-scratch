@@ -1,6 +1,7 @@
 package robotraconteur
 
 import (
+	"context"
 	"runtime"
 	"time"
 
@@ -19,23 +20,37 @@ const (
 )
 
 // RequestObjectLock locks obj (and its sub objects) on the service.
-func (n *Node) RequestObjectLock(obj any, flags ObjectLockFlags) (string, error) {
+func (n *Node) RequestObjectLock(ctx context.Context, obj any, flags ObjectLockFlags) (string, error) {
 	b, err := stubBaseOf(obj)
 	if err != nil {
 		return "", err
 	}
-	return call(func() string {
-		return n.native.RequestObjectLock(b.inner, swig.RobotRaconteurRobotRaconteurObjectLockFlags(flags))
+	return n.awaitString(ctx, func(t int32, d swig.AsyncStringReturnDirector, id int32) {
+		n.native.AsyncRequestObjectLock(b.inner, swig.RobotRaconteurRobotRaconteurObjectLockFlags(flags), t, d, id)
 	})
 }
 
 // ReleaseObjectLock releases an object lock.
-func (n *Node) ReleaseObjectLock(obj any) (string, error) {
+func (n *Node) ReleaseObjectLock(ctx context.Context, obj any) (string, error) {
 	b, err := stubBaseOf(obj)
 	if err != nil {
 		return "", err
 	}
-	return call(func() string { return n.native.ReleaseObjectLock(b.inner) })
+	return n.awaitString(ctx, func(t int32, d swig.AsyncStringReturnDirector, id int32) {
+		n.native.AsyncReleaseObjectLock(b.inner, t, d, id)
+	})
+}
+
+func (n *Node) awaitString(ctx context.Context, start func(t int32, d swig.AsyncStringReturnDirector, id int32)) (string, error) {
+	return await(ctx, func(done func(string, error)) error {
+		d, id := newAsyncString(done)
+		t := n.requestTimeoutMs(ctx)
+		err := startNative(func() error { start(t, d, id); return nil })
+		if err != nil {
+			heapRemove(id)
+		}
+		return err
+	}, nil)
 }
 
 // WithMonitorLock runs f while holding the monitor lock of obj (a short

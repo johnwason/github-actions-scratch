@@ -1,6 +1,7 @@
 package robotraconteur
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"sync"
@@ -16,6 +17,13 @@ type Node struct {
 
 	mu         sync.Mutex
 	registered map[string]ServiceFactory
+	services   map[string]*ServerContext
+}
+
+func (n *Node) registeredService(name string) *ServerContext {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	return n.services[name]
 }
 
 var defaultNode struct {
@@ -112,7 +120,6 @@ type connectOptions struct {
 	credentials map[string]any
 	objectType  string
 	listener    func(ClientServiceListenerEvent)
-	timeout     time.Duration
 }
 
 // WithCredentials sets the username and credentials used for authentication.
@@ -123,11 +130,6 @@ func WithCredentials(username string, credentials map[string]any) ConnectOption 
 // WithObjectType sets the requested root object type (recommended).
 func WithObjectType(objectType string) ConnectOption {
 	return func(o *connectOptions) { o.objectType = objectType }
-}
-
-// WithConnectTimeout sets the timeout for AsyncConnectService.
-func WithConnectTimeout(t time.Duration) ConnectOption {
-	return func(o *connectOptions) { o.timeout = t }
 }
 
 func (n *Node) packCredentials(cred map[string]any) (swig.MessageElementData, error) {
@@ -148,16 +150,18 @@ func (n *Node) packCredentials(cred map[string]any) (swig.MessageElementData, er
 
 // ConnectService connects to a service and returns the root object
 // reference (a generated stub, e.g. experimental_reynard_the_robot.Reynard).
-func (n *Node) ConnectService(url string, opts ...ConnectOption) (any, error) {
-	return n.connectService([]string{url}, opts...)
+// Without a ctx deadline the connection attempt times out after twice the
+// request timeout.
+func (n *Node) ConnectService(ctx context.Context, url string, opts ...ConnectOption) (any, error) {
+	return n.connectService(ctx, []string{url}, opts...)
 }
 
 // ConnectServiceURLs connects using a list of candidate URLs for the same service.
-func (n *Node) ConnectServiceURLs(urls []string, opts ...ConnectOption) (any, error) {
-	return n.connectService(urls, opts...)
+func (n *Node) ConnectServiceURLs(ctx context.Context, urls []string, opts ...ConnectOption) (any, error) {
+	return n.connectService(ctx, urls, opts...)
 }
 
-func (n *Node) connectService(urls []string, opts ...ConnectOption) (any, error) {
+func (n *Node) connectService(ctx context.Context, urls []string, opts ...ConnectOption) (any, error) {
 	var o connectOptions
 	for _, f := range opts {
 		f(&o)
@@ -165,70 +169,34 @@ func (n *Node) connectService(urls []string, opts ...ConnectOption) (any, error)
 	if err := n.RegisterServiceTypes(); err != nil {
 		return nil, err
 	}
-	var cerr error
-	stub, err := call(func() swig.WrappedServiceStub {
-		cred, err := n.packCredentials(o.credentials)
-		if err != nil {
-			cerr = err
+	return await(ctx, func(done func(any, error)) error {
+		d, id := newAsyncStub(n, done)
+		t := ctxTimeoutMs(ctx, 2*n.RequestTimeout())
+		err := startNative(func() error {
+			cred, err := n.packCredentials(o.credentials)
+			if err != nil {
+				return err
+			}
+			if cred != nil {
+				defer swig.DeleteMessageElementData(cred)
+			}
+			urlv := swig.NewVectorstring()
+			defer swig.DeleteVectorstring(urlv)
+			for _, u := range urls {
+				urlv.Add(u)
+			}
+			var listener swig.ClientServiceListenerDirector
+			if o.listener != nil {
+				listener = newClientServiceListener(n, o.listener)
+			}
+			swig.SwigcptrRobotRaconteurNode(n.native.Swigcptr()).AsyncConnectService__SWIG_1(urlv, o.username, cred, listener, o.objectType, t, d, id)
 			return nil
-		}
-		if cred != nil {
-			defer swig.DeleteMessageElementData(cred)
-		}
-		urlv := swig.NewVectorstring()
-		defer swig.DeleteVectorstring(urlv)
-		for _, u := range urls {
-			urlv.Add(u)
-		}
-		var listener swig.ClientServiceListenerDirector
-		if o.listener != nil {
-			listener = newClientServiceListener(n, o.listener)
-		}
-		return swig.SwigcptrRobotRaconteurNode(n.native.Swigcptr()).ConnectService__SWIG_5(urlv, o.username, cred, listener, o.objectType)
-	})
-	if cerr != nil {
-		return nil, cerr
-	}
-	if err != nil {
-		return nil, err
-	}
-	return n.stubFromNative(stub)
-}
-
-// AsyncConnectService connects asynchronously; handler receives the root object.
-func (n *Node) AsyncConnectService(url string, handler func(any, error), opts ...ConnectOption) {
-	o := connectOptions{timeout: TimeoutInfinite}
-	for _, f := range opts {
-		f(&o)
-	}
-	if err := n.RegisterServiceTypes(); err != nil {
-		go handler(nil, err)
-		return
-	}
-	d, id := newAsyncStub(n, handler)
-	var cerr error
-	err := callVoid(func() {
-		cred, err := n.packCredentials(o.credentials)
+		})
 		if err != nil {
-			cerr = err
-			return
+			heapRemove(id)
 		}
-		if cred != nil {
-			defer swig.DeleteMessageElementData(cred)
-		}
-		var listener swig.ClientServiceListenerDirector
-		if o.listener != nil {
-			listener = newClientServiceListener(n, o.listener)
-		}
-		swig.SwigcptrRobotRaconteurNode(n.native.Swigcptr()).AsyncConnectService__SWIG_0(url, o.username, cred, listener, o.objectType, timeoutMs(o.timeout), d, id)
-	})
-	if cerr != nil {
-		err = cerr
-	}
-	if err != nil {
-		heapRemove(id)
-		go handler(nil, err)
-	}
+		return err
+	}, func(obj any) { _ = n.DisconnectService(obj) })
 }
 
 // stubFromNative converts a native stub into its Go client object, reusing
@@ -287,13 +255,22 @@ func stubBaseOf(obj any) (*StubBase, error) {
 	return h.RRStubBase(), nil
 }
 
-// DisconnectService disconnects the client connection of obj.
+// DisconnectService disconnects the client connection of obj. It waits for
+// the disconnect to complete.
 func (n *Node) DisconnectService(obj any) error {
 	b, err := stubBaseOf(obj)
 	if err != nil {
 		return err
 	}
-	return callVoid(func() { n.native.DisconnectService(b.inner) })
+	_, err = await(context.Background(), func(done func(struct{}, error)) error {
+		d, id := newAsyncVoidNoErr(func() { done(struct{}{}, nil) })
+		err := startNative(func() error { n.native.AsyncDisconnectService(b.inner, d, id); return nil })
+		if err != nil {
+			heapRemove(id)
+		}
+		return err
+	}, nil)
+	return err
 }
 
 // RequestTimeout returns the default timeout for requests.

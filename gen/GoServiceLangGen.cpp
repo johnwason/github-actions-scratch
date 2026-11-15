@@ -47,7 +47,8 @@ struct GenContext
     std::set<std::string> imports; // service names imported by generated code
     bool uses_time;
     bool uses_strconv;
-    GenContext() : uses_time(false), uses_strconv(false) {}
+    bool uses_sync;
+    GenContext() : uses_time(false), uses_strconv(false), uses_sync(false) {}
 };
 
 const char* go_keywords[] = {"break",     "case",   "chan",   "const",  "continue", "default", "defer",
@@ -868,6 +869,53 @@ bool objref_index_type(const RR_SHARED_PTR<ObjRefDefinition>& o, std::string& in
     }
 }
 
+
+// value type of a pipe/wire member
+std::string member_value_type(GenContext& ctx, const RR_SHARED_PTR<TypeDefinition>& t) { return go_type(ctx, *t); }
+
+struct MemoryInfo
+{
+    std::string iface;      // rr.ArrayMemory[float64]
+    std::string client_new; // rr.NewArrayMemoryClient[float64]
+    std::string server_new; // rr.NewArrayMemoryServer[float64]
+};
+
+MemoryInfo memory_info(GenContext& ctx, const RR_SHARED_PTR<MemoryDefinition>& m)
+{
+    MemoryInfo o;
+    const TypeDefinition& t = *m->Type;
+    bool md = t.ArrayType == DataTypes_ArrayTypes_multidimarray;
+    if (IsTypeNumeric(t.Type))
+    {
+        std::string p = go_primitive(t.Type);
+        std::string k = md ? "MultiDimArrayMemory" : "ArrayMemory";
+        o.iface = "rr." + k + "[" + p + "]";
+        o.client_new = "rr.New" + k + "Client[" + p + "]";
+        o.server_new = "rr.New" + k + "Server[" + p + "]";
+        return o;
+    }
+    RR_SHARED_PTR<NamedTypeDefinition> nt = resolve(ctx, t);
+    std::string ref = go_named_ref(ctx, nt);
+    if (nt->RRDataType() == DataTypes_pod_t)
+    {
+        std::string k = md ? "PodMultiDimArrayMemory" : "PodArrayMemory";
+        o.iface = "rr." + k + "[" + ref + "]";
+        o.client_new = "rr.New" + k + "Client[" + ref + "]";
+        o.server_new = "rr.New" + k + "Server[" + ref + "]";
+        return o;
+    }
+    if (nt->RRDataType() == DataTypes_namedarray_t)
+    {
+        std::string el = namedarray_element_type(ctx, RR_DYNAMIC_POINTER_CAST<ServiceEntryDefinition>(nt));
+        std::string k = md ? "NamedMultiDimArrayMemory" : "NamedArrayMemory";
+        o.iface = "rr." + k + "[" + ref + "]";
+        o.client_new = "rr.New" + k + "Client[" + ref + ", " + el + "]";
+        o.server_new = "rr.New" + k + "Server[" + ref + ", " + el + "]";
+        return o;
+    }
+    throw DataTypeException("Invalid memory type");
+}
+
 void GenerateObjectInterface(GenContext& ctx, const RR_SHARED_PTR<ServiceEntryDefinition>& e, std::ostream& w)
 {
     std::string name = exported(e->Name);
@@ -911,7 +959,18 @@ void GenerateObjectInterface(GenContext& ctx, const RR_SHARED_PTR<ServiceEntryDe
         {
             w << "\t" << n << "() *rr.Callback[" << callback_func_type(ctx, cb) << "]\n";
         }
-        // TODO(pipes, wires, memories)
+        else if (RR_SHARED_PTR<PipeDefinition> pp = RR_DYNAMIC_POINTER_CAST<PipeDefinition>(m))
+        {
+            w << "\t" << n << "() *rr.Pipe[" << member_value_type(ctx, pp->Type) << "]\n";
+        }
+        else if (RR_SHARED_PTR<WireDefinition> wd = RR_DYNAMIC_POINTER_CAST<WireDefinition>(m))
+        {
+            w << "\t" << n << "() *rr.Wire[" << member_value_type(ctx, wd->Type) << "]\n";
+        }
+        else if (RR_SHARED_PTR<MemoryDefinition> md = RR_DYNAMIC_POINTER_CAST<MemoryDefinition>(m))
+        {
+            w << "\t" << n << "() " << memory_info(ctx, md).iface << "\n";
+        }
     }
     w << "}\n\n";
 
@@ -957,10 +1016,12 @@ std::string pack_args(GenContext& ctx, const std::vector<RR_SHARED_PTR<TypeDefin
                       const std::string& indent = "\t")
 {
     std::ostringstream o;
-    o << indent << "var rr_b rr.ElementBuilder\n";
+    // inside skeleton closures (deeper indent) the builder is rr_b2 (rr_b is the SkelBase)
+    std::string bn = indent.size() > 2 ? "rr_b2" : "rr_b";
+    o << indent << "var " << bn << " rr.ElementBuilder\n";
     BOOST_FOREACH (const RR_SHARED_PTR<TypeDefinition>& p, params)
     {
-        o << indent << "rr.PackField(&rr_b, " << go_string_literal(p->Name) << ", " << fix_local(p->Name) << ", "
+        o << indent << "rr.PackField(&" << bn << ", " << go_string_literal(p->Name) << ", " << fix_local(p->Name) << ", "
           << go_codec(ctx, *p) << ")\n";
     }
     return o.str();
@@ -992,8 +1053,30 @@ void GenerateStub(GenContext& ctx, const RR_SHARED_PTR<ServiceEntryDefinition>& 
             w << "\trr_" << ev->Name << " rr.Event[" << event_func_type(ctx, ev) << "]\n";
         if (RR_SHARED_PTR<CallbackDefinition> cb = RR_DYNAMIC_POINTER_CAST<CallbackDefinition>(m))
             w << "\trr_" << cb->Name << " rr.Callback[" << callback_func_type(ctx, cb) << "]\n";
+        if (RR_SHARED_PTR<PipeDefinition> pp = RR_DYNAMIC_POINTER_CAST<PipeDefinition>(m))
+            w << "\trr_" << pp->Name << " *rr.Pipe[" << member_value_type(ctx, pp->Type) << "]\n";
+        if (RR_SHARED_PTR<WireDefinition> wd = RR_DYNAMIC_POINTER_CAST<WireDefinition>(m))
+            w << "\trr_" << wd->Name << " *rr.Wire[" << member_value_type(ctx, wd->Type) << "]\n";
+        if (RR_SHARED_PTR<MemoryDefinition> md = RR_DYNAMIC_POINTER_CAST<MemoryDefinition>(m))
+            w << "\trr_" << md->Name << " " << memory_info(ctx, md).iface << "\n";
     }
     w << "}\n\n";
+    // client side member initialization
+    w << "func (rr_s *" << sn << ") rrInitClient() error {\n\tvar rr_err error\n\t_ = rr_err\n";
+    BOOST_FOREACH (const RR_SHARED_PTR<MemberDefinition>& m, e->Members)
+    {
+        std::string mname = go_string_literal(m->Name);
+        if (RR_SHARED_PTR<PipeDefinition> pp = RR_DYNAMIC_POINTER_CAST<PipeDefinition>(m))
+            w << "\tif rr_s.rr_" << pp->Name << ", rr_err = rr.NewPipeClient(rr_s.StubBase, " << mname << ", "
+              << go_codec(ctx, *pp->Type) << "); rr_err != nil {\n\t\treturn rr_err\n\t}\n";
+        if (RR_SHARED_PTR<WireDefinition> wd = RR_DYNAMIC_POINTER_CAST<WireDefinition>(m))
+            w << "\tif rr_s.rr_" << wd->Name << ", rr_err = rr.NewWireClient(rr_s.StubBase, " << mname << ", "
+              << go_codec(ctx, *wd->Type) << "); rr_err != nil {\n\t\treturn rr_err\n\t}\n";
+        if (RR_SHARED_PTR<MemoryDefinition> md = RR_DYNAMIC_POINTER_CAST<MemoryDefinition>(m))
+            w << "\tif rr_s.rr_" << md->Name << ", rr_err = " << memory_info(ctx, md).client_new
+              << "(rr_s.StubBase, " << mname << "); rr_err != nil {\n\t\treturn rr_err\n\t}\n";
+    }
+    w << "\treturn nil\n}\n\n";
     w << "var _ " << name << " = (*" << sn << ")(nil)\n";
     w << "var _ Async" << name << " = (*" << sn << ")(nil)\n\n";
 
@@ -1053,6 +1136,21 @@ void GenerateStub(GenContext& ctx, const RR_SHARED_PTR<ServiceEntryDefinition>& 
         {
             w << "func (rr_s *" << sn << ") " << n << "() *rr.Callback[" << callback_func_type(ctx, cb)
               << "] { return &rr_s.rr_" << cb->Name << " }\n\n";
+        }
+        else if (RR_SHARED_PTR<PipeDefinition> pp = RR_DYNAMIC_POINTER_CAST<PipeDefinition>(m))
+        {
+            w << "func (rr_s *" << sn << ") " << n << "() *rr.Pipe[" << member_value_type(ctx, pp->Type)
+              << "] { return rr_s.rr_" << pp->Name << " }\n\n";
+        }
+        else if (RR_SHARED_PTR<WireDefinition> wd = RR_DYNAMIC_POINTER_CAST<WireDefinition>(m))
+        {
+            w << "func (rr_s *" << sn << ") " << n << "() *rr.Wire[" << member_value_type(ctx, wd->Type)
+              << "] { return rr_s.rr_" << wd->Name << " }\n\n";
+        }
+        else if (RR_SHARED_PTR<MemoryDefinition> md = RR_DYNAMIC_POINTER_CAST<MemoryDefinition>(m))
+        {
+            w << "func (rr_s *" << sn << ") " << n << "() " << memory_info(ctx, md).iface << " { return rr_s.rr_"
+              << md->Name << " }\n\n";
         }
         else if (RR_SHARED_PTR<ObjRefDefinition> o = RR_DYNAMIC_POINTER_CAST<ObjRefDefinition>(m))
         {
@@ -1121,6 +1219,284 @@ void GenerateStub(GenContext& ctx, const RR_SHARED_PTR<ServiceEntryDefinition>& 
     w << "\t}\n\t_ = rr_args\n\treturn nil, rr.NewMemberNotFound(\"callback \" + rr_name + \" not found\")\n}\n\n";
 }
 
+
+void GenerateSkel(GenContext& ctx, const RR_SHARED_PTR<ServiceEntryDefinition>& e, std::ostream& w)
+{
+    std::string name = exported(e->Name);
+    std::string kn = lower_first(name) + "Skel";
+    std::map<std::string, std::string> mn = exported_names(e->Members);
+
+    w << "type " << kn << " struct {\n\tobj " << name << "\n}\n\n";
+
+    // RRInit: pipes, wires, events, callbacks
+    w << "func (rr_s *" << kn << ") RRInit(rr_b *rr.SkelBase) error {\n";
+    BOOST_FOREACH (const RR_SHARED_PTR<MemberDefinition>& m, e->Members)
+    {
+        std::string n = mn[m->Name];
+        std::string mname = go_string_literal(m->Name);
+        if (RR_SHARED_PTR<PipeDefinition> pp = RR_DYNAMIC_POINTER_CAST<PipeDefinition>(m))
+        {
+            std::string vt = member_value_type(ctx, pp->Type);
+            w << "\tif rr_p, rr_err := rr.NewPipeServer(rr_b, " << mname << ", " << go_codec(ctx, *pp->Type)
+              << "); rr_err != nil {\n\t\treturn rr_err\n\t} else if rr_set, rr_ok := rr_s.obj.(interface{ Set" << n
+              << "(*rr.Pipe[" << vt << "]) }); rr_ok {\n\t\trr_set.Set" << n << "(rr_p)\n\t}\n";
+        }
+        else if (RR_SHARED_PTR<WireDefinition> wd = RR_DYNAMIC_POINTER_CAST<WireDefinition>(m))
+        {
+            std::string vt = member_value_type(ctx, wd->Type);
+            w << "\tif rr_w, rr_err := rr.NewWireServer(rr_b, " << mname << ", " << go_codec(ctx, *wd->Type)
+              << "); rr_err != nil {\n\t\treturn rr_err\n\t} else if rr_set, rr_ok := rr_s.obj.(interface{ Set" << n
+              << "(*rr.Wire[" << vt << "]) }); rr_ok {\n\t\trr_set.Set" << n << "(rr_w)\n\t}\n";
+        }
+        else if (RR_SHARED_PTR<EventDefinition> ev = RR_DYNAMIC_POINTER_CAST<EventDefinition>(m))
+        {
+            w << "\tif rr_ev := rr_s.obj." << n << "(); rr_ev != nil {\n";
+            w << "\t\trr_b.RRAddEventConnection(rr_ev.Connect(func(" << params_types(ctx, ev->Parameters) << ") {\n";
+            w << pack_args(ctx, ev->Parameters, "\t\t\t");
+            w << "\t\t\t_ = rr_b.DispatchEvent(" << mname << ", &rr_b2)\n\t\t}))\n\t}\n";
+        }
+        else if (RR_SHARED_PTR<CallbackDefinition> cb = RR_DYNAMIC_POINTER_CAST<CallbackDefinition>(m))
+        {
+            std::string ft = callback_func_type(ctx, cb);
+            w << "\tif rr_cb := rr_s.obj." << n << "(); rr_cb != nil {\n";
+            w << "\t\trr_cb.RRSetClientFunctionSource(func(rr_ep uint32) (" << ft << ", error) {\n";
+            w << "\t\t\treturn func(" << params_types(ctx, cb->Parameters) << ") " << ret_sig(ctx, cb->ReturnType)
+              << " {\n";
+            w << pack_args(ctx, cb->Parameters, "\t\t\t\t");
+            if (is_void(cb->ReturnType))
+            {
+                w << "\t\t\t\t_, rr_err := rr_b.CallbackCall(" << mname << ", rr_ep, &rr_b2)\n\t\t\t\treturn rr_err\n";
+            }
+            else
+            {
+                w << "\t\t\t\trr_ret, rr_err := rr_b.CallbackCall(" << mname << ", rr_ep, &rr_b2)\n";
+                w << "\t\t\t\tif rr_err != nil {\n\t\t\t\t\tvar rr_zero " << go_type(ctx, *cb->ReturnType)
+                  << "\n\t\t\t\t\treturn rr_zero, rr_err\n\t\t\t\t}\n";
+                w << "\t\t\t\treturn rr.UnpackReturn(rr_ret, " << go_codec(ctx, *cb->ReturnType) << ")\n";
+            }
+            w << "\t\t\t}, nil\n\t\t})\n\t}\n";
+        }
+    }
+    w << "\treturn nil\n}\n\n";
+
+    // properties
+    w << "func (rr_s *" << kn << ") RRCallGetProperty(rr_name string) (*rr.Element, error) {\n\tswitch rr_name {\n";
+    BOOST_FOREACH (const RR_SHARED_PTR<MemberDefinition>& m, e->Members)
+    {
+        RR_SHARED_PTR<PropertyDefinition> p = RR_DYNAMIC_POINTER_CAST<PropertyDefinition>(m);
+        if (!p || p->Direction() == MemberDefinition_Direction_writeonly)
+            continue;
+        w << "\tcase " << go_string_literal(p->Name) << ":\n\t\trr_v, rr_err := rr_s.obj.Get" << mn[p->Name]
+          << "()\n\t\tif rr_err != nil {\n\t\t\treturn nil, rr_err\n\t\t}\n\t\treturn " << go_codec(ctx, *p->Type)
+          << ".Pack(\"value\", rr_v)\n";
+    }
+    w << "\t}\n\treturn nil, rr.NewMemberNotFound(\"property \" + rr_name + \" not found\")\n}\n\n";
+
+    w << "func (rr_s *" << kn << ") RRCallSetProperty(rr_name string, rr_value *rr.Element) error {\n\tswitch rr_name {\n";
+    BOOST_FOREACH (const RR_SHARED_PTR<MemberDefinition>& m, e->Members)
+    {
+        RR_SHARED_PTR<PropertyDefinition> p = RR_DYNAMIC_POINTER_CAST<PropertyDefinition>(m);
+        if (!p || p->Direction() == MemberDefinition_Direction_readonly)
+            continue;
+        w << "\tcase " << go_string_literal(p->Name) << ":\n\t\trr_v, rr_err := " << go_codec(ctx, *p->Type)
+          << ".Unpack(rr_value)\n\t\tif rr_err != nil {\n\t\t\treturn rr_err\n\t\t}\n\t\treturn rr_s.obj.Set"
+          << mn[p->Name] << "(rr_v)\n";
+    }
+    w << "\t}\n\t_ = rr_value\n\treturn rr.NewMemberNotFound(\"property \" + rr_name + \" not found\")\n}\n\n";
+
+    // functions
+    w << "func (rr_s *" << kn
+      << ") RRCallFunction(rr_name string, rr_args []*rr.Element) (*rr.Element, error) {\n\tswitch rr_name {\n";
+    BOOST_FOREACH (const RR_SHARED_PTR<MemberDefinition>& m, e->Members)
+    {
+        RR_SHARED_PTR<FunctionDefinition> f = RR_DYNAMIC_POINTER_CAST<FunctionDefinition>(m);
+        if (!f || f->IsGenerator())
+            continue;
+        w << "\tcase " << go_string_literal(f->Name) << ":\n";
+        w << unpack_args(ctx, f->Parameters, "\t\t", "return nil, rr_err");
+        if (is_void(f->ReturnType))
+        {
+            w << "\t\treturn nil, rr_s.obj." << mn[f->Name] << "(" << params_names(f->Parameters) << ")\n";
+        }
+        else
+        {
+            w << "\t\trr_ret, rr_err := rr_s.obj." << mn[f->Name] << "(" << params_names(f->Parameters) << ")\n";
+            w << "\t\tif rr_err != nil {\n\t\t\treturn nil, rr_err\n\t\t}\n";
+            w << "\t\treturn " << go_codec(ctx, *f->ReturnType) << ".Pack(\"return\", rr_ret)\n";
+        }
+    }
+    w << "\t}\n\t_ = rr_args\n\treturn nil, rr.NewMemberNotFound(\"function \" + rr_name + \" not found\")\n}\n\n";
+
+    // objrefs
+    w << "func (rr_s *" << kn
+      << ") RRGetSubObj(rr_name, rr_index string) (any, string, error) {\n\tswitch rr_name {\n";
+    BOOST_FOREACH (const RR_SHARED_PTR<MemberDefinition>& m, e->Members)
+    {
+        RR_SHARED_PTR<ObjRefDefinition> o = RR_DYNAMIC_POINTER_CAST<ObjRefDefinition>(m);
+        if (!o)
+            continue;
+        std::string ind;
+        std::string qt = go_string_literal(qualified_object_type(o->ObjectType, ctx.def));
+        w << "\tcase " << go_string_literal(o->Name) << ":\n";
+        if (objref_index_type(o, ind))
+        {
+            if (ind == "int32")
+            {
+                ctx.uses_strconv = true;
+                w << "\t\trr_i, rr_err := strconv.ParseInt(rr_index, 10, 32)\n\t\tif rr_err != nil {\n\t\t\treturn nil, "
+                     "\"\", rr.NewInvalidArgument(\"invalid index \" + rr_index)\n\t\t}\n";
+                w << "\t\trr_o, rr_err := rr_s.obj.Get" << mn[o->Name] << "(int32(rr_i))\n";
+            }
+            else
+            {
+                w << "\t\trr_o, rr_err := rr_s.obj.Get" << mn[o->Name] << "(rr_index)\n";
+            }
+        }
+        else
+        {
+            w << "\t\trr_o, rr_err := rr_s.obj.Get" << mn[o->Name] << "()\n";
+        }
+        w << "\t\tif rr_err != nil {\n\t\t\treturn nil, \"\", rr_err\n\t\t}\n";
+        w << "\t\tif rr_o == nil {\n\t\t\treturn nil, \"\", rr.NewObjectNotFound(\"object not found\")\n\t\t}\n";
+        w << "\t\treturn rr_o, " << qt << ", nil\n";
+    }
+    w << "\t}\n\t_ = rr_index\n\treturn nil, \"\", rr.NewMemberNotFound(\"objref \" + rr_name + \" not found\")\n}\n\n";
+
+    // memories
+    w << "func (rr_s *" << kn << ") RRGetMemory(rr_name string) (*rr.MemoryServer, error) {\n\tswitch rr_name {\n";
+    BOOST_FOREACH (const RR_SHARED_PTR<MemberDefinition>& m, e->Members)
+    {
+        RR_SHARED_PTR<MemoryDefinition> md = RR_DYNAMIC_POINTER_CAST<MemoryDefinition>(m);
+        if (!md)
+            continue;
+        w << "\tcase " << go_string_literal(md->Name) << ":\n\t\treturn " << memory_info(ctx, md).server_new
+          << "(rr_s.obj." << mn[md->Name] << "()), nil\n";
+    }
+    w << "\t}\n\treturn nil, rr.NewMemberNotFound(\"memory \" + rr_name + \" not found\")\n}\n\n";
+}
+
+void GenerateDefaultImpl(GenContext& ctx, const RR_SHARED_PTR<ServiceEntryDefinition>& e, std::ostream& w)
+{
+    std::string name = exported(e->Name);
+    std::string dn = name + "DefaultImpl";
+    std::map<std::string, std::string> mn = exported_names(e->Members);
+
+    w << "// " << dn << " is a default implementation of " << name << " for services.\n";
+    w << "// Embed it in a struct and override the members to implement.\n";
+    w << "// Properties are stored in memory, functions and objrefs return\n";
+    w << "// NotImplementedError, readonly pipes and wires get broadcasters and\n";
+    w << "// writeonly wires get unicast receivers.\n";
+    w << "type " << dn << " struct {\n\trr_mu sync.Mutex\n";
+    ctx.uses_sync = true;
+    BOOST_FOREACH (const RR_SHARED_PTR<MemberDefinition>& m, e->Members)
+    {
+        std::string n = mn[m->Name];
+        if (RR_SHARED_PTR<PropertyDefinition> p = RR_DYNAMIC_POINTER_CAST<PropertyDefinition>(m))
+            w << "\trr_" << p->Name << " " << go_type(ctx, *p->Type) << "\n";
+        else if (RR_SHARED_PTR<EventDefinition> ev = RR_DYNAMIC_POINTER_CAST<EventDefinition>(m))
+            w << "\trr_" << ev->Name << " rr.Event[" << event_func_type(ctx, ev) << "]\n";
+        else if (RR_SHARED_PTR<CallbackDefinition> cb = RR_DYNAMIC_POINTER_CAST<CallbackDefinition>(m))
+            w << "\trr_" << cb->Name << " rr.Callback[" << callback_func_type(ctx, cb) << "]\n";
+        else if (RR_SHARED_PTR<PipeDefinition> pp = RR_DYNAMIC_POINTER_CAST<PipeDefinition>(m))
+        {
+            std::string vt = member_value_type(ctx, pp->Type);
+            w << "\trr_" << pp->Name << " *rr.Pipe[" << vt << "]\n";
+            if (pp->Direction() == MemberDefinition_Direction_readonly)
+                w << "\t// " << n << "Broadcaster sends packets to all clients connected to " << pp->Name << ".\n\t"
+                  << n << "Broadcaster *rr.PipeBroadcaster[" << vt << "]\n";
+        }
+        else if (RR_SHARED_PTR<WireDefinition> wd = RR_DYNAMIC_POINTER_CAST<WireDefinition>(m))
+        {
+            std::string vt = member_value_type(ctx, wd->Type);
+            w << "\trr_" << wd->Name << " *rr.Wire[" << vt << "]\n";
+            if (wd->Direction() == MemberDefinition_Direction_readonly)
+                w << "\t// " << n << "Broadcaster sends the value of " << wd->Name << " to all clients.\n\t" << n
+                  << "Broadcaster *rr.WireBroadcaster[" << vt << "]\n";
+            if (wd->Direction() == MemberDefinition_Direction_writeonly)
+                w << "\t// " << n << "Receiver receives the value of " << wd->Name << " written by clients.\n\t" << n
+                  << "Receiver *rr.WireUnicastReceiver[" << vt << "]\n";
+        }
+    }
+    w << "}\n\nvar _ " << name << " = (*" << dn << ")(nil)\n\n";
+
+    BOOST_FOREACH (const RR_SHARED_PTR<MemberDefinition>& m, e->Members)
+    {
+        std::string n = mn[m->Name];
+        if (RR_SHARED_PTR<PropertyDefinition> p = RR_DYNAMIC_POINTER_CAST<PropertyDefinition>(m))
+        {
+            std::string t = go_type(ctx, *p->Type);
+            if (p->Direction() != MemberDefinition_Direction_writeonly)
+                w << "func (rr_s *" << dn << ") Get" << n << "() (" << t
+                  << ", error) {\n\trr_s.rr_mu.Lock()\n\tdefer rr_s.rr_mu.Unlock()\n\treturn rr_s.rr_" << p->Name
+                  << ", nil\n}\n\n";
+            if (p->Direction() != MemberDefinition_Direction_readonly)
+                w << "func (rr_s *" << dn << ") Set" << n << "(value " << t
+                  << ") error {\n\trr_s.rr_mu.Lock()\n\tdefer rr_s.rr_mu.Unlock()\n\trr_s.rr_" << p->Name
+                  << " = value\n\treturn nil\n}\n\n";
+        }
+        else if (RR_SHARED_PTR<FunctionDefinition> f = RR_DYNAMIC_POINTER_CAST<FunctionDefinition>(m))
+        {
+            if (f->IsGenerator())
+                continue;
+            w << "func (rr_s *" << dn << ") " << n << "(" << params_decl(ctx, f->Parameters) << ") "
+              << ret_sig(ctx, f->ReturnType) << " {\n";
+            if (is_void(f->ReturnType))
+                w << "\treturn rr.NewNotImplementedError(\"" << f->Name << " not implemented\")\n}\n\n";
+            else
+                w << "\tvar rr_zero " << go_type(ctx, *f->ReturnType) << "\n\treturn rr_zero, rr.NewNotImplementedError(\""
+                  << f->Name << " not implemented\")\n}\n\n";
+        }
+        else if (RR_SHARED_PTR<EventDefinition> ev = RR_DYNAMIC_POINTER_CAST<EventDefinition>(m))
+        {
+            w << "func (rr_s *" << dn << ") " << n << "() *rr.Event[" << event_func_type(ctx, ev) << "] { return &rr_s.rr_"
+              << ev->Name << " }\n\n";
+        }
+        else if (RR_SHARED_PTR<CallbackDefinition> cb = RR_DYNAMIC_POINTER_CAST<CallbackDefinition>(m))
+        {
+            w << "func (rr_s *" << dn << ") " << n << "() *rr.Callback[" << callback_func_type(ctx, cb)
+              << "] { return &rr_s.rr_" << cb->Name << " }\n\n";
+        }
+        else if (RR_SHARED_PTR<ObjRefDefinition> o = RR_DYNAMIC_POINTER_CAST<ObjRefDefinition>(m))
+        {
+            std::string ind;
+            std::string ot = go_object_ref(ctx, o->ObjectType, ctx.def);
+            std::string arg = objref_index_type(o, ind) ? "index " + ind : "";
+            w << "func (rr_s *" << dn << ") Get" << n << "(" << arg << ") (" << ot
+              << ", error) {\n\treturn nil, rr.NewNotImplementedError(\"" << o->Name << " not implemented\")\n}\n\n";
+        }
+        else if (RR_SHARED_PTR<PipeDefinition> pp = RR_DYNAMIC_POINTER_CAST<PipeDefinition>(m))
+        {
+            std::string vt = member_value_type(ctx, pp->Type);
+            w << "func (rr_s *" << dn << ") " << n << "() *rr.Pipe[" << vt
+              << "] {\n\trr_s.rr_mu.Lock()\n\tdefer rr_s.rr_mu.Unlock()\n\treturn rr_s.rr_" << pp->Name << "\n}\n\n";
+            w << "// Set" << n << " is called by the service skeleton.\n";
+            w << "func (rr_s *" << dn << ") Set" << n << "(p *rr.Pipe[" << vt
+              << "]) {\n\trr_s.rr_mu.Lock()\n\tdefer rr_s.rr_mu.Unlock()\n\trr_s.rr_" << pp->Name << " = p\n";
+            if (pp->Direction() == MemberDefinition_Direction_readonly)
+                w << "\trr_s." << n << "Broadcaster, _ = rr.NewPipeBroadcaster(p, -1)\n";
+            w << "}\n\n";
+        }
+        else if (RR_SHARED_PTR<WireDefinition> wd = RR_DYNAMIC_POINTER_CAST<WireDefinition>(m))
+        {
+            std::string vt = member_value_type(ctx, wd->Type);
+            w << "func (rr_s *" << dn << ") " << n << "() *rr.Wire[" << vt
+              << "] {\n\trr_s.rr_mu.Lock()\n\tdefer rr_s.rr_mu.Unlock()\n\treturn rr_s.rr_" << wd->Name << "\n}\n\n";
+            w << "// Set" << n << " is called by the service skeleton.\n";
+            w << "func (rr_s *" << dn << ") Set" << n << "(wr *rr.Wire[" << vt
+              << "]) {\n\trr_s.rr_mu.Lock()\n\tdefer rr_s.rr_mu.Unlock()\n\trr_s.rr_" << wd->Name << " = wr\n";
+            if (wd->Direction() == MemberDefinition_Direction_readonly)
+                w << "\trr_s." << n << "Broadcaster, _ = rr.NewWireBroadcaster(wr)\n";
+            if (wd->Direction() == MemberDefinition_Direction_writeonly)
+                w << "\trr_s." << n << "Receiver, _ = rr.NewWireUnicastReceiver(wr)\n";
+            w << "}\n\n";
+        }
+        else if (RR_SHARED_PTR<MemoryDefinition> md = RR_DYNAMIC_POINTER_CAST<MemoryDefinition>(m))
+        {
+            w << "func (rr_s *" << dn << ") " << n << "() " << memory_info(ctx, md).iface << " { return nil }\n\n";
+        }
+    }
+}
+
 void GenerateFactory(GenContext& ctx, const std::string& defstring, std::ostream& w)
 {
     w << "const serviceDefinition = " << go_raw_string(defstring) << "\n\n";
@@ -1134,12 +1510,21 @@ void GenerateFactory(GenContext& ctx, const std::string& defstring, std::ostream
     {
         std::string sn = lower_first(exported(e->Name)) + "Stub";
         w << "\tcase " << go_string_literal(qualified_name(ctx.def, e->Name)) << ":\n";
-        w << "\t\ts := &" << sn << "{StubBase: b}\n\t\tif err := b.RRInit(s); err != nil {\n\t\t\treturn nil, err\n\t\t}\n";
+        w << "\t\ts := &" << sn << "{StubBase: b}\n\t\tif err := s.rrInitClient(); err != nil {\n\t\t\treturn nil, err\n\t\t}\n";
+        w << "\t\tif err := b.RRInit(s); err != nil {\n\t\t\treturn nil, err\n\t\t}\n";
         w << "\t\treturn s, nil\n";
     }
     w << "\t}\n\treturn nil, rr.NewServiceError(\"unknown object type \" + objectType)\n}\n\n";
-    w << "func (serviceFactory) CreateSkel(objectType string, obj any, b *rr.SkelBase) (rr.ServiceSkel, error) {\n";
-    w << "\treturn nil, rr.NewNotImplementedError(\"service skeletons not implemented\")\n}\n\n";
+    w << "func (serviceFactory) CreateSkel(objectType string, obj any, b *rr.SkelBase) (rr.ServiceSkel, error) {\n\tswitch objectType {\n";
+    BOOST_FOREACH (const RR_SHARED_PTR<ServiceEntryDefinition>& e, ctx.def->Objects)
+    {
+        std::string name = exported(e->Name);
+        w << "\tcase " << go_string_literal(qualified_name(ctx.def, e->Name)) << ":\n";
+        w << "\t\to, ok := obj.(" << name << ")\n\t\tif !ok {\n\t\t\treturn nil, rr.NewInvalidArgument(\"object does not implement "
+          << qualified_name(ctx.def, e->Name) << "\")\n\t\t}\n";
+        w << "\t\treturn &" << lower_first(name) << "Skel{obj: o}, nil\n";
+    }
+    w << "\t}\n\treturn nil, rr.NewServiceError(\"unknown object type \" + objectType)\n}\n\n";
     w << "func (serviceFactory) DownCastError(e *rr.Error) error {\n\tswitch e.Name {\n";
     BOOST_FOREACH (const RR_SHARED_PTR<ExceptionDefinition>& ex, ctx.def->Exceptions)
     {
@@ -1224,6 +1609,8 @@ void GoServiceLangGen::GenerateFile(const RR_SHARED_PTR<ServiceDefinition>& d, c
     {
         GenerateObjectInterface(ctx, e, body);
         GenerateStub(ctx, e, body);
+        GenerateSkel(ctx, e, body);
+        GenerateDefaultImpl(ctx, e, body);
     }
     GenerateFactory(ctx, servicedef, body);
 
@@ -1235,6 +1622,8 @@ void GoServiceLangGen::GenerateFile(const RR_SHARED_PTR<ServiceDefinition>& d, c
     o << "import (\n";
     if (ctx.uses_strconv)
         o << "\t\"strconv\"\n";
+    if (ctx.uses_sync)
+        o << "\t\"sync\"\n";
     if (ctx.uses_time)
         o << "\t\"time\"\n";
     o << "\n\trr \"" << options.runtime_import << "\"\n";

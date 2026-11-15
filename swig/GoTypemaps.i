@@ -111,3 +111,8 @@ std::string string();
 };
 }
 }
+
+// Director methods returning std::vector<uint64_t> by value: the Go side
+// returns a new vector handle which is transferred to C++ and deleted here.
+%typemap(directorout) std::vector<uint64_t>
+%{ if (*(std::vector<uint64_t>**)&$input) { $result = **(std::vector<uint64_t>**)&$input; delete *(std::vector<uint64_t>**)&$input; } %}

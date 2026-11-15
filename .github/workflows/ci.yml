@@ -47,7 +47,9 @@ jobs:
         env:
           RRGO_CACHE_DIR: ${{ runner.temp }}/rr-go-cache
           RR_SRC_DIR: ${{ github.workspace }}/robotraconteur
-          JOBS: "4"
+          JOBS: "2"
+          # builds the upstream C++ test server used by the interop tests
+          RR_TESTING: "ON"
         run: robotraconteur_go/scripts/podman.sh build
       - name: Test (no network)
         env:

@@ -9,6 +9,8 @@ export CGO_ENABLED=1
 # Keep link/compile parallelism bounded on small hosts
 export GOMAXPROCS=${GOMAXPROCS:-4}
 export GOFLAGS="${GOFLAGS:-} -p=2"
+# generate Go packages for the upstream test service definitions
+scripts/gen_test.sh
 PKGS=${*:-./...}
 # -unsafeptr=false: C++ owned memory (RRBaseArray::void_ptr, SWIG handles) is
 # reached through uintptr by design; it is never Go heap memory.

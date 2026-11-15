@@ -3,3 +3,4 @@ build/
 robotraconteur/internal/swig/robotraconteurswig.go
 robotraconteur/internal/swig/cgo_flags_*.go
 robotraconteur/internal/swig/upcasts_gen.go
+robotraconteur/errors_gen.go

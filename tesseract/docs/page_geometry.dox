@@ -1,0 +1,127 @@
+/**
+@page geometry Geometry Types
+
+@brief Tesseract supports primitive shapes, meshes, convex hulls, signed distance fields, and octrees for collision and visualization.
+
+The tesseract_geometry package provides the geometry types used throughout Tesseract for both
+visualization and collision checking. Each geometry type can be attached to links in the
+@ref scene_graph "scene graph" and is used by the @ref collision "collision system".
+
+@section geometry_overview Overview
+
+Tesseract provides a comprehensive set of geometry types:
+
+@subsection geometry_primitives Primitive Shapes
+
+Analytically-defined shapes with exact representations:
+
+| Shape | Description | Parameters |
+|-------|-------------|------------|
+| <b>Box</b> | Axis-aligned rectangular prism | width (x), height (y), depth (z) |
+| <b>Sphere</b> | Perfect sphere | radius |
+| <b>Cylinder</b> | Circular cylinder | radius, length |
+| <b>Cone</b> | Circular cone | radius, length |
+| <b>Capsule</b> | Cylinder with hemispherical end caps | radius, length |
+| <b>Plane</b> | Infinite half-space | normal (a, b, c), offset (d) |
+
+- <b>Mesh</b> — General triangle mesh loaded from file or constructed manually. Important: Tesseract
+  keeps each mesh in a file as an independent shape (unlike MoveIt which merges all shapes into
+  a single triangle list). This preserves individual bounding boxes and enables better convex hull
+  approximation.
+- <b>Convex Mesh</b> — A mesh guaranteed to be convex. Used for efficient collision checking.
+  The data must already be convex; use Tesseract utilities to convert if needed.
+
+@subsection geometry_sdf Signed Distance Field
+
+A volumetric, implicit geometry: the signed distance to a surface (negative inside). It is stored in
+a backend-neutral form, either sampled on a regular axis-aligned grid over a local-frame domain, or
+sparse: a NanoVDB grid that holds only the voxels near the surface. Collision
+backends query the field in place through its distance and gradient; nothing is copied into a
+backend-specific representation. It enables true concave volumetric contact and
+signed-distance/gradient queries, and is the canonical way to use a distance field. Create one
+in-process from any distance function (analytic, sensor-fused, or a sampler wrapping another library
+such as OpenVDB), sample a function onto a grid up front with the discrete factory, or load a
+serialized VDB FloatGrid or NanoVDB file. VDB import currently accepts one FloatGrid with an
+axis-aligned, uniform transform.
+
+A sparse field is one grid of a NanoVDB file (by name when the file holds several), read in place
+with its band clamp: the distance at which its values saturate. Where it has no data, or reads at or
+past the clamp outside the surface, it has no answer (+infinity), so several fields on a link (for
+example level sets of different objects stored in one file) combine as any geometries do: the
+nearest answers. In a level set (NanoVDB grid class LevelSet) inactive voxels hold the background and count
+as data; in any other grid every voxel a read uses must be active.
+
+Grids of one surface at different resolutions can instead be stacked as levels, explicitly: a multi-level field
+takes sparse fields finest first and answers from the first that can, a finer level giving way at
+its band clamp to a coarser one with real range. A fine grid cropped around a region of interest
+over a coarse grid of the whole object then costs fine voxels only where they are needed. Levels
+must describe the same surface; separate objects belong in separate fields. In URDF, `level`
+children of the element select each level's grid (by `grid` name or `index`) and band clamp.
+
+> <b>Note:</b> A field built from a distance function calls that function at every collision query.
+> For an expensive function (for example, distance to a mesh), sample it onto a grid up front with
+> the discrete factory.
+
+> <b>Note:</b> The Bullet and FCL discrete collision backends consume a Signed Distance Field. It is
+> concave, so it is not supported by the continuous/cast managers. This is distinct from the Gazebo
+> "SDF" Simulation Description Format.
+
+@subsection geometry_octree Octree
+
+Volumetric representation using an octree data structure. Useful for representing point cloud data
+(e.g., from depth cameras) as collision geometry.
+
+Octree cells can be represented as different shapes:
+- `Octree::SubType::BOX` — Each cell is a box
+- `Octree::SubType::SPHERE_INSIDE` — Each cell is an inscribed sphere
+- `Octree::SubType::SPHERE_OUTSIDE` — Each cell is a circumscribed sphere
+
+> <b>Tip:</b> Prune the octree before creating the Tesseract octree shape to simplify the collision geometry.
+
+@section geometry_examples Examples
+
+See the @ref create_geometries_example "Creating Geometries Example" for complete code demonstrating
+how to create each geometry type programmatically.
+
+For loading meshes from files, see the mesh parsing utilities in the scene_graph package.
+
+@section geometry_usage Usage with Links
+
+Geometry objects are assigned to links through Visual and Collision elements:
+
+@code{.cpp}
+#include <tesseract_geometry/geometries.h>
+#include <tesseract_scene_graph/link.h>
+
+// Create a box geometry
+auto box = std::make_shared<tesseract_geometry::Box>(0.1, 0.2, 0.3);
+
+// Assign to a link's visual
+auto visual = std::make_shared<tesseract_scene_graph::Visual>();
+visual->geometry = box;
+link->visual.push_back(visual);
+
+// Assign to a link's collision (can use different geometry)
+auto collision = std::make_shared<tesseract_scene_graph::Collision>();
+collision->geometry = box;
+link->collision.push_back(collision);
+@endcode
+
+@section geometry_mesh_vs_moveit Mesh Handling: Tesseract vs MoveIt
+
+A key difference from MoveIt is how mesh files with multiple shapes are handled:
+
+- <b>MoveIt</b> merges all shapes in a mesh file into a single triangle list for collision checking
+- <b>Tesseract</b> keeps each mesh independent — each gets its own bounding box, and convex hull
+  conversion produces a closer approximation of the actual geometry
+
+This is particularly important for complex parts where a single convex hull would be a poor
+approximation, but multiple convex hulls (one per sub-mesh) provide much better coverage.
+
+@section geometry_next_steps Next Steps
+
+- @ref collision — See how geometry is used in collision checking
+- @ref urdf — Define geometry in your robot description
+- @ref scene_graph — Attach geometry to links in the scene graph
+
+*/

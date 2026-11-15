@@ -1,0 +1,1991 @@
+#include <tesseract/common/macros.h>
+TESSERACT_COMMON_IGNORE_WARNINGS_PUSH
+#include <gtest/gtest.h>
+// #include <boost/graph/filtered_graph.hpp>
+#include <iostream>
+#include <kdl/treefksolverpos_recursive.hpp>
+TESSERACT_COMMON_IGNORE_WARNINGS_POP
+
+#include <tesseract/geometry/geometries.h>
+#include <tesseract/common/utils.h>
+
+#include <tesseract/scene_graph/graph.h>
+#include <tesseract/scene_graph/link.h>
+#include <tesseract/scene_graph/joint.h>
+#include <tesseract/scene_graph/kdl_parser.h>
+#include <tesseract/scene_graph/scene_state.h>
+#include <tesseract/common/types.h>
+
+using tesseract::common::JointId;
+using tesseract::common::LinkId;
+
+// getLinks and getJoint use an internal map so need to check against graph
+void checkSceneGraph(tesseract::scene_graph::SceneGraph& scene_graph)
+{
+  using namespace tesseract::scene_graph;
+
+  std::vector<Link::ConstPtr> links = scene_graph.getLinks();
+  std::vector<Link::ConstPtr> check_links;
+  SceneGraph::vertex_iterator i, iend;
+  for (boost::tie(i, iend) = boost::vertices(scene_graph); i != iend; ++i)
+    check_links.push_back(boost::get(boost::vertex_link, scene_graph)[*i]);
+
+  EXPECT_TRUE(links.size() == check_links.size());
+
+  for (const auto& l : links)
+  {
+    auto it = std::find_if(
+        check_links.begin(), check_links.end(), [&](const Link::ConstPtr& p) { return p.get() == l.get(); });
+    EXPECT_TRUE(it != check_links.end());
+  }
+}
+
+tesseract::scene_graph::SceneGraph createTestSceneGraph()
+{
+  using namespace tesseract::scene_graph;
+  SceneGraph g;
+
+  Link link_1("link_1");
+  Link link_2("link_2");
+  Link link_3("link_3");
+  Link link_4("link_4");
+  Link link_5("link_5");
+
+  EXPECT_TRUE(g.addLink(link_1));
+  EXPECT_TRUE(g.addLink(link_2));
+  EXPECT_TRUE(g.addLink(link_3));
+  EXPECT_TRUE(g.addLink(link_4));
+  EXPECT_TRUE(g.addLink(link_5));
+
+  Joint joint_1("joint_1");
+  joint_1.parent_to_joint_origin_transform.translation()(0) = 1.25;
+  joint_1.parent_link_id = "link_1";
+  joint_1.child_link_id = "link_2";
+  joint_1.type = JointType::FIXED;
+  EXPECT_TRUE(g.addJoint(joint_1));
+
+  Joint joint_2("joint_2");
+  joint_2.parent_to_joint_origin_transform.translation()(0) = 1.25;
+  joint_2.parent_link_id = "link_2";
+  joint_2.child_link_id = "link_3";
+  joint_2.type = JointType::PLANAR;
+  joint_2.limits = std::make_shared<JointLimits>(-1, 1, 0, 2, 3, 6);
+  EXPECT_TRUE(g.addJoint(joint_2));
+
+  Joint joint_3("joint_3");
+  joint_3.parent_to_joint_origin_transform.translation()(0) = 1.25;
+  joint_3.parent_link_id = "link_3";
+  joint_3.child_link_id = "link_4";
+  joint_3.type = JointType::FLOATING;
+  EXPECT_TRUE(g.addJoint(joint_3));
+
+  Joint joint_4("joint_4");
+  joint_4.parent_to_joint_origin_transform.translation()(1) = 1.25;
+  joint_4.parent_link_id = "link_2";
+  joint_4.child_link_id = "link_5";
+  joint_4.type = JointType::REVOLUTE;
+  joint_4.limits = std::make_shared<JointLimits>(-1, 1, 0, 2, 3, 4);
+  EXPECT_TRUE(g.addJoint(joint_4));
+
+  g.addAllowedCollision("link_1", "link_2", "Adjacent");
+  g.addAllowedCollision("link_2", "link_3", "Adjacent");
+  g.addAllowedCollision("link_3", "link_5", "Adjacent");
+  g.addAllowedCollision("link_2", "link_5", "Adjacent");
+
+  return g;
+}
+
+void runTest(tesseract::scene_graph::SceneGraph& g)
+{
+  using namespace tesseract::scene_graph;
+
+  // Check getAdjacentLinkIds Method
+  std::vector<tesseract::common::LinkId> adjacent_links = g.getAdjacentLinkIds("link_3");
+  EXPECT_TRUE(adjacent_links.size() == 1);
+  EXPECT_TRUE(adjacent_links[0] == "link_4");
+
+  // Check getInvAdjacentLinkIds Method
+  std::vector<tesseract::common::LinkId> inv_adjacent_links = g.getInvAdjacentLinkIds("link_3");
+  EXPECT_TRUE(inv_adjacent_links.size() == 1);
+  EXPECT_TRUE(inv_adjacent_links[0] == "link_2");
+
+  // Check getLinkChildrenIds
+  std::vector<tesseract::common::LinkId> child_link_ids = g.getLinkChildrenIds("link_5");
+  EXPECT_TRUE(child_link_ids.empty());
+
+  child_link_ids = g.getLinkChildrenIds("link_3");
+  EXPECT_TRUE(child_link_ids.size() == 1);
+  EXPECT_TRUE(child_link_ids[0] == "link_4");
+
+  child_link_ids = g.getLinkChildrenIds("link_2");
+  EXPECT_TRUE(child_link_ids.size() == 3);
+  EXPECT_TRUE(std::find(child_link_ids.begin(), child_link_ids.end(), "link_3") != child_link_ids.end());
+  EXPECT_TRUE(std::find(child_link_ids.begin(), child_link_ids.end(), "link_4") != child_link_ids.end());
+  EXPECT_TRUE(std::find(child_link_ids.begin(), child_link_ids.end(), "link_5") != child_link_ids.end());
+
+  // Check getAdjacencyMap
+  std::unordered_map<LinkId, LinkId> adj_map = g.getAdjacencyMap({ "link_2", "link_3" });
+  EXPECT_TRUE(adj_map.size() == 4);
+  EXPECT_EQ(adj_map.at("link_3"), "link_3");
+  EXPECT_EQ(adj_map.at("link_4"), "link_3");
+  EXPECT_EQ(adj_map.at("link_5"), "link_2");
+  EXPECT_EQ(adj_map.at("link_2"), "link_2");
+
+  // Check getLeafLinks
+  std::vector<Link::ConstPtr> leaf_links = g.getLeafLinks();
+  EXPECT_TRUE(leaf_links.size() == 2);
+  EXPECT_TRUE(std::find(leaf_links.begin(), leaf_links.end(), g.getLink("link_5")) != leaf_links.end());
+  EXPECT_TRUE(std::find(leaf_links.begin(), leaf_links.end(), g.getLink("link_4")) != leaf_links.end());
+
+  // Check getJointChildrenIds
+  child_link_ids = g.getJointChildrenIds("joint_4");
+  EXPECT_TRUE(child_link_ids.size() == 1);
+  EXPECT_TRUE(child_link_ids[0] == "link_5");
+
+  child_link_ids = g.getJointChildrenIds("joint_3");
+  EXPECT_TRUE(child_link_ids.size() == 1);
+  EXPECT_TRUE(child_link_ids[0] == "link_4");
+
+  child_link_ids = g.getJointChildrenIds("joint_1");
+  EXPECT_TRUE(child_link_ids.size() == 4);
+  EXPECT_TRUE(std::find(child_link_ids.begin(), child_link_ids.end(), "link_2") != child_link_ids.end());
+  EXPECT_TRUE(std::find(child_link_ids.begin(), child_link_ids.end(), "link_3") != child_link_ids.end());
+  EXPECT_TRUE(std::find(child_link_ids.begin(), child_link_ids.end(), "link_4") != child_link_ids.end());
+  EXPECT_TRUE(std::find(child_link_ids.begin(), child_link_ids.end(), "link_5") != child_link_ids.end());
+
+  // check getActiveJoints
+  std::vector<Joint::ConstPtr> active_joints = g.getActiveJoints();
+  EXPECT_TRUE(active_joints.size() == 2);
+  EXPECT_TRUE(std::find(active_joints.begin(), active_joints.end(), g.getJoint("joint_2")) != active_joints.end());
+  EXPECT_TRUE(std::find(active_joints.begin(), active_joints.end(), g.getJoint("joint_4")) != active_joints.end());
+
+  // Check Graph
+  checkSceneGraph(g);
+
+  // Save Graph
+  g.saveDOT(tesseract::common::getTempPath() + "graph_acyclic_tree_example.dot");
+
+  // Test if the graph is Acyclic
+  std::cout << "Is Acyclic: " << g.isAcyclic() << "\n";
+  EXPECT_TRUE(g.isAcyclic());
+
+  // Test if the graph is Tree
+  std::cout << "Is Tree: " << g.isTree() << "\n";
+  EXPECT_TRUE(g.isTree());
+
+  // Test for unused links
+  Link link_6("link_6");
+  g.addLink(link_6);
+  std::cout << "Free Link, Is Tree: " << g.isTree() << "\n";
+  EXPECT_FALSE(g.isTree());
+
+  // Check Graph
+  checkSceneGraph(g);
+
+  g.removeLink("link_6");
+  std::cout << "Free Link Removed, Is Tree: " << g.isTree() << "\n";
+  EXPECT_TRUE(g.isTree());
+
+  // Check Graph
+  checkSceneGraph(g);
+
+  Joint joint_5("joint_5");
+  joint_5.parent_to_joint_origin_transform.translation()(1) = 1.5;
+  joint_5.parent_link_id = "link_5";
+  joint_5.child_link_id = "link_4";
+  joint_5.type = JointType::CONTINUOUS;
+  g.addJoint(joint_5);
+
+  // Check Graph
+  checkSceneGraph(g);
+
+  // Save Graph
+  g.saveDOT(tesseract::common::getTempPath() + "graph_acyclic_not_tree_example.dot");
+
+  // Test if the graph is Acyclic
+  std::cout << "Is Acyclic: " << g.isAcyclic() << "\n";
+  EXPECT_TRUE(g.isAcyclic());
+
+  // Test if the graph is Tree
+  std::cout << "Is Tree: " << g.isTree() << "\n";
+  EXPECT_FALSE(g.isTree());
+
+  Joint joint_6("joint_6");
+  joint_6.parent_to_joint_origin_transform.translation()(1) = 1.25;
+  joint_6.parent_link_id = "link_5";
+  joint_6.child_link_id = "link_1";
+  joint_6.type = JointType::CONTINUOUS;
+  g.addJoint(joint_6);
+
+  // Check Graph
+  checkSceneGraph(g);
+
+  // Save Graph
+  g.saveDOT(tesseract::common::getTempPath() + "graph_cyclic_not_tree_example.dot");
+
+  // Test if the graph is Acyclic
+  std::cout << "Is Acyclic: " << g.isAcyclic() << "\n";
+  EXPECT_FALSE(g.isAcyclic());
+
+  // Test if the graph is Tree
+  std::cout << "Is Tree: " << g.isTree() << "\n";
+  EXPECT_FALSE(g.isTree());
+
+  {  // Get Shortest Path
+    ShortestPath path = g.getShortestPath("link_1", "link_4");
+
+    std::cout << path << "\n";
+    EXPECT_TRUE(path.links.size() == 3);
+    EXPECT_TRUE(std::find(path.links.begin(), path.links.end(), "link_1") != path.links.end());
+    EXPECT_TRUE(std::find(path.links.begin(), path.links.end(), "link_5") != path.links.end());
+    EXPECT_TRUE(std::find(path.links.begin(), path.links.end(), "link_4") != path.links.end());
+    EXPECT_TRUE(path.joints.size() == 2);
+    EXPECT_TRUE(std::find(path.joints.begin(), path.joints.end(), "joint_5") != path.joints.end());
+    EXPECT_TRUE(std::find(path.joints.begin(), path.joints.end(), "joint_6") != path.joints.end());
+    EXPECT_TRUE(path.active_joints.size() == 2);
+    EXPECT_TRUE(std::find(path.active_joints.begin(), path.active_joints.end(), "joint_5") != path.active_joints.end());
+    EXPECT_TRUE(std::find(path.active_joints.begin(), path.active_joints.end(), "joint_6") != path.active_joints.end());
+
+    std::cout << (g.getName().c_str()) << "\n";
+  }
+
+  {  // Get Shortest Path wit links reversed
+    ShortestPath path = g.getShortestPath("link_4", "link_1");
+
+    std::cout << path << "\n";
+    EXPECT_TRUE(path.links.size() == 3);
+    EXPECT_TRUE(std::find(path.links.begin(), path.links.end(), "link_1") != path.links.end());
+    EXPECT_TRUE(std::find(path.links.begin(), path.links.end(), "link_5") != path.links.end());
+    EXPECT_TRUE(std::find(path.links.begin(), path.links.end(), "link_4") != path.links.end());
+    EXPECT_TRUE(path.joints.size() == 2);
+    EXPECT_TRUE(std::find(path.joints.begin(), path.joints.end(), "joint_5") != path.joints.end());
+    EXPECT_TRUE(std::find(path.joints.begin(), path.joints.end(), "joint_6") != path.joints.end());
+    EXPECT_TRUE(path.active_joints.size() == 2);
+    EXPECT_TRUE(std::find(path.active_joints.begin(), path.active_joints.end(), "joint_5") != path.active_joints.end());
+    EXPECT_TRUE(std::find(path.active_joints.begin(), path.active_joints.end(), "joint_6") != path.active_joints.end());
+
+    std::cout << (g.getName().c_str()) << "\n";
+  }
+
+  // Should throw since this is a directory and not a file
+  EXPECT_ANY_THROW(g.saveDOT(tesseract::common::getTempPath()));  // NOLINT
+  EXPECT_ANY_THROW(g.getVertex("vertex_does_not_exist"));         // NOLINT
+  EXPECT_ANY_THROW(g.getEdge("edge_does_not_exist"));             // NOLINT
+}
+
+TEST(TesseractSceneGraphUnit, TesseractSceneGraphUnit)  // NOLINT
+{
+  {
+    tesseract::scene_graph::SceneGraph g = createTestSceneGraph();
+    runTest(g);
+  }
+
+  {  // Move Constructor
+    tesseract::scene_graph::SceneGraph g = createTestSceneGraph();
+    tesseract::scene_graph::SceneGraph g_move(std::move(g));
+    runTest(g_move);
+  }
+
+  {  // Move Assignment Constructor
+    tesseract::scene_graph::SceneGraph g = createTestSceneGraph();
+    tesseract::scene_graph::SceneGraph g_move;
+    g_move = std::move(g);
+    runTest(g_move);
+  }
+}
+
+TEST(TesseractSceneGraphUnit, TesseractSceneGraphClearUnit)  // NOLINT
+{
+  using namespace tesseract::scene_graph;
+  SceneGraph g = createTestSceneGraph();
+
+  EXPECT_EQ(g.getLinks().size(), 5);
+  EXPECT_EQ(g.getJoints().size(), 4);
+  EXPECT_EQ(g.getAllowedCollisionMatrix()->getAllAllowedCollisions().size(), 4);
+
+  g.clear();
+
+  EXPECT_EQ(g.getLinks().size(), 0);
+  EXPECT_EQ(g.getJoints().size(), 0);
+  EXPECT_EQ(g.getAllowedCollisionMatrix()->getAllAllowedCollisions().size(), 0);
+}
+
+TEST(TesseractSceneGraphUnit, TesseractSceneGraphRootLinkUnit)  // NOLINT
+{
+  using namespace tesseract::scene_graph;
+  SceneGraph g = createTestSceneGraph();
+
+  EXPECT_EQ(g.getRoot(), "link_1");
+  EXPECT_TRUE(g.setRoot("link_5"));
+  EXPECT_FALSE(g.setRoot("link_10"));
+}
+
+TEST(TesseractSceneGraphUnit, TesseractSceneGraphGetLinkJointUnit)  // NOLINT
+{
+  using namespace tesseract::scene_graph;
+  SceneGraph g = createTestSceneGraph();
+
+  EXPECT_TRUE(g.getLink("link_1") != nullptr);
+  EXPECT_TRUE(g.getJoint("joint_1") != nullptr);
+
+  EXPECT_TRUE(g.getLink("does_not_exist") == nullptr);
+  EXPECT_TRUE(g.getJoint("does_not_exist") == nullptr);
+}
+
+TEST(TesseractSceneGraphUnit, TesseractSceneGraphAddLinkJointPairUnit)  // NOLINT
+{
+  using namespace tesseract::scene_graph;
+  SceneGraph g = createTestSceneGraph();
+
+  Link link_6("link_6");
+  Joint joint_6("joint_5");
+  joint_6.parent_to_joint_origin_transform.translation()(0) = 1.25;
+  joint_6.parent_link_id = "link_5";
+  joint_6.child_link_id = "link_6";
+  joint_6.type = JointType::FIXED;
+
+  EXPECT_TRUE(g.addLink(link_6, joint_6));
+  EXPECT_TRUE(g.getLink("link_6") != nullptr);
+  EXPECT_TRUE(g.getJoint("joint_5") != nullptr);
+  EXPECT_EQ(g.getLinks().size(), 6);
+  EXPECT_EQ(g.getJoints().size(), 5);
+
+  // Add link which already exists but joint does not
+  Link link_6d("link_6");
+  Joint joint_6d("joint_5d");
+  joint_6d.parent_to_joint_origin_transform.translation()(0) = 1.25;
+  joint_6d.parent_link_id = "link_5";
+  joint_6d.child_link_id = "link_6";
+  joint_6d.type = JointType::FIXED;
+  EXPECT_FALSE(g.addLink(link_6d, joint_6d));
+  EXPECT_EQ(g.getLinks().size(), 6);
+  EXPECT_EQ(g.getJoints().size(), 5);
+
+  // Check Graph
+  checkSceneGraph(g);
+
+  // Add joint which already exists but link does not
+  Link link_6e("link_6e");
+  Joint joint_6e("joint_5");
+  joint_6d.parent_to_joint_origin_transform.translation()(0) = 1.25;
+  joint_6d.parent_link_id = "link_5";
+  joint_6d.child_link_id = "link_6e";
+  joint_6d.type = JointType::FIXED;
+  EXPECT_FALSE(g.addLink(link_6e, joint_6e));
+  EXPECT_EQ(g.getLinks().size(), 6);
+  EXPECT_EQ(g.getJoints().size(), 5);
+
+  // Check Graph
+  checkSceneGraph(g);
+}
+
+TEST(TesseractSceneGraphUnit, TesseractSceneGraphAddLinkUnit)  // NOLINT
+{
+  using namespace tesseract::scene_graph;
+  SceneGraph g = createTestSceneGraph();
+
+  Link replace_link("link_5");
+
+  // Add link which already exists but replace is not allowed
+  EXPECT_FALSE(g.addLink(replace_link));
+  EXPECT_EQ(g.getLinks().size(), 5);
+  EXPECT_EQ(g.getJoints().size(), 4);
+
+  // Check Graph
+  checkSceneGraph(g);
+
+  // Add link which already exists but replace is not allowed
+  EXPECT_TRUE(g.addLink(replace_link, true));
+  EXPECT_EQ(g.getLinks().size(), 5);
+  EXPECT_EQ(g.getJoints().size(), 4);
+
+  // Check Graph
+  checkSceneGraph(g);
+}
+
+TEST(TesseractSceneGraphUnit, TesseractSceneGraphRemoveLinkUnit)  // NOLINT
+{
+  using namespace tesseract::scene_graph;
+  {  // Remove Link
+    SceneGraph g = createTestSceneGraph();
+    EXPECT_EQ(g.getLinks().size(), 5);
+    EXPECT_EQ(g.getJoints().size(), 4);
+    EXPECT_TRUE(g.removeLink("link_5"));
+    EXPECT_TRUE(g.getJoint("joint_4") == nullptr);
+    EXPECT_TRUE(g.getLink("link_5") == nullptr);
+    EXPECT_EQ(g.getLinks().size(), 4);
+    EXPECT_EQ(g.getJoints().size(), 3);
+
+    // Check Graph
+    checkSceneGraph(g);
+  }
+
+  {  // Make sure all inbound and outbound edges are removed
+    /** @todo Doing this causes the test to fail but assign to new object works. Need to look into why */
+    //  g = createTestSceneGraph();
+    SceneGraph g = createTestSceneGraph();
+    EXPECT_EQ(g.getLinks().size(), 5);
+    EXPECT_EQ(g.getJoints().size(), 4);
+    EXPECT_TRUE(g.removeLink("link_2"));
+    EXPECT_EQ(g.getLinks().size(), 4);
+    EXPECT_EQ(g.getJoints().size(), 1);
+
+    // Check Graph
+    checkSceneGraph(g);
+  }
+
+  {  // Try to remove link which does not exist
+    SceneGraph g = createTestSceneGraph();
+    EXPECT_EQ(g.getLinks().size(), 5);
+    EXPECT_EQ(g.getJoints().size(), 4);
+    EXPECT_FALSE(g.removeLink("link_does_not_exist"));
+    EXPECT_EQ(g.getLinks().size(), 5);
+    EXPECT_EQ(g.getJoints().size(), 4);
+
+    // Check Graph
+    checkSceneGraph(g);
+  }
+
+  {  // Make sure all children are removed if enabled
+    SceneGraph g = createTestSceneGraph();
+    EXPECT_EQ(g.getLinks().size(), 5);
+    EXPECT_EQ(g.getJoints().size(), 4);
+    EXPECT_TRUE(g.removeLink("link_2", true));
+    EXPECT_EQ(g.getLinks().size(), 1);
+    EXPECT_EQ(g.getJoints().size(), 0);
+
+    // Check Graph
+    checkSceneGraph(g);
+  }
+}
+
+TEST(TesseractSceneGraphUnit, TesseractSceneGraphMoveLinkUnit)  // NOLINT
+{
+  using namespace tesseract::scene_graph;
+  SceneGraph g = createTestSceneGraph();
+
+  Joint::ConstPtr j = g.getJoint("joint_4");
+  EXPECT_EQ(g.getLinks().size(), 5);
+  EXPECT_EQ(g.getJoints().size(), 4);
+  EXPECT_NE(j->parent_link_id, "link_4");
+
+  Joint move_joint = j->clone("move_joint_4");
+  move_joint.parent_link_id = "link_4";
+  EXPECT_TRUE(g.moveLink(move_joint));
+  EXPECT_TRUE(g.getJoint("joint_4") == nullptr);
+  EXPECT_TRUE(g.getJoint("move_joint_4") != nullptr);
+  EXPECT_EQ(g.getLinks().size(), 5);
+  EXPECT_EQ(g.getJoints().size(), 4);
+
+  // Check Graph
+  checkSceneGraph(g);
+
+  // Parent link does not exist
+  {
+    SceneGraph ng = createTestSceneGraph();
+    move_joint.parent_link_id = "link_does_not_exist";
+    EXPECT_FALSE(ng.moveLink(move_joint));
+
+    // Check Graph
+    checkSceneGraph(ng);
+  }
+
+  // Child link does not exist
+  {
+    SceneGraph ng = createTestSceneGraph();
+    move_joint.child_link_id = "link_does_not_exist";
+    EXPECT_FALSE(ng.moveLink(move_joint));
+
+    // Check Graph
+    checkSceneGraph(ng);
+  }
+}
+
+TEST(TesseractSceneGraphUnit, TesseractSceneGraphRemoveAllowedCollisionUnit)  // NOLINT
+{
+  using namespace tesseract::scene_graph;
+
+  SceneGraph g = createTestSceneGraph();
+  EXPECT_EQ(g.getAllowedCollisionMatrix()->getAllAllowedCollisions().size(), 4);
+  EXPECT_TRUE(g.isCollisionAllowed({ "link_1", "link_2" }));
+
+  g.removeAllowedCollision("link_1", "link_2");
+  EXPECT_FALSE(g.isCollisionAllowed({ "link_1", "link_2" }));
+  EXPECT_EQ(g.getAllowedCollisionMatrix()->getAllAllowedCollisions().size(), 3);
+
+  g.clearAllowedCollisions();
+  EXPECT_TRUE(g.getAllowedCollisionMatrix()->getAllAllowedCollisions().empty());
+}
+
+TEST(TesseractSceneGraphUnit, TesseractSceneGraphIdCollectionMethodsUnit)  // NOLINT
+{
+  using namespace tesseract::scene_graph;
+  SceneGraph g = createTestSceneGraph();
+
+  // --- getAdjacentLinkIds ---
+  {
+    std::vector<LinkId> adjacent = g.getAdjacentLinkIds("link_3");
+    EXPECT_EQ(adjacent.size(), 1);
+    EXPECT_EQ(adjacent[0], "link_4");
+  }
+
+  // --- getInvAdjacentLinkIds ---
+  {
+    std::vector<LinkId> inv_adjacent = g.getInvAdjacentLinkIds("link_3");
+    EXPECT_EQ(inv_adjacent.size(), 1);
+    EXPECT_EQ(inv_adjacent[0], "link_2");
+  }
+
+  // --- getLinkChildrenIds ---
+  {
+    std::vector<LinkId> children = g.getLinkChildrenIds("link_5");
+    EXPECT_TRUE(children.empty());
+  }
+  {
+    std::vector<LinkId> children = g.getLinkChildrenIds("link_3");
+    EXPECT_EQ(children.size(), 1);
+    EXPECT_EQ(children[0], "link_4");
+  }
+  {
+    std::vector<LinkId> children = g.getLinkChildrenIds("link_2");
+    EXPECT_EQ(children.size(), 3);
+    EXPECT_NE(std::find(children.begin(), children.end(), "link_3"), children.end());
+    EXPECT_NE(std::find(children.begin(), children.end(), "link_4"), children.end());
+    EXPECT_NE(std::find(children.begin(), children.end(), "link_5"), children.end());
+  }
+
+  // --- getJointChildrenIds (single) ---
+  {
+    std::vector<LinkId> children = g.getJointChildrenIds("joint_4");
+    EXPECT_EQ(children.size(), 1);
+    EXPECT_EQ(children[0], "link_5");
+  }
+  {
+    std::vector<LinkId> children = g.getJointChildrenIds("joint_1");
+    EXPECT_EQ(children.size(), 4);
+    EXPECT_NE(std::find(children.begin(), children.end(), "link_2"), children.end());
+    EXPECT_NE(std::find(children.begin(), children.end(), "link_3"), children.end());
+    EXPECT_NE(std::find(children.begin(), children.end(), "link_4"), children.end());
+    EXPECT_NE(std::find(children.begin(), children.end(), "link_5"), children.end());
+  }
+
+  // --- getJointChildrenIds (multi) ---
+  {
+    std::vector<LinkId> children = g.getJointChildrenIds(std::vector<JointId>{ "joint_3", "joint_4" });
+    EXPECT_EQ(children.size(), 2);
+    EXPECT_NE(std::find(children.begin(), children.end(), "link_4"), children.end());
+    EXPECT_NE(std::find(children.begin(), children.end(), "link_5"), children.end());
+  }
+  {
+    std::vector<LinkId> children = g.getJointChildrenIds(std::vector<JointId>{ "joint_1" });
+    EXPECT_EQ(children.size(), 4);
+    EXPECT_NE(std::find(children.begin(), children.end(), "link_2"), children.end());
+    EXPECT_NE(std::find(children.begin(), children.end(), "link_3"), children.end());
+    EXPECT_NE(std::find(children.begin(), children.end(), "link_4"), children.end());
+    EXPECT_NE(std::find(children.begin(), children.end(), "link_5"), children.end());
+  }
+}
+
+TEST(TesseractSceneGraphUnit, TesseractSceneGraphAcmIdOverloadsUnit)  // NOLINT
+{
+  using namespace tesseract::scene_graph;
+  SceneGraph g = createTestSceneGraph();
+
+  // Test addAllowedCollision with LinkId
+  g.addAllowedCollision("link_1", "link_4", "TestReason");
+  EXPECT_TRUE(g.isCollisionAllowed({ "link_1", "link_4" }));
+
+  // Test removeAllowedCollision(LinkId, LinkId)
+  g.removeAllowedCollision("link_1", "link_4");
+  EXPECT_FALSE(g.isCollisionAllowed({ "link_1", "link_4" }));
+
+  // Test removeAllowedCollision(LinkId) — removes all pairs involving this link
+  EXPECT_TRUE(g.isCollisionAllowed({ "link_1", "link_2" }));
+  g.removeAllowedCollision("link_1");
+  EXPECT_FALSE(g.isCollisionAllowed({ "link_1", "link_2" }));
+
+  // Verify other collisions still exist
+  EXPECT_TRUE(g.isCollisionAllowed({ "link_2", "link_3" }));
+  EXPECT_TRUE(g.isCollisionAllowed({ "link_2", "link_5" }));
+}
+
+TEST(TesseractSceneGraphUnit, TesseractSceneGraphChangeJointOriginUnit)  // NOLINT
+{
+  using namespace tesseract::scene_graph;
+  SceneGraph g = createTestSceneGraph();
+
+  Joint::ConstPtr j = g.getJoint("joint_4");
+  Eigen::Isometry3d origin = j->parent_to_joint_origin_transform;
+  double check = origin.translation().x();
+  origin.translation().x() = check + 5;
+
+  EXPECT_EQ(g.getLinks().size(), 5);
+  EXPECT_EQ(g.getJoints().size(), 4);
+  EXPECT_TRUE(g.changeJointOrigin("joint_4", origin));
+  EXPECT_DOUBLE_EQ(g.getJoint("joint_4")->parent_to_joint_origin_transform.translation().x(), check + 5);
+  EXPECT_EQ(g.getLinks().size(), 5);
+  EXPECT_EQ(g.getJoints().size(), 4);
+
+  // Joint does not exist
+  EXPECT_FALSE(g.changeJointOrigin("joint_does_not_exist", origin));
+}
+
+TEST(TesseractSceneGraphUnit, TesseractSceneGraphChangeJointLimitsUnit)  // NOLINT
+{
+  using namespace tesseract::scene_graph;
+  SceneGraph g = createTestSceneGraph();
+
+  JointLimits::ConstPtr jl = g.getJointLimits("joint_4");
+  EXPECT_TRUE(jl != nullptr);
+
+  JointLimits::ConstPtr jld = g.getJointLimits("joint_does_not_exist");
+  EXPECT_TRUE(jld == nullptr);
+
+  JointLimits nlimits;
+  nlimits.lower = -5;
+  nlimits.upper = 5;
+
+  Joint::ConstPtr j = g.getJoint("joint_4");
+  EXPECT_EQ(g.getLinks().size(), 5);
+  EXPECT_EQ(g.getJoints().size(), 4);
+  EXPECT_TRUE(g.changeJointLimits("joint_4", nlimits));
+  EXPECT_DOUBLE_EQ(j->limits->lower, -5);
+  EXPECT_DOUBLE_EQ(j->limits->upper, 5);
+  EXPECT_EQ(g.getLinks().size(), 5);
+  EXPECT_EQ(g.getJoints().size(), 4);
+
+  // Joint does not exist
+  EXPECT_FALSE(g.changeJointLimits("joint_does_not_exist", nlimits));
+
+  // Cannot change limits of fixed or floating joint
+  EXPECT_FALSE(g.changeJointLimits("joint_1", nlimits));
+  EXPECT_FALSE(g.changeJointLimits("joint_3", nlimits));
+}
+
+TEST(TesseractSceneGraphUnit, TesseractSceneGraphChangeJointPositionLimitsUnit)  // NOLINT
+{
+  using namespace tesseract::scene_graph;
+  SceneGraph g = createTestSceneGraph();
+
+  Joint::ConstPtr j = g.getJoint("joint_4");
+  EXPECT_EQ(g.getLinks().size(), 5);
+  EXPECT_EQ(g.getJoints().size(), 4);
+  EXPECT_TRUE(g.changeJointPositionLimits("joint_4", -5, 5));
+  EXPECT_DOUBLE_EQ(j->limits->lower, -5);
+  EXPECT_DOUBLE_EQ(j->limits->upper, 5);
+  EXPECT_EQ(g.getLinks().size(), 5);
+  EXPECT_EQ(g.getJoints().size(), 4);
+
+  // Joint does not exist
+  EXPECT_FALSE(g.changeJointPositionLimits("joint_does_not_exist", -5, 5));
+
+  // Cannot change limits of fixed or floating joint
+  EXPECT_FALSE(g.changeJointPositionLimits("joint_1", -5, 5));
+  EXPECT_FALSE(g.changeJointPositionLimits("joint_3", -5, 5));
+}
+
+TEST(TesseractSceneGraphUnit, TesseractSceneGraphChangeJointVelocityLimitsUnit)  // NOLINT
+{
+  using namespace tesseract::scene_graph;
+  SceneGraph g = createTestSceneGraph();
+
+  Joint::ConstPtr j = g.getJoint("joint_4");
+  EXPECT_EQ(g.getLinks().size(), 5);
+  EXPECT_EQ(g.getJoints().size(), 4);
+  EXPECT_TRUE(g.changeJointVelocityLimits("joint_4", 10));
+  EXPECT_DOUBLE_EQ(j->limits->velocity, 10);
+  EXPECT_EQ(g.getLinks().size(), 5);
+  EXPECT_EQ(g.getJoints().size(), 4);
+
+  // Joint does not exist
+  EXPECT_FALSE(g.changeJointVelocityLimits("joint_does_not_exist", 10));
+
+  // Cannot change limits of fixed or floating joint
+  EXPECT_FALSE(g.changeJointVelocityLimits("joint_1", 10));
+  EXPECT_FALSE(g.changeJointVelocityLimits("joint_3", 10));
+}
+
+TEST(TesseractSceneGraphUnit, TesseractSceneGraphChangeJointAccelerationLimitsUnit)  // NOLINT
+{
+  using namespace tesseract::scene_graph;
+  SceneGraph g = createTestSceneGraph();
+
+  Joint::ConstPtr j = g.getJoint("joint_4");
+  EXPECT_EQ(g.getLinks().size(), 5);
+  EXPECT_EQ(g.getJoints().size(), 4);
+  EXPECT_TRUE(g.changeJointAccelerationLimits("joint_4", 20));
+  EXPECT_DOUBLE_EQ(j->limits->acceleration, 20);
+  EXPECT_EQ(g.getLinks().size(), 5);
+  EXPECT_EQ(g.getJoints().size(), 4);
+
+  // Joint does not exist
+  EXPECT_FALSE(g.changeJointAccelerationLimits("joint_does_not_exist", 20));
+
+  // Cannot change limits of fixed or floating joint
+  EXPECT_FALSE(g.changeJointAccelerationLimits("joint_1", 20));
+  EXPECT_FALSE(g.changeJointAccelerationLimits("joint_3", 20));
+}
+
+TEST(TesseractSceneGraphUnit, TesseractSceneGraphChangeJointJerkLimitsUnit)  // NOLINT
+{
+  using namespace tesseract::scene_graph;
+  SceneGraph g = createTestSceneGraph();
+
+  Joint::ConstPtr j = g.getJoint("joint_4");
+  EXPECT_EQ(g.getLinks().size(), 5);
+  EXPECT_EQ(g.getJoints().size(), 4);
+  EXPECT_TRUE(g.changeJointJerkLimits("joint_4", 20));
+  EXPECT_DOUBLE_EQ(j->limits->jerk, 20);
+  EXPECT_EQ(g.getLinks().size(), 5);
+  EXPECT_EQ(g.getJoints().size(), 4);
+
+  // Joint does not exist
+  EXPECT_FALSE(g.changeJointJerkLimits("joint_does_not_exist", 20));
+
+  // Cannot change limits of fixed or floating joint
+  EXPECT_FALSE(g.changeJointJerkLimits("joint_1", 20));
+  EXPECT_FALSE(g.changeJointJerkLimits("joint_3", 20));
+}
+
+TEST(TesseractSceneGraphUnit, TesseractSceneGraphMoveJointUnit)  // NOLINT
+{
+  using namespace tesseract::scene_graph;
+  SceneGraph g = createTestSceneGraph();
+
+  Joint::ConstPtr j = g.getJoint("joint_4");
+  EXPECT_EQ(g.getLinks().size(), 5);
+  EXPECT_EQ(g.getJoints().size(), 4);
+  EXPECT_NE(j->parent_link_id, "link_4");
+  EXPECT_TRUE(g.moveJoint("joint_4", "link_4"));
+  EXPECT_EQ(j->parent_link_id, "link_4");
+  EXPECT_EQ(g.getLinks().size(), 5);
+  EXPECT_EQ(g.getJoints().size(), 4);
+
+  // Check Graph
+  checkSceneGraph(g);
+
+  // Joint does not exist
+  EXPECT_FALSE(g.moveJoint("joint_does_not_exist", "link_4"));
+
+  // Check Graph
+  checkSceneGraph(g);
+
+  // Joint does not exist
+  EXPECT_FALSE(g.moveJoint("joint_4", "link_does_not_exist"));
+
+  // Check Graph
+  checkSceneGraph(g);
+}
+
+TEST(TesseractSceneGraphUnit, TesseractSceneGraphAddJointUnit)  // NOLINT
+{
+  using namespace tesseract::scene_graph;
+  SceneGraph g = createTestSceneGraph();
+
+  Joint joint_6("joint_5");
+  joint_6.parent_to_joint_origin_transform.translation()(0) = 1.25;
+  joint_6.parent_link_id = "link_5";
+  joint_6.child_link_id = "link_6";
+  joint_6.type = JointType::FIXED;
+
+  // Child does not exist
+  EXPECT_FALSE(g.addJoint(joint_6));
+  EXPECT_EQ(g.getLinks().size(), 5);
+  EXPECT_EQ(g.getJoints().size(), 4);
+
+  Joint joint_7("joint_7");
+  joint_7.parent_to_joint_origin_transform.translation()(0) = 1.25;
+  joint_7.parent_link_id = "link_6";
+  joint_7.child_link_id = "link_5";
+  joint_7.type = JointType::FIXED;
+
+  // Parent does not exist
+  EXPECT_FALSE(g.addJoint(joint_7));
+  EXPECT_EQ(g.getLinks().size(), 5);
+  EXPECT_EQ(g.getJoints().size(), 4);
+
+  Joint joint_4("joint_4");
+  joint_4.parent_to_joint_origin_transform.translation()(0) = 1.25;
+  joint_4.parent_link_id = "link_4";
+  joint_4.child_link_id = "link_5";
+  joint_4.type = JointType::FIXED;
+
+  // Joint already exist
+  EXPECT_FALSE(g.addJoint(joint_4));
+  EXPECT_EQ(g.getLinks().size(), 5);
+  EXPECT_EQ(g.getJoints().size(), 4);
+
+  // Add Joint with no joint limits
+  Link link_6("link_6");
+  EXPECT_TRUE(g.addLink(link_6));
+  joint_7.type = JointType::PRISMATIC;
+  EXPECT_FALSE(g.addJoint(joint_7));
+  EXPECT_EQ(g.getLinks().size(), 6);
+  EXPECT_EQ(g.getJoints().size(), 4);
+
+  joint_7.type = JointType::CONTINUOUS;
+  EXPECT_TRUE(g.addJoint(joint_7));
+  EXPECT_EQ(g.getJoints().size(), 5);
+  EXPECT_TRUE(g.getJoint("joint_7")->limits != nullptr);
+  EXPECT_NEAR(g.getJoint("joint_7")->limits->lower, -4 * M_PI, 1e-5);
+  EXPECT_NEAR(g.getJoint("joint_7")->limits->upper, 4 * M_PI, 1e-5);
+  EXPECT_NEAR(g.getJoint("joint_7")->limits->effort, 0.0, 1e-5);
+  EXPECT_NEAR(g.getJoint("joint_7")->limits->velocity, 2.0, 1e-5);
+  EXPECT_NEAR(g.getJoint("joint_7")->limits->acceleration, 1.0, 1e-5);
+
+  Link link_7("link_7");
+  EXPECT_TRUE(g.addLink(link_7));
+  EXPECT_EQ(g.getLinks().size(), 7);
+  EXPECT_EQ(g.getJoints().size(), 5);
+
+  Joint joint_8("joint_8");
+  joint_8.parent_to_joint_origin_transform.translation()(0) = 1.75;
+  joint_8.parent_link_id = "link_7";
+  joint_8.child_link_id = "link_6";
+  joint_8.type = JointType::CONTINUOUS;
+  joint_8.limits = std::make_shared<JointLimits>(0, 0, 0, 2, 1, 0.5);
+  EXPECT_TRUE(g.addJoint(joint_8));
+  EXPECT_EQ(g.getJoints().size(), 6);
+  EXPECT_TRUE(g.getJoint("joint_7")->limits != nullptr);
+  EXPECT_NEAR(g.getJoint("joint_7")->limits->lower, -4 * M_PI, 1e-5);
+  EXPECT_NEAR(g.getJoint("joint_7")->limits->upper, 4 * M_PI, 1e-5);
+  EXPECT_NEAR(g.getJoint("joint_7")->limits->effort, 0.0, 1e-5);
+  EXPECT_NEAR(g.getJoint("joint_7")->limits->velocity, 2.0, 1e-5);
+  EXPECT_NEAR(g.getJoint("joint_7")->limits->acceleration, 1.0, 1e-5);
+}
+
+TEST(TesseractSceneGraphUnit, TesseractSceneGraphRemoveJointUnit)  // NOLINT
+{
+  using namespace tesseract::scene_graph;
+  {
+    SceneGraph g = createTestSceneGraph();
+
+    EXPECT_EQ(g.getLinks().size(), 5);
+    EXPECT_EQ(g.getJoints().size(), 4);
+    EXPECT_TRUE(g.removeJoint("joint_4"));
+    EXPECT_TRUE(g.getJoint("joint_4") == nullptr);
+    EXPECT_TRUE(g.getLink("link_5") != nullptr);  // The child link should remain
+    EXPECT_EQ(g.getLinks().size(), 5);
+    EXPECT_EQ(g.getJoints().size(), 3);
+  }
+
+  {  // Try to remove joint which does not exist
+    SceneGraph g = createTestSceneGraph();
+    EXPECT_EQ(g.getLinks().size(), 5);
+    EXPECT_EQ(g.getJoints().size(), 4);
+    EXPECT_FALSE(g.removeJoint("joint_does_not_exist"));
+    EXPECT_EQ(g.getLinks().size(), 5);
+    EXPECT_EQ(g.getJoints().size(), 4);
+
+    // Check Graph
+    checkSceneGraph(g);
+  }
+
+  {  // Make sure all children are removed if enabled
+    SceneGraph g = createTestSceneGraph();
+    EXPECT_EQ(g.getLinks().size(), 5);
+    EXPECT_EQ(g.getJoints().size(), 4);
+    EXPECT_TRUE(g.removeJoint("joint_2", true));
+    EXPECT_EQ(g.getLinks().size(), 3);
+    EXPECT_EQ(g.getJoints().size(), 2);
+
+    // Check Graph
+    checkSceneGraph(g);
+  }
+}
+
+void printKDLTree(const KDL::SegmentMap::const_iterator& link, const std::string& prefix)
+{
+  std::cout << prefix << "- Segment " << GetTreeElementSegment(link->second).getName() << " has "
+            << GetTreeElementChildren(link->second).size() << " children\n";
+
+  for (auto child : GetTreeElementChildren(link->second))
+    printKDLTree(child, prefix + "  ");
+}
+
+tesseract::scene_graph::SceneGraph buildTestSceneGraph()
+{
+  using namespace tesseract::scene_graph;
+  SceneGraph g;
+
+  Link base_link("base_link");
+  Link link_1("link_1");
+  Link link_2("link_2");
+  Link link_3("link_3");
+  Link link_4("link_4");
+  Link link_5("link_5");
+
+  EXPECT_TRUE(g.addLink(base_link));
+  EXPECT_TRUE(g.addLink(link_1));
+  EXPECT_TRUE(g.addLink(link_2));
+  EXPECT_TRUE(g.addLink(link_3));
+  EXPECT_TRUE(g.addLink(link_4));
+  EXPECT_TRUE(g.addLink(link_5));
+
+  Joint base_joint("base_joint");
+  base_joint.parent_link_id = "base_link";
+  base_joint.child_link_id = "link_1";
+  base_joint.type = JointType::FIXED;
+  EXPECT_TRUE(g.addJoint(base_joint));
+
+  Joint joint_1("joint_1");
+  joint_1.parent_link_id = "link_1";
+  joint_1.child_link_id = "link_2";
+  joint_1.type = JointType::REVOLUTE;
+  joint_1.limits = std::make_shared<JointLimits>(-1, 1, 0, 2, 3, 4);
+  EXPECT_TRUE(g.addJoint(joint_1));
+
+  Joint joint_2("joint_2");
+  joint_2.parent_to_joint_origin_transform.translation()(0) = 1.25;
+  joint_2.parent_link_id = "link_2";
+  joint_2.child_link_id = "link_3";
+  joint_2.type = JointType::REVOLUTE;
+  joint_2.limits = std::make_shared<JointLimits>(-1, 1, 0, 2, 3, 4);
+  EXPECT_TRUE(g.addJoint(joint_2));
+
+  Joint joint_3("joint_3");
+  joint_3.parent_to_joint_origin_transform.translation()(0) = 1.25;
+  joint_3.parent_link_id = "link_3";
+  joint_3.child_link_id = "link_4";
+  joint_3.type = JointType::REVOLUTE;
+  joint_3.limits = std::make_shared<JointLimits>(-1, 1, 0, 2, 3, 4);
+  EXPECT_TRUE(g.addJoint(joint_3));
+
+  Joint joint_4("joint_4");
+  joint_4.parent_to_joint_origin_transform.translation()(1) = 1.25;
+  joint_4.parent_link_id = "link_2";
+  joint_4.child_link_id = "link_5";
+  joint_4.type = JointType::REVOLUTE;
+  joint_4.limits = std::make_shared<JointLimits>(-1, 1, 0, 2, 3, 4);
+  EXPECT_TRUE(g.addJoint(joint_4));
+
+  return g;
+}
+
+tesseract::scene_graph::SceneGraph buildTestSceneGraphForSubTree()
+{
+  using namespace tesseract::scene_graph;
+  std::vector<std::string> prefix{ "left_", "right_" };
+  std::vector<std::string> link_names = { "base_link", "link_1", "link_2", "link_3", "link_4", "link_5" };
+  SceneGraph g;
+
+  EXPECT_TRUE(g.addLink(Link("world")));
+
+  for (const auto& p : prefix)
+  {
+    for (const auto& link_name : link_names)
+    {
+      EXPECT_TRUE(g.addLink(Link(p + link_name)));
+    }
+  }
+
+  for (const auto& p : prefix)
+  {
+    Joint world_joint(p + "word_joint");
+    if (p == prefix[0])
+      world_joint.parent_to_joint_origin_transform.translation()(0) = 1;
+    else
+      world_joint.parent_to_joint_origin_transform.translation()(0) = -1;
+
+    world_joint.parent_link_id = "world";
+    world_joint.child_link_id = p + "base_link";
+    world_joint.type = JointType::FIXED;
+    EXPECT_TRUE(g.addJoint(world_joint));
+
+    Joint base_joint(p + "base_joint");
+    base_joint.parent_link_id = p + "base_link";
+    base_joint.child_link_id = p + "link_1";
+    base_joint.type = JointType::FIXED;
+    EXPECT_TRUE(g.addJoint(base_joint));
+
+    Joint joint_1(p + "joint_1");
+    joint_1.parent_link_id = p + "link_1";
+    joint_1.child_link_id = p + "link_2";
+    joint_1.type = JointType::REVOLUTE;
+    joint_1.limits = std::make_shared<JointLimits>(-1, 1, 0, 2, 3, 4);
+    EXPECT_TRUE(g.addJoint(joint_1));
+
+    Joint joint_2(p + "joint_2");
+    joint_2.parent_to_joint_origin_transform.translation()(0) = 1.25;
+    joint_2.parent_link_id = p + "link_2";
+    joint_2.child_link_id = p + "link_3";
+    joint_2.type = JointType::REVOLUTE;
+    joint_2.limits = std::make_shared<JointLimits>(-1, 1, 0, 2, 3, 4);
+    EXPECT_TRUE(g.addJoint(joint_2));
+
+    Joint joint_3(p + "joint_3");
+    joint_3.parent_to_joint_origin_transform.translation()(0) = 1.25;
+    joint_3.parent_link_id = p + "link_3";
+    joint_3.child_link_id = p + "link_4";
+    joint_3.type = JointType::REVOLUTE;
+    joint_3.limits = std::make_shared<JointLimits>(-1, 1, 0, 2, 3, 4);
+    EXPECT_TRUE(g.addJoint(joint_3));
+
+    Joint joint_4(p + "joint_4");
+    joint_4.parent_to_joint_origin_transform.translation()(1) = 1.25;
+    joint_4.parent_link_id = p + "link_2";
+    joint_4.child_link_id = p + "link_5";
+    joint_4.type = JointType::REVOLUTE;
+    joint_4.limits = std::make_shared<JointLimits>(-1, 1, 0, 2, 3, 4);
+    EXPECT_TRUE(g.addJoint(joint_4));
+  }
+
+  return g;
+}
+
+void testSceneGraphKDLTree(KDL::Tree& tree)
+{
+  KDL::TreeFkSolverPos_recursive solver(tree);
+  KDL::JntArray joints;
+  joints.resize(4);
+  for (unsigned int i = 0; i < 4; ++i)
+    joints(i) = 0;
+
+  {
+    KDL::Frame frame;
+    solver.JntToCart(joints, frame, "base_link");
+    Eigen::Isometry3d e_frame = tesseract::scene_graph::convert(frame);
+    EXPECT_TRUE(e_frame.isApprox(Eigen::Isometry3d::Identity(), 1e-8));
+  }
+
+  {
+    KDL::Frame frame;
+    solver.JntToCart(joints, frame, "link_1");
+    Eigen::Isometry3d e_frame = tesseract::scene_graph::convert(frame);
+    EXPECT_TRUE(e_frame.isApprox(Eigen::Isometry3d::Identity(), 1e-8));
+  }
+
+  {
+    KDL::Frame frame;
+    solver.JntToCart(joints, frame, "link_2");
+    Eigen::Isometry3d e_frame = tesseract::scene_graph::convert(frame);
+    EXPECT_TRUE(e_frame.isApprox(Eigen::Isometry3d::Identity(), 1e-8));
+  }
+
+  {
+    KDL::Frame frame;
+    solver.JntToCart(joints, frame, "link_3");
+    Eigen::Isometry3d e_frame = tesseract::scene_graph::convert(frame);
+    Eigen::Isometry3d c_frame{ Eigen::Isometry3d::Identity() };
+    c_frame.translation()(0) = 1.25;
+    EXPECT_TRUE(e_frame.isApprox(c_frame, 1e-8));
+  }
+
+  {
+    KDL::Frame frame;
+    solver.JntToCart(joints, frame, "link_4");
+    Eigen::Isometry3d e_frame = tesseract::scene_graph::convert(frame);
+    Eigen::Isometry3d c_frame{ Eigen::Isometry3d::Identity() };
+    c_frame.translation()(0) = 2 * 1.25;
+    EXPECT_TRUE(e_frame.isApprox(c_frame, 1e-8));
+  }
+
+  {
+    KDL::Frame frame;
+    solver.JntToCart(joints, frame, "link_5");
+    Eigen::Isometry3d e_frame = tesseract::scene_graph::convert(frame);
+    Eigen::Isometry3d c_frame{ Eigen::Isometry3d::Identity() };
+    c_frame.translation()(1) = 1.25;
+    EXPECT_TRUE(e_frame.isApprox(c_frame, 1e-8));
+  }
+}
+
+void testSubSceneGraphKDLTree(tesseract::scene_graph::KDLTreeData& data,
+                              tesseract::scene_graph::KDLTreeData& full_data,
+                              const std::unordered_map<JointId, double>& joint_values)
+{
+  std::vector<std::string> prefix{ "left_", "right_" };
+  KDL::TreeFkSolverPos_recursive solver(data.tree);
+  KDL::TreeFkSolverPos_recursive full_solver(data.tree);
+
+  KDL::JntArray joints;
+  joints.resize(data.tree.getNrOfJoints());
+  for (unsigned int i = 0; i < data.tree.getNrOfJoints(); ++i)
+    joints(i) = joint_values.at(data.active_joint_ids[i]);
+
+  KDL::JntArray full_joints;
+  joints.resize(full_data.tree.getNrOfJoints());
+  for (unsigned int i = 0; i < full_data.tree.getNrOfJoints(); ++i)
+    joints(i) = joint_values.at(full_data.active_joint_ids[i]);
+
+  EXPECT_EQ(data.tree.getRootSegment()->first, "world");
+  EXPECT_EQ(full_data.tree.getRootSegment()->first, "world");
+
+  for (const auto& p : prefix)
+  {
+    {
+      KDL::Frame frame;
+      solver.JntToCart(joints, frame, p + "link_2");
+
+      KDL::Frame c_frame;
+      full_solver.JntToCart(full_joints, c_frame, p + "link_2");
+
+      EXPECT_TRUE(tesseract::scene_graph::convert(frame).isApprox(tesseract::scene_graph::convert(c_frame), 1e-8));
+    }
+
+    {
+      KDL::Frame frame;
+      solver.JntToCart(joints, frame, p + "link_3");
+
+      KDL::Frame c_frame;
+      full_solver.JntToCart(full_joints, c_frame, p + "link_3");
+
+      EXPECT_TRUE(tesseract::scene_graph::convert(frame).isApprox(tesseract::scene_graph::convert(c_frame), 1e-8));
+    }
+
+    {
+      KDL::Frame frame;
+      solver.JntToCart(joints, frame, p + "link_4");
+
+      KDL::Frame c_frame;
+      full_solver.JntToCart(full_joints, c_frame, p + "link_4");
+
+      EXPECT_TRUE(tesseract::scene_graph::convert(frame).isApprox(tesseract::scene_graph::convert(c_frame), 1e-8));
+    }
+
+    {
+      KDL::Frame frame;
+      solver.JntToCart(joints, frame, p + "link_5");
+
+      KDL::Frame c_frame;
+      full_solver.JntToCart(full_joints, c_frame, p + "link_5");
+
+      EXPECT_TRUE(tesseract::scene_graph::convert(frame).isApprox(tesseract::scene_graph::convert(c_frame), 1e-8));
+    }
+  }
+}
+
+TEST(TesseractSceneGraphUnit, GetSourceLinkUnit)  // NOLINT
+{
+  using namespace tesseract::scene_graph;
+  SceneGraph g = buildTestSceneGraph();
+
+  for (int i = 1; i <= 3; ++i)
+  {
+    std::string link_name = "link_" + std::to_string(i);
+    std::string joint_name = "joint_" + std::to_string(i);
+    Link::ConstPtr l = g.getSourceLink(joint_name);
+    Joint::ConstPtr j = g.getJoint(joint_name);
+    EXPECT_EQ(l->getName(), link_name);
+    EXPECT_EQ(j->parent_link_id.name(), link_name);
+    EXPECT_TRUE(g.getLink(link_name) == l);
+  }
+}
+
+TEST(TesseractSceneGraphUnit, GetTargetLinkUnit)  // NOLINT
+{
+  using namespace tesseract::scene_graph;
+  SceneGraph g = buildTestSceneGraph();
+
+  for (int i = 1; i <= 3; ++i)
+  {
+    std::string link_name = "link_" + std::to_string(i + 1);
+    std::string joint_name = "joint_" + std::to_string(i);
+    Link::ConstPtr l = g.getTargetLink(joint_name);
+    Joint::ConstPtr j = g.getJoint(joint_name);
+    EXPECT_EQ(l->getName(), link_name);
+    EXPECT_EQ(j->child_link_id.name(), link_name);
+    EXPECT_TRUE(g.getLink(link_name) == l);
+  }
+}
+
+TEST(TesseractSceneGraphUnit, GetInboundJointsUnit)  // NOLINT
+{
+  using namespace tesseract::scene_graph;
+  SceneGraph g = buildTestSceneGraph();
+
+  for (int i = 2; i <= 4; ++i)
+  {
+    std::string link_name = "link_" + std::to_string(i);
+    std::string joint_name = "joint_" + std::to_string(i - 1);
+    std::vector<Joint::ConstPtr> j = g.getInboundJoints(link_name);
+    Link::ConstPtr l = g.getLink(link_name);
+    EXPECT_EQ(j.size(), 1);
+    EXPECT_EQ(j[0]->getName(), joint_name);
+    EXPECT_EQ(j[0]->child_link_id.name(), link_name);
+    EXPECT_TRUE(g.getJoint(joint_name) == j[0]);
+  }
+}
+
+TEST(TesseractSceneGraphUnit, GetOutboundJointsUnit)  // NOLINT
+{
+  using namespace tesseract::scene_graph;
+  SceneGraph g = buildTestSceneGraph();
+
+  for (int i = 1; i <= 3; ++i)
+  {
+    std::string link_name = "link_" + std::to_string(i);
+    std::string joint_name = "joint_" + std::to_string(i);
+    std::vector<Joint::ConstPtr> j = g.getOutboundJoints(link_name);
+    Link::ConstPtr l = g.getLink(link_name);
+    if (i == 2)
+    {
+      EXPECT_EQ(j.size(), 2);
+      EXPECT_EQ(j[0]->getName(), joint_name);
+      EXPECT_EQ(j[0]->parent_link_id.name(), link_name);
+      EXPECT_TRUE(g.getJoint(joint_name) == j[0]);
+
+      EXPECT_EQ(j[1]->getName(), "joint_4");
+      EXPECT_EQ(j[1]->parent_link_id.name(), link_name);
+      EXPECT_TRUE(g.getJoint("joint_4") == j[1]);
+    }
+    else
+    {
+      EXPECT_EQ(j.size(), 1);
+      EXPECT_EQ(j[0]->getName(), joint_name);
+      EXPECT_EQ(j[0]->parent_link_id.name(), link_name);
+      EXPECT_TRUE(g.getJoint(joint_name) == j[0]);
+    }
+  }
+}
+
+TEST(TesseractSceneGraphUnit, LoadKDLUnit)  // NOLINT
+{
+  using namespace tesseract::scene_graph;
+  SceneGraph g = buildTestSceneGraph();
+
+  // Check to make sure all links are enabled
+  for (const auto& link : g.getLinks())
+  {
+    EXPECT_TRUE(g.getLinkCollisionEnabled(link->getName()));
+    EXPECT_TRUE(g.getLinkVisibility(link->getName()));
+  }
+
+  std::vector<JointId> joint_ids{ "joint_1", "joint_2", "joint_3", "joint_4" };
+  std::vector<LinkId> link_ids{ "base_link", "link_1", "link_2", "link_3", "link_4", "link_5" };
+  std::vector<LinkId> static_link_ids{ "base_link", "link_1" };
+  std::vector<LinkId> active_link_ids{ "link_2", "link_3", "link_4", "link_5" };
+  {
+    KDLTreeData data = parseSceneGraph(g);
+
+    EXPECT_TRUE(tesseract::common::isIdentical(data.link_ids, link_ids, false));
+    EXPECT_TRUE(tesseract::common::isIdentical(data.static_link_ids, static_link_ids, false));
+    EXPECT_TRUE(tesseract::common::isIdentical(data.active_joint_ids, joint_ids, false));
+    EXPECT_TRUE(tesseract::common::isIdentical(data.active_link_ids, active_link_ids, false));
+
+    testSceneGraphKDLTree(data.tree);
+
+    // walk through tree
+    std::cout << " ======================================\n";
+    std::cout << " Tree has " << data.tree.getNrOfSegments() << " link(s) and a root link\n";
+    std::cout << " ======================================\n";
+    auto root = data.tree.getRootSegment();
+    printKDLTree(root, "");
+
+    EXPECT_EQ(data.tree.getNrOfJoints(), 4);
+    EXPECT_EQ(data.tree.getNrOfSegments(), 5);
+  }
+
+  SceneGraph::Ptr g_clone = g.clone();
+
+  // Check to make sure all links are enabled
+  for (const auto& link : g_clone->getLinks())
+  {
+    EXPECT_TRUE(g_clone->getLinkCollisionEnabled(link->getName()));
+    EXPECT_TRUE(g_clone->getLinkVisibility(link->getName()));
+  }
+
+  {
+    KDLTreeData data = parseSceneGraph(*g_clone);
+
+    EXPECT_TRUE(tesseract::common::isIdentical(data.link_ids, link_ids, false));
+    EXPECT_TRUE(tesseract::common::isIdentical(data.static_link_ids, static_link_ids, false));
+    EXPECT_TRUE(tesseract::common::isIdentical(data.active_joint_ids, joint_ids, false));
+    EXPECT_TRUE(tesseract::common::isIdentical(data.active_link_ids, active_link_ids, false));
+
+    testSceneGraphKDLTree(data.tree);
+
+    // walk through tree
+    std::cout << " ======================================\n";
+    std::cout << " Tree has " << data.tree.getNrOfSegments() << " link(s) and a root link\n";
+    std::cout << " ======================================\n";
+    auto root = data.tree.getRootSegment();
+    printKDLTree(root, "");
+
+    EXPECT_EQ(data.tree.getNrOfJoints(), 4);
+    EXPECT_EQ(data.tree.getNrOfSegments(), 5);
+  }
+}
+
+TEST(TesseractSceneGraphUnit, LoadSubKDLUnit)  // NOLINT
+{
+  using namespace tesseract::scene_graph;
+  SceneGraph g = buildTestSceneGraphForSubTree();
+  std::vector<std::string> joint_names{ "left_joint_1",  "left_joint_2",  "left_joint_3",  "left_joint_4",
+                                        "right_joint_1", "right_joint_2", "right_joint_3", "right_joint_4" };
+  std::vector<JointId> sub_joint_ids{ "left_joint_2",  "left_joint_3",  "left_joint_4",
+                                      "right_joint_2", "right_joint_3", "right_joint_4" };
+  std::vector<LinkId> link_ids{ "world",        "left_link_2",  "left_link_3",  "left_link_4", "left_link_5",
+                                "right_link_2", "right_link_3", "right_link_4", "right_link_5" };
+
+  std::vector<LinkId> static_link_ids{ "world", "left_link_2", "right_link_2" };
+
+  std::vector<LinkId> active_link_ids{ "left_link_3",  "left_link_4",  "left_link_5",
+                                       "right_link_3", "right_link_4", "right_link_5" };
+
+  std::unordered_map<JointId, double> joint_values;
+  for (const auto& joint_name : joint_names)
+  {
+    auto jnt = g.getJoint(joint_name);
+    std::uniform_real_distribution<double> sample(jnt->limits->lower, jnt->limits->upper);
+    joint_values[joint_name] = sample(tesseract::common::mersenne);
+  }
+
+  {
+    KDLTreeData full_data = parseSceneGraph(g);
+    KDLTreeData data = parseSceneGraph(g, sub_joint_ids, joint_values, tesseract::common::JointIdTransformMap());
+
+    EXPECT_TRUE(tesseract::common::isIdentical(data.link_ids, link_ids, false));
+    EXPECT_TRUE(tesseract::common::isIdentical(data.static_link_ids, static_link_ids, false));
+    EXPECT_TRUE(tesseract::common::isIdentical(data.active_joint_ids, sub_joint_ids, false));
+    EXPECT_TRUE(tesseract::common::isIdentical(data.active_link_ids, active_link_ids, false));
+
+    testSubSceneGraphKDLTree(data, full_data, joint_values);
+
+    // walk through tree
+    std::cout << " ======================================\n";
+    std::cout << " Tree has " << data.tree.getNrOfSegments() << " link(s) and a root link\n";
+    std::cout << " ======================================\n";
+    auto root = data.tree.getRootSegment();
+    printKDLTree(root, "");
+
+    EXPECT_EQ(data.tree.getNrOfJoints(), 6);
+    EXPECT_EQ(data.tree.getNrOfSegments(), 8);
+  }
+
+  SceneGraph::Ptr g_clone = g.clone();
+
+  // Check to make sure all links are enabled
+  for (const auto& link : g_clone->getLinks())
+  {
+    EXPECT_TRUE(g_clone->getLinkCollisionEnabled(link->getName()));
+    EXPECT_TRUE(g_clone->getLinkVisibility(link->getName()));
+  }
+
+  {
+    KDLTreeData full_data = parseSceneGraph(g);
+    KDLTreeData data = parseSceneGraph(*g_clone, sub_joint_ids, joint_values, tesseract::common::JointIdTransformMap());
+
+    EXPECT_TRUE(tesseract::common::isIdentical(data.link_ids, link_ids, false));
+    EXPECT_TRUE(tesseract::common::isIdentical(data.static_link_ids, static_link_ids, false));
+    EXPECT_TRUE(tesseract::common::isIdentical(data.active_joint_ids, sub_joint_ids, false));
+    EXPECT_TRUE(tesseract::common::isIdentical(data.active_link_ids, active_link_ids, false));
+
+    testSubSceneGraphKDLTree(data, full_data, joint_values);
+
+    // walk through tree
+    std::cout << " ======================================\n";
+    std::cout << " Tree has " << data.tree.getNrOfSegments() << " link(s) and a root link\n";
+    std::cout << " ======================================\n";
+    auto root = data.tree.getRootSegment();
+    printKDLTree(root, "");
+
+    EXPECT_EQ(data.tree.getNrOfJoints(), 6);
+    EXPECT_EQ(data.tree.getNrOfSegments(), 8);
+  }
+}
+
+TEST(TesseractSceneGraphUnit, KDLParserSubTreeUnit)  // NOLINT
+{
+  using namespace tesseract::scene_graph;
+  SceneGraph g = buildTestSceneGraph();
+
+  std::vector<Joint::ConstPtr> active_joints = g.getActiveJoints();
+
+  // Explicit subset: exclude joint_3 so its parent link_3 (added via joint_2) hits the
+  // "downstream fixed segment" branch in kdl_sub_tree_builder.
+  // Using a literal subset avoids depending on std::unordered_map iteration order.
+  const std::vector<JointId> subset{ "joint_1", "joint_2", "joint_4" };
+
+  // Populate joint_values for all active joints; the sub-tree builder looks up values
+  // for every non-fixed joint it traverses, not just the subset.
+  std::unordered_map<JointId, double> joint_values;
+  for (const auto& j : active_joints)
+    joint_values[j->getId()] = 0.0;
+
+  tesseract::common::JointIdTransformMap floating;
+
+  KDLTreeData data = parseSceneGraph(g, subset, joint_values, floating);
+
+  EXPECT_GT(data.tree.getNrOfJoints(), 0U);
+  EXPECT_EQ(data.tree.getNrOfJoints(), subset.size());
+  EXPECT_EQ(data.active_joint_ids.size(), subset.size());
+  EXPECT_FALSE(data.link_ids.empty());
+  EXPECT_FALSE(data.active_link_ids.empty());
+  EXPECT_FALSE(data.static_link_ids.empty());
+}
+
+TEST(TesseractSceneGraphUnit, KDLTreeDataEqualityUnit)  // NOLINT
+{
+  using namespace tesseract::scene_graph;
+  SceneGraph g = buildTestSceneGraph();
+
+  // Parse the full tree twice to produce two structurally-identical KDLTreeData
+  // instances, exercising KDLTreeData::operator==.
+  KDLTreeData a = parseSceneGraph(g);
+  KDLTreeData b = parseSceneGraph(g);
+
+  EXPECT_TRUE(a == b);
+  EXPECT_FALSE(a != b);
+
+  // Mutate base_link_id to flip one of the boolean AND-chain terms.
+  {
+    KDLTreeData mutated = b;
+    mutated.base_link_id = "mutated_base";
+    EXPECT_FALSE(a == mutated);
+    EXPECT_TRUE(a != mutated);
+  }
+
+  // Inject a floating-joint value into one side to exercise the isometry_equal
+  // branch of the isIdenticalMap comparison. buildTestSceneGraph()
+  // contains no FLOATING joints, so floating_joint_values is empty on both
+  // sides; directly populate `b` to force the map comparison to differ.
+  {
+    KDLTreeData mutated = b;
+    Eigen::Isometry3d shifted = Eigen::Isometry3d::Identity();
+    shifted.translation().x() = 10.0;
+    mutated.floating_joint_values["phantom_floating"] = shifted;
+    EXPECT_FALSE(a == mutated);
+    EXPECT_TRUE(a != mutated);
+  }
+
+  // Two non-empty floating_joint_values maps with matching keys but differing
+  // transforms: hits the isometry_equal lambda with a false result.
+  {
+    KDLTreeData left = b;
+    KDLTreeData right = b;
+    left.floating_joint_values["phantom_floating"] = Eigen::Isometry3d::Identity();
+    Eigen::Isometry3d shifted = Eigen::Isometry3d::Identity();
+    shifted.translation().y() = 5.0;
+    right.floating_joint_values["phantom_floating"] = shifted;
+    EXPECT_FALSE(left == right);
+    EXPECT_TRUE(left != right);
+  }
+
+  // Matching non-empty floating_joint_values maps: isometry_equal returns true.
+  {
+    KDLTreeData left = b;
+    KDLTreeData right = b;
+    Eigen::Isometry3d same = Eigen::Isometry3d::Identity();
+    same.translation().z() = 2.0;
+    left.floating_joint_values["phantom_floating"] = same;
+    right.floating_joint_values["phantom_floating"] = same;
+    EXPECT_TRUE(left == right);
+  }
+}
+
+// Exercises the sub-tree builder constructor when the provided floating_joint_values
+// map is non-empty, so its entries are copied into the sub-tree's own map. A prior
+// implementation used .at() on the empty destination map and threw std::out_of_range.
+// buildTestSceneGraph()'s joint_3 is REVOLUTE, so this test does not exercise the DFS
+// FLOATING branch in discover_vertex; see KDLParserSubTreeFloatingJointDfsUnit below.
+TEST(TesseractSceneGraphUnit, KDLParserSubTreeFloatingJointUnit)  // NOLINT
+{
+  using namespace tesseract::scene_graph;
+  SceneGraph g = buildTestSceneGraph();
+
+  std::vector<Joint::ConstPtr> active_joints = g.getActiveJoints();
+
+  const std::vector<JointId> subset{ "joint_1", "joint_2", "joint_4" };
+
+  std::unordered_map<JointId, double> joint_values;
+  for (const auto& j : active_joints)
+    joint_values[j->getId()] = 0.0;
+
+  tesseract::common::JointIdTransformMap floating;
+  Eigen::Isometry3d fj_tf = Eigen::Isometry3d::Identity();
+  fj_tf.translation().x() = 0.75;
+  fj_tf.translation().y() = -0.25;
+  floating["joint_3"] = fj_tf;
+
+  // Regression: this call must not throw std::out_of_range when floating values are supplied.
+  KDLTreeData data = parseSceneGraph(g, subset, joint_values, floating);
+
+  ASSERT_EQ(data.floating_joint_values.count("joint_3"), 1U);
+  EXPECT_TRUE(data.floating_joint_values["joint_3"].isApprox(fj_tf));
+  EXPECT_FALSE(data.link_ids.empty());
+  EXPECT_EQ(data.tree.getNrOfJoints(), subset.size());
+}
+
+// Exercises the DFS FLOATING branch in discover_vertex that reads the transform back
+// out of the sub-tree's floating_joint_values while building the segment for a FLOATING
+// joint's child link. Requires an actual FLOATING joint in the graph, which
+// buildTestSceneGraph() does not provide.
+TEST(TesseractSceneGraphUnit, KDLParserSubTreeFloatingJointDfsUnit)  // NOLINT
+{
+  using namespace tesseract::scene_graph;
+
+  // Minimal graph: base_link (root) --fixed--> link_1 --floating--> link_2.
+  SceneGraph g;
+  EXPECT_TRUE(g.addLink(Link("base_link")));
+  EXPECT_TRUE(g.addLink(Link("link_1")));
+  EXPECT_TRUE(g.addLink(Link("link_2")));
+
+  Joint j_fixed("j_fixed");
+  j_fixed.parent_link_id = "base_link";
+  j_fixed.child_link_id = "link_1";
+  j_fixed.type = JointType::FIXED;
+  EXPECT_TRUE(g.addJoint(j_fixed));
+
+  Joint j_float("j_float");
+  j_float.parent_link_id = "link_1";
+  j_float.child_link_id = "link_2";
+  j_float.type = JointType::FLOATING;
+  EXPECT_TRUE(g.addJoint(j_float));
+
+  // An empty active-joint subset means every joint (including the FLOATING one)
+  // is walked by the sub-tree builder as a fixed segment driven by the provided
+  // floating_joint_values transform.
+  const std::vector<JointId> subset;
+  const std::unordered_map<JointId, double> joint_values;
+
+  tesseract::common::JointIdTransformMap floating;
+  Eigen::Isometry3d fj_tf = Eigen::Isometry3d::Identity();
+  fj_tf.translation().x() = 0.5;
+  floating["j_float"] = fj_tf;
+
+  KDLTreeData data = parseSceneGraph(g, subset, joint_values, floating);
+
+  EXPECT_EQ(data.base_link_id, "base_link");
+  ASSERT_EQ(data.floating_joint_values.count("j_float"), 1U);
+  EXPECT_TRUE(data.floating_joint_values["j_float"].isApprox(fj_tf));
+}
+
+TEST(TesseractSceneGraphUnit, KDLParserSubTreeUnitMissingJointValueThrows)  // NOLINT
+{
+  // Regression test: discover_vertex must throw std::runtime_error (naming the offending joint) when
+  // joint_values is missing an entry for a non-FIXED, non-FLOATING joint reachable from the root.
+  using namespace tesseract::scene_graph;
+
+  SceneGraph g = buildTestSceneGraph();
+
+  // Empty active-joint subset — every revolute joint walked by the DFS will hit the missing-value path.
+  const std::vector<JointId> subset;
+  // Deliberately omit all entries so joint_3 (revolute) has no value.
+  const std::unordered_map<JointId, double> joint_values;
+  const tesseract::common::JointIdTransformMap floating;
+
+  // Must throw std::runtime_error, not std::out_of_range.
+  EXPECT_THROW(parseSceneGraph(g, subset, joint_values, floating), std::runtime_error);
+
+  // The error message must name the offending joint so callers can act on it.
+  try
+  {
+    parseSceneGraph(g, subset, joint_values, floating);
+    FAIL() << "Expected std::runtime_error";
+  }
+  catch (const std::runtime_error& e)
+  {
+    // joint_1, joint_2, joint_3, joint_4 are all revolute — whichever the DFS hits first must be named.
+    const std::string msg(e.what());
+    const bool names_a_joint = msg.find("joint_1") != std::string::npos || msg.find("joint_2") != std::string::npos ||
+                               msg.find("joint_3") != std::string::npos || msg.find("joint_4") != std::string::npos;
+    EXPECT_TRUE(names_a_joint) << "Exception message did not name the offending joint: " << msg;
+  }
+}
+
+TEST(TesseractSceneGraphUnit, KDLParserSubTreeUnitMissingFloatingJointValueThrows)  // NOLINT
+{
+  // Regression test: the FLOATING-joint counterpart of KDLParserSubTreeUnitMissingJointValueThrows.
+  // discover_vertex must throw std::runtime_error (naming the offending joint) when
+  // floating_joint_values is missing an entry for a FLOATING joint reachable from the root.
+  using namespace tesseract::scene_graph;
+
+  // Minimal graph: base_link (root) --fixed--> link_1 --floating--> link_2.
+  SceneGraph g;
+  EXPECT_TRUE(g.addLink(Link("base_link")));
+  EXPECT_TRUE(g.addLink(Link("link_1")));
+  EXPECT_TRUE(g.addLink(Link("link_2")));
+
+  Joint j_fixed("j_fixed");
+  j_fixed.parent_link_id = "base_link";
+  j_fixed.child_link_id = "link_1";
+  j_fixed.type = JointType::FIXED;
+  EXPECT_TRUE(g.addJoint(j_fixed));
+
+  Joint j_float("j_float");
+  j_float.parent_link_id = "link_1";
+  j_float.child_link_id = "link_2";
+  j_float.type = JointType::FLOATING;
+  EXPECT_TRUE(g.addJoint(j_float));
+
+  const std::vector<JointId> subset;
+  const std::unordered_map<JointId, double> joint_values;
+  // Deliberately empty — j_float has no transform supplied.
+  const tesseract::common::JointIdTransformMap floating;
+
+  // Must throw std::runtime_error, not std::out_of_range.
+  EXPECT_THROW(parseSceneGraph(g, subset, joint_values, floating), std::runtime_error);
+
+  // The error message must name the offending FLOATING joint so callers can act on it.
+  try
+  {
+    parseSceneGraph(g, subset, joint_values, floating);
+    FAIL() << "Expected std::runtime_error";
+  }
+  catch (const std::runtime_error& e)
+  {
+    const std::string msg(e.what());
+    EXPECT_NE(msg.find("j_float"), std::string::npos)
+        << "Exception message did not name the offending FLOATING joint: " << msg;
+  }
+}
+
+TEST(TesseractSceneGraphUnit, TestChangeJointOrigin)  // NOLINT
+{
+  using namespace tesseract::scene_graph;
+  SceneGraph g;
+
+  Link link_1("link_n1");
+  Link link_2("link_n2");
+
+  Joint joint_1("joint_n1");
+  joint_1.parent_link_id = "link_n1";
+  joint_1.child_link_id = "link_n2";
+  joint_1.type = JointType::FIXED;
+
+  g.addLink(link_1);
+  g.addLink(link_2);
+  g.addJoint(joint_1);
+
+  Eigen::Isometry3d new_origin = Eigen::Isometry3d::Identity();
+  new_origin.translation()(0) += 1.234;
+  g.changeJointOrigin("joint_n1", new_origin);
+
+  // Check that the transform got updated and the edge was recalculated.
+  EXPECT_TRUE(g.getJoint("joint_n1")->parent_to_joint_origin_transform.isApprox(new_origin));
+  tesseract::scene_graph::SceneGraph::edge_descriptor e = g.getEdge("joint_n1");
+  double d = boost::get(boost::edge_weight_t(), g)[e];
+  EXPECT_EQ(d, g.getJoint("joint_n1")->parent_to_joint_origin_transform.translation().norm());
+}
+
+TEST(TesseractSceneGraphUnit, TesseractSceneGraphInsertEmptyUnit)  // NOLINT
+{
+  // Test inserting graph into empty graph
+  tesseract::scene_graph::SceneGraph g = buildTestSceneGraph();
+  tesseract::common::AllowedCollisionMatrix acm;
+  acm.addAllowedCollision("link1", "link2", "test");
+  acm.addAllowedCollision("link1", "link3", "test");
+  g.getAllowedCollisionMatrix()->insertAllowedCollisionMatrix(acm);
+  EXPECT_EQ(g.getAllowedCollisionMatrix()->getAllAllowedCollisions().size(), 2);
+
+  tesseract::scene_graph::SceneGraph ng;
+  EXPECT_TRUE(ng.insertSceneGraph(g));
+
+  // Check Graph
+  checkSceneGraph(ng);
+
+  EXPECT_EQ(g.getLinks().size(), ng.getLinks().size());
+  EXPECT_EQ(g.getJoints().size(), ng.getJoints().size());
+  EXPECT_EQ(g.getRoot(), ng.getRoot());
+  EXPECT_EQ(ng.getAllowedCollisionMatrix()->getAllAllowedCollisions().size(), 2);
+
+  for (const auto& l : g.getLinks())
+  {
+    EXPECT_TRUE(ng.getLink(l->getName()) != nullptr);
+  }
+
+  for (const auto& j : g.getJoints())
+  {
+    EXPECT_TRUE(ng.getJoint(j->getName()) != nullptr);
+  }
+
+  for (const auto& entry : g.getAllowedCollisionMatrix()->getAllAllowedCollisions())
+  {
+    EXPECT_TRUE(ng.getAllowedCollisionMatrix()->isCollisionAllowed(entry.first));
+  }
+
+  // Save Graph
+  ng.saveDOT(tesseract::common::getTempPath() + "graph_insert_empty_example.dot");
+}
+
+TEST(TesseractSceneGraphUnit, TesseractSceneGraphInsertEmptyWithPrefixUnit)  // NOLINT
+{
+  // Regression test: insertSceneGraph into an empty graph WITH a prefix must store the prefixed root LinkId.
+  // The unprefixed root name is not in the destination's link map, so setting it must not be attempted.
+  using namespace tesseract::scene_graph;
+
+  tesseract::scene_graph::SceneGraph g = buildTestSceneGraph();
+  const std::string prefix = "r1::";
+
+  // buildTestSceneGraph() root is "base_link"; after prefix it must be "r1::base_link".
+  const std::string expected_root_name = prefix + g.getRoot().name();
+
+  tesseract::scene_graph::SceneGraph ng;
+  EXPECT_TRUE(ng.insertSceneGraph(g, prefix));
+
+  // Root must be exactly the prefixed version of the original root.
+  EXPECT_EQ(ng.getRoot().name(), expected_root_name);
+
+  // Root must be retrievable from link_map_.
+  EXPECT_NE(ng.getLink(ng.getRoot()), nullptr);
+
+  // Inserting into an empty graph must produce a tree.
+  EXPECT_TRUE(ng.isTree());
+}
+
+TEST(TesseractSceneGraphUnit, TesseractSceneGraphInsertWithoutJointNoPrefixUnit)  // NOLINT
+{
+  // Test inserting graph into empty graph
+  tesseract::scene_graph::SceneGraph g = buildTestSceneGraph();
+  tesseract::common::AllowedCollisionMatrix acm;
+  acm.addAllowedCollision("link1", "link2", "test");
+  acm.addAllowedCollision("link1", "link3", "test");
+  g.getAllowedCollisionMatrix()->insertAllowedCollisionMatrix(acm);
+  EXPECT_EQ(g.getAllowedCollisionMatrix()->getAllAllowedCollisions().size(), 2);
+
+  tesseract::scene_graph::SceneGraph ng = buildTestSceneGraph();
+  ng.getAllowedCollisionMatrix()->insertAllowedCollisionMatrix(acm);
+  EXPECT_EQ(ng.getAllowedCollisionMatrix()->getAllAllowedCollisions().size(), 2);
+
+  // Insert without prefix which should fail leaving the original graph
+  EXPECT_FALSE(ng.insertSceneGraph(g));
+  EXPECT_EQ(g.getLinks().size(), ng.getLinks().size());
+  EXPECT_EQ(g.getJoints().size(), ng.getJoints().size());
+  EXPECT_EQ(g.getRoot(), ng.getRoot());
+  EXPECT_EQ(ng.getAllowedCollisionMatrix()->getAllAllowedCollisions().size(), 2);
+
+  for (const auto& l : g.getLinks())
+  {
+    EXPECT_TRUE(ng.getLink(l->getName()) != nullptr);
+  }
+
+  for (const auto& j : g.getJoints())
+  {
+    EXPECT_TRUE(ng.getJoint(j->getName()) != nullptr);
+  }
+
+  for (const auto& entry : g.getAllowedCollisionMatrix()->getAllAllowedCollisions())
+  {
+    EXPECT_TRUE(ng.getAllowedCollisionMatrix()->isCollisionAllowed(entry.first));
+  }
+}
+
+TEST(TesseractSceneGraphUnit, TesseractSceneGraphInsertWithoutJointWithPrefixUnit)  // NOLINT
+{
+  // Test inserting graph into empty graph
+  tesseract::scene_graph::SceneGraph g = buildTestSceneGraph();
+  tesseract::common::AllowedCollisionMatrix acm;
+  acm.addAllowedCollision("link1", "link2", "test");
+  acm.addAllowedCollision("link1", "link3", "test");
+  g.getAllowedCollisionMatrix()->insertAllowedCollisionMatrix(acm);
+  EXPECT_EQ(g.getAllowedCollisionMatrix()->getAllAllowedCollisions().size(), 2);
+
+  tesseract::scene_graph::SceneGraph ng = buildTestSceneGraph();
+  ng.getAllowedCollisionMatrix()->insertAllowedCollisionMatrix(acm);
+  EXPECT_EQ(ng.getAllowedCollisionMatrix()->getAllAllowedCollisions().size(), 2);
+
+  std::string prefix = "r1::";
+  EXPECT_TRUE(ng.insertSceneGraph(g, prefix));
+  EXPECT_FALSE(ng.isTree());
+
+  // Check Graph
+  checkSceneGraph(ng);
+
+  EXPECT_EQ(2 * g.getLinks().size(), ng.getLinks().size());
+  EXPECT_EQ(2 * g.getJoints().size(), ng.getJoints().size());
+  EXPECT_EQ(g.getRoot(), ng.getRoot());
+  EXPECT_EQ(ng.getAllowedCollisionMatrix()->getAllAllowedCollisions().size(), 4);
+
+  for (const auto& l : g.getLinks())
+  {
+    EXPECT_TRUE(ng.getLink(l->getName()) != nullptr);
+    EXPECT_TRUE(ng.getLink(prefix + l->getName()) != nullptr);
+  }
+
+  for (const auto& j : g.getJoints())
+  {
+    EXPECT_TRUE(ng.getJoint(j->getName()) != nullptr);
+    EXPECT_TRUE(ng.getJoint(prefix + j->getName()) != nullptr);
+  }
+
+  for (const auto& entry : g.getAllowedCollisionMatrix()->getAllAllowedCollisions())
+  {
+    EXPECT_TRUE(ng.getAllowedCollisionMatrix()->isCollisionAllowed(entry.first));
+    EXPECT_TRUE(ng.getAllowedCollisionMatrix()->isCollisionAllowed(
+        { prefix + entry.first.first().name(), prefix + entry.first.second().name() }));
+  }
+
+  // Save Graph
+  ng.saveDOT(tesseract::common::getTempPath() + "graph_insert_example.dot");
+}
+
+TEST(TesseractSceneGraphUnit, TesseractSceneGraphInsertWithJointWithPrefixUnit)  // NOLINT
+{
+  // Test inserting graph into empty graph
+  tesseract::scene_graph::SceneGraph g = buildTestSceneGraph();
+  tesseract::common::AllowedCollisionMatrix acm;
+  acm.addAllowedCollision("link1", "link2", "test");
+  acm.addAllowedCollision("link1", "link3", "test");
+  g.getAllowedCollisionMatrix()->insertAllowedCollisionMatrix(acm);
+  EXPECT_EQ(g.getAllowedCollisionMatrix()->getAllAllowedCollisions().size(), 2);
+  EXPECT_TRUE(g.isCollisionAllowed({ "link1", "link2" }));
+  EXPECT_TRUE(g.isCollisionAllowed({ "link1", "link3" }));
+
+  tesseract::scene_graph::SceneGraph ng = buildTestSceneGraph();
+  ng.getAllowedCollisionMatrix()->insertAllowedCollisionMatrix(acm);
+  EXPECT_EQ(ng.getAllowedCollisionMatrix()->getAllAllowedCollisions().size(), 2);
+  EXPECT_TRUE(ng.isCollisionAllowed({ "link1", "link2" }));
+  EXPECT_TRUE(ng.isCollisionAllowed({ "link1", "link3" }));
+
+  std::string prefix = "r1::";
+
+  tesseract::scene_graph::Joint new_joint("insert_graph_joint");
+  new_joint.parent_link_id = "base_link";
+  new_joint.child_link_id = prefix + new_joint.parent_link_id.name();
+  new_joint.type = tesseract::scene_graph::JointType::FIXED;
+  new_joint.parent_to_joint_origin_transform = Eigen::Translation3d(1, 0, 0) * Eigen::Isometry3d::Identity();
+  EXPECT_TRUE(ng.insertSceneGraph(g, new_joint, prefix));
+  EXPECT_TRUE(ng.isTree());
+
+  // Check Graph
+  checkSceneGraph(ng);
+
+  EXPECT_EQ(2 * g.getLinks().size(), ng.getLinks().size());
+  EXPECT_EQ((2 * g.getJoints().size()) + 1, ng.getJoints().size());
+  EXPECT_EQ(g.getRoot(), ng.getRoot());
+  EXPECT_EQ(ng.getAllowedCollisionMatrix()->getAllAllowedCollisions().size(), 4);
+
+  for (const auto& l : g.getLinks())
+  {
+    EXPECT_TRUE(ng.getLink(l->getName()) != nullptr);
+    EXPECT_TRUE(ng.getLink(prefix + l->getName()) != nullptr);
+  }
+
+  for (const auto& j : g.getJoints())
+  {
+    EXPECT_TRUE(ng.getJoint(j->getName()) != nullptr);
+    EXPECT_TRUE(ng.getJoint(prefix + j->getName()) != nullptr);
+  }
+
+  for (const auto& entry : g.getAllowedCollisionMatrix()->getAllAllowedCollisions())
+  {
+    EXPECT_TRUE(ng.getAllowedCollisionMatrix()->isCollisionAllowed(entry.first));
+    EXPECT_TRUE(ng.getAllowedCollisionMatrix()->isCollisionAllowed(
+        { prefix + entry.first.first().name(), prefix + entry.first.second().name() }));
+  }
+
+  // Save Graph
+  ng.saveDOT(tesseract::common::getTempPath() + "graph_insert_with_joint_example.dot");
+}
+
+TEST(TesseractSceneGraphUnit, TesseractSceneState)  // NOLINT
+{
+  using tesseract::common::JointId;
+
+  tesseract::scene_graph::SceneState state;
+  state.joints["j1"] = 1;
+  state.joints["j2"] = 2;
+  state.joints["j3"] = 3;
+  state.joints["j4"] = 4;
+  state.joints["j5"] = 5;
+  state.joints["j6"] = 6;
+
+  Eigen::VectorXd jv = state.getJointValues({ "j2", "j3", "j6" });
+
+  EXPECT_NEAR(jv(0), state.joints["j2"], 1e-6);
+  EXPECT_NEAR(jv(1), state.joints["j3"], 1e-6);
+  EXPECT_NEAR(jv(2), state.joints["j6"], 1e-6);
+}
+
+TEST(TesseractSceneGraphUnit, TesseractSceneGraphKDLConversions)  // NOLINT
+{
+  {  // Eigen to KDL
+    Eigen::Isometry3d t = Eigen::Isometry3d::Identity();
+    t.translation() = Eigen::Vector3d(1, 2, 3);
+    KDL::Frame kdl_t = tesseract::scene_graph::convert(t);
+    for (int i = 0; i < 4; ++i)
+    {
+      for (int j = 0; j < 4; ++j)
+      {
+        EXPECT_DOUBLE_EQ(kdl_t(i, j), t(i, j));  // NOLINT
+      }
+    }
+  }
+
+  {  // KDL to Eigen
+    KDL::Frame kdl_t = KDL::Frame::Identity();
+    kdl_t.p = KDL::Vector(1, 2, 3);
+    Eigen::Isometry3d t = tesseract::scene_graph::convert(kdl_t);
+    for (int i = 0; i < 4; ++i)
+    {
+      for (int j = 0; j < 4; ++j)
+      {
+        EXPECT_DOUBLE_EQ(kdl_t(i, j), t(i, j));
+      }
+    }
+  }
+
+  {  // Eigen to KDL
+    Eigen::Vector3d v(1, 2, 3);
+    KDL::Vector kdl_v = tesseract::scene_graph::convert(v);
+    for (int i = 0; i < 3; ++i)
+    {
+      EXPECT_DOUBLE_EQ(kdl_v(i), v(i));
+    }
+  }
+
+  {  // KDL to Eigen
+    KDL::Vector kdl_v(1, 2, 3);
+    Eigen::Vector3d v = tesseract::scene_graph::convert(kdl_v);
+    for (int i = 0; i < 3; ++i)
+    {
+      EXPECT_DOUBLE_EQ(kdl_v(i), v(i));
+    }
+  }
+
+  {  // Eigen to KDL
+    Eigen::MatrixXd t = Eigen::MatrixXd::Random(6, 6);
+    KDL::Jacobian kdl_t = tesseract::scene_graph::convert(t);
+    for (int i = 0; i < 6; ++i)
+    {
+      for (int j = 0; j < 6; ++j)
+      {
+        EXPECT_DOUBLE_EQ(kdl_t(static_cast<unsigned>(i), static_cast<unsigned>(j)), t(i, j));
+      }
+    }
+
+    Eigen::MatrixXd t_wrong_size = Eigen::MatrixXd::Random(7, 7);
+    EXPECT_ANY_THROW(tesseract::scene_graph::convert(t_wrong_size));  // NOLINT
+  }
+
+  {  // KDL to Eigen
+    KDL::Jacobian kdl_t;
+    kdl_t.resize(6);
+    kdl_t.data = Eigen::MatrixXd::Random(6, 6);
+    Eigen::MatrixXd t = tesseract::scene_graph::convert(kdl_t);
+    EXPECT_EQ(t.cols(), 6);
+    EXPECT_EQ(t.rows(), 6);
+    for (int i = 0; i < 6; ++i)
+    {
+      for (int j = 0; j < 6; ++j)
+      {
+        EXPECT_DOUBLE_EQ(kdl_t(static_cast<unsigned>(i), static_cast<unsigned>(j)), t(i, j));
+      }
+    }
+  }
+
+  {  // KDL to Eigen
+    KDL::Jacobian kdl_t;
+    kdl_t.resize(6);
+    kdl_t.data = Eigen::MatrixXd::Random(6, 6);
+
+    std::vector<int> q_nrs{ 0, 2, 5 };
+    Eigen::MatrixXd t = tesseract::scene_graph::convert(kdl_t, q_nrs);
+    EXPECT_EQ(t.cols(), 3);
+    EXPECT_EQ(t.rows(), 6);
+    for (int i = 0; i < 6; ++i)
+    {
+      EXPECT_DOUBLE_EQ(kdl_t(static_cast<unsigned>(i), 0), t(i, 0));
+      EXPECT_DOUBLE_EQ(kdl_t(static_cast<unsigned>(i), 2), t(i, 1));
+      EXPECT_DOUBLE_EQ(kdl_t(static_cast<unsigned>(i), 5), t(i, 2));
+    }
+  }
+}
+
+int main(int argc, char** argv)
+{
+  testing::InitGoogleTest(&argc, argv);
+
+  return RUN_ALL_TESTS();
+}

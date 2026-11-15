@@ -1,0 +1,98 @@
+name: Mac OSX
+
+on:
+  push:
+    branches:
+      - 'tesseract-conda-resource/**'
+
+# Supersede in-progress pull-request runs; queue everything else so two runs on one ref never race.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  VCPKG_PKGS: >- 
+    boost-dll boost-program-options boost-stacktrace
+    boost-filesystem cereal
+    tinyxml2 spdlog assimp
+    urdfdom octomap orocos-kdl pcl
+    gtest benchmark flann jsoncpp
+    yaml-cpp eigen3
+    openblas
+    fcl ompl taskflow
+    bullet3[multithreading,double-precision,rtti]
+    ccd[double-precision] gperftools
+    openssl
+
+jobs:
+  build-macos:
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - runner: macos-15-intel
+            vcpkg_triplet: x64-osx-dynamic-release
+            arch: x64
+            homebrew_root: /usr/local
+          - runner: macos-15
+            vcpkg_triplet: arm64-osx-dynamic-release
+            arch: arm64
+            homebrew_root: /opt/homebrew
+    runs-on: ${{ matrix.config.runner }}
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        path: target_ws/src
+    - uses: actions/setup-python@v7
+      id: setup-python
+      with:
+        python-version: '3.12'
+    - name: brew
+      run: |
+        brew install libomp cmake automake autoconf autoconf-archive libtool gcc ninja libarchive    
+    - name: vcpkg build
+      uses: johnwason/vcpkg-action@v8
+      with:
+        pkgs: >-
+          ${{ env.VCPKG_PKGS }}
+        triplet: ${{ matrix.config.vcpkg_triplet }}
+        extra-args: --clean-after-build --overlay-triplets=${{ github.workspace }}/target_ws/src/tesseract/.github/workflows/vcpkg_triplets
+        token: ${{ github.token }}
+        cache-key: osx-${{ matrix.config.arch }}-vcpkg
+    - name: update environment
+      shell: bash
+      run: |
+        echo "DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:$GITHUB_WORKSPACE/vcpkg/installed/${{ matrix.config.vcpkg_triplet }}/lib" >> "$GITHUB_ENV"
+        echo "CMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH:$GITHUB_WORKSPACE/vcpkg/installed/${{ matrix.config.vcpkg_triplet }}" >> "$GITHUB_ENV"
+    - name: Build and Tests
+      uses: tesseract-robotics/colcon-action@v16
+      with:
+        ccache-prefix: ci-mac-build-${{ matrix.config.arch }}
+        vcs-file: tesseract/.github/workflows/windows_dependencies.repos
+        rosdep-enabled: false
+        upstream-args: >-
+          --merge-install
+          --cmake-args -G "Ninja" -DVCPKG_TARGET_TRIPLET=${{ matrix.config.vcpkg_triplet }} -DCMAKE_BUILD_TYPE=Release
+          -DVCPKG_APPLOCAL_DEPS=OFF -DTESSERACT_ENABLE_TESTING=ON \
+          -DTESSERACT_ENABLE_BENCHMARKING=OFF -DTESSERACT_ENABLE_RUN_BENCHMARKING=OFF \
+          -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0 \
+          -DOpenMP_CXX_INCLUDE_DIR=${{ matrix.config.homebrew_root }}/opt/libomp/include \
+          -DOpenMP_C_INCLUDE_DIR=${{ matrix.config.homebrew_root }}/opt/libomp/include \
+          -DOpenMP_CXX_LIB_NAMES=libomp -DOpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp" \
+          -DOpenMP_C_LIB_NAMES=libomp -DOpenMP_C_FLAGS="-Xpreprocessor -fopenmp" \
+          -DOpenMP_libomp_LIBRARY=${{ matrix.config.homebrew_root }}/opt/libomp/lib/libomp.dylib
+        target-path: target_ws/src
+        target-args: >-
+          --merge-install
+          --cmake-args -G "Ninja" -DVCPKG_TARGET_TRIPLET=${{ matrix.config.vcpkg_triplet }} 
+          -DCMAKE_BUILD_TYPE=Release -DTESSERACT_ENABLE_TESTING=ON \
+          -DTESSERACT_ENABLE_BENCHMARKING=OFF -DTESSERACT_ENABLE_RUN_BENCHMARKING=OFF \
+          -DVCPKG_APPLOCAL_DEPS=OFF \
+          -DLibArchive_ROOT=${{ matrix.config.homebrew_root }}/opt/libarchive -DTESSERACT_CONDA_ENABLE_TESTING=ON \
+          -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0 \
+          -DOpenMP_CXX_INCLUDE_DIR=${{ matrix.config.homebrew_root }}/opt/libomp/include \
+          -DOpenMP_C_INCLUDE_DIR=${{ matrix.config.homebrew_root }}/opt/libomp/include \
+          -DOpenMP_CXX_LIB_NAMES=libomp -DOpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp" \
+          -DOpenMP_C_LIB_NAMES=libomp -DOpenMP_C_FLAGS="-Xpreprocessor -fopenmp" \
+          -DOpenMP_libomp_LIBRARY=${{ matrix.config.homebrew_root }}/opt/libomp/lib/libomp.dylib
+        run-tests-args: --merge-install --ctest-args -E "TesseractEnvironmentUnit.checkTrajectoryUnit|TesseractCommonUnit.timer"

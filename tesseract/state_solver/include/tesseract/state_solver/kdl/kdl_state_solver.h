@@ -1,0 +1,219 @@
+/**
+ * @file kdl_state_solver.h
+ * @brief Tesseract Scene Graph State Solver KDL Implementation.
+ *
+ * @author Levi Armstrong
+ * @date Dec 18, 2017
+ *
+ * @copyright Copyright (c) 2017, Southwest Research Institute
+ *
+ * @par License
+ * Software License Agreement (Apache License)
+ * @par
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * @par
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+#ifndef TESSERACT_STATE_SOLVER_KDL_STATE_SOLVER_H
+#define TESSERACT_STATE_SOLVER_KDL_STATE_SOLVER_H
+
+#include <tesseract/common/macros.h>
+TESSERACT_COMMON_IGNORE_WARNINGS_PUSH
+#include <kdl/tree.hpp>
+#include <kdl/jntarray.hpp>
+#include <kdl/treejnttojacsolver.hpp>
+#include <shared_mutex>
+#include <thread>
+#include <unordered_set>
+TESSERACT_COMMON_IGNORE_WARNINGS_POP
+
+#include <tesseract/state_solver/state_solver.h>
+#include <tesseract/scene_graph/kdl_parser.h>
+#include <tesseract/scene_graph/scene_state.h>
+#include <tesseract/common/kinematic_limits.h>
+#include <tesseract/common/eigen_types.h>
+
+namespace tesseract::scene_graph
+{
+class KDLStateSolver : public StateSolver
+{
+public:
+  using Ptr = std::shared_ptr<KDLStateSolver>;
+  using ConstPtr = std::shared_ptr<const KDLStateSolver>;
+  using UPtr = std::unique_ptr<KDLStateSolver>;
+  using ConstUPtr = std::unique_ptr<const KDLStateSolver>;
+
+  KDLStateSolver(const tesseract::scene_graph::SceneGraph& scene_graph);
+  KDLStateSolver(const tesseract::scene_graph::SceneGraph& scene_graph, KDLTreeData data);
+  ~KDLStateSolver() override = default;
+  KDLStateSolver(const KDLStateSolver& other);
+  KDLStateSolver& operator=(const KDLStateSolver& other);
+  KDLStateSolver(KDLStateSolver&&) = delete;
+  KDLStateSolver& operator=(KDLStateSolver&&) = delete;
+
+  StateSolver::UPtr clone() const override;
+
+  void setState(const Eigen::Ref<const Eigen::VectorXd>& joint_values,
+                const tesseract::common::JointIdTransformMap& floating_joint_values = {}) override final;
+
+  void setState(const SceneState::JointValues& joint_values,
+                const tesseract::common::JointIdTransformMap& floating_joint_values = {}) override final;
+
+  void setState(const std::vector<tesseract::common::JointId>& joint_ids,
+                const Eigen::Ref<const Eigen::VectorXd>& joint_values,
+                const tesseract::common::JointIdTransformMap& floating_joint_values = {}) override final;
+
+  void setState(const tesseract::common::JointIdTransformMap& floating_joint_values) override final;
+
+  SceneState getState(const Eigen::Ref<const Eigen::VectorXd>& joint_values,
+                      const tesseract::common::JointIdTransformMap& floating_joint_values = {}) const override final;
+
+  SceneState getState(const SceneState::JointValues& joint_values,
+                      const tesseract::common::JointIdTransformMap& floating_joint_values = {}) const override final;
+
+  SceneState getState(const std::vector<tesseract::common::JointId>& joint_ids,
+                      const Eigen::Ref<const Eigen::VectorXd>& joint_values,
+                      const tesseract::common::JointIdTransformMap& floating_joint_values = {}) const override final;
+
+  SceneState getState(const tesseract::common::JointIdTransformMap& floating_joint_values) const override final;
+
+  SceneState getState() const override final;
+
+  void getLinkTransforms(tesseract::common::LinkIdTransformMap& link_transforms,
+                         const std::vector<tesseract::common::JointId>& joint_ids,
+                         const Eigen::Ref<const Eigen::VectorXd>& joint_values,
+                         const tesseract::common::JointIdTransformMap& floating_joint_values) const override final;
+
+  void getLinkTransforms(tesseract::common::LinkIdTransformMap& link_transforms,
+                         const std::vector<tesseract::common::JointId>& joint_ids,
+                         const Eigen::Ref<const Eigen::VectorXd>& joint_values) const override final;
+
+  SceneState getRandomState() const override final;
+
+  Eigen::MatrixXd
+  getJacobian(const Eigen::Ref<const Eigen::VectorXd>& joint_values,
+              const tesseract::common::LinkId& link_id,
+              const tesseract::common::JointIdTransformMap& floating_joint_values = {}) const override final;
+
+  Eigen::MatrixXd
+  getJacobian(const std::vector<tesseract::common::JointId>& joint_ids,
+              const Eigen::Ref<const Eigen::VectorXd>& joint_values,
+              const tesseract::common::LinkId& link_id,
+              const tesseract::common::JointIdTransformMap& floating_joint_values = {}) const override final;
+
+  std::vector<tesseract::common::JointId> getJointIds() const override final;
+
+  std::vector<tesseract::common::JointId> getFloatingJointIds() const override final;
+
+  std::vector<tesseract::common::JointId> getActiveJointIds() const override final;
+
+  tesseract::common::LinkId getBaseLinkId() const override final;
+
+  std::vector<tesseract::common::LinkId> getLinkIds() const override final;
+
+  std::vector<tesseract::common::LinkId> getActiveLinkIds() const override final;
+
+  std::vector<tesseract::common::LinkId> getStaticLinkIds() const override final;
+
+  bool isActiveLinkId(const tesseract::common::LinkId& link_id) const override final;
+
+  bool hasLinkId(const tesseract::common::LinkId& link_id) const override final;
+
+  tesseract::common::VectorIsometry3d getLinkTransforms() const override final;
+
+  Eigen::Isometry3d getLinkTransform(const tesseract::common::LinkId& link_id) const override final;
+
+  Eigen::Isometry3d getRelativeLinkTransform(const tesseract::common::LinkId& from_link_id,
+                                             const tesseract::common::LinkId& to_link_id) const override final;
+
+  tesseract::common::KinematicLimits getLimits() const override final;
+
+private:
+  SceneState current_state_; /**< Current state of the environment */
+  KDLTreeData data_;         /**< KDL tree data */
+  /** @brief One jacobian solver per thread. KDL memoises joint poses into mutable members of the
+   * solver's own copy of the tree, so a single solver cannot serve concurrent callers. Each entry
+   * holds a copy of the tree and lives as long as this object, so a caller that creates unboundedly
+   * many short-lived threads accumulates one per thread that ever asked for a jacobian. */
+  mutable std::unordered_map<std::thread::id, std::unique_ptr<KDL::TreeJntToJacSolver>> jac_solvers_;
+  mutable std::shared_mutex jac_solvers_mutex_;
+  std::unordered_map<tesseract::common::JointId, unsigned int> joint_to_qnr_; /**< Map between joint ID and kdl q index
+                                                                               */
+  std::vector<int> joint_qnr_;                /**< The kdl segment number corresponding to joint in joint names */
+  KDL::JntArray kdl_jnt_array_;               /**< The kdl joint array */
+  tesseract::common::KinematicLimits limits_; /**< The kinematic limits */
+
+  /** @brief Cached LinkId/JointId and joint geometry per KDL segment, avoiding per-FK constructor
+   *  calls and calls back into KDL. Keyed by pointer to KDL TreeElement (pointer-stable in
+   *  std::map). */
+  struct SegmentIdCache
+  {
+    tesseract::common::LinkId link_id;
+    tesseract::common::JointId joint_id;
+
+    /** @brief The segment's joint geometry, captured once so the traversal never calls back into
+     * KDL. KDL's joint pose memoises into mutable members and cannot be evaluated concurrently. */
+    KDL::Joint::JointType joint_type{ KDL::Joint::None };
+    Eigen::Vector3d joint_axis{ Eigen::Vector3d::Zero() };
+    Eigen::Vector3d joint_origin{ Eigen::Vector3d::Zero() };
+    Eigen::Isometry3d tip_transform{ Eigen::Isometry3d::Identity() };
+    unsigned q_nr{ 0 };
+  };
+  tesseract::common::AlignedUnorderedMap<const KDL::TreeElementType*, SegmentIdCache> segment_id_cache_;
+  const KDL::TreeElementType* root_element_{ nullptr }; /**< Cached root element pointer for fast comparison */
+
+  /** @brief O(1) mirror of data_.active_link_ids, populated in processKDLData and copied in op=. */
+  std::unordered_set<tesseract::common::LinkId> active_link_ids_set_;
+  /** @brief O(1) mirror of data_.link_ids, populated in processKDLData and copied in op=. */
+  std::unordered_set<tesseract::common::LinkId> link_ids_set_;
+
+  static thread_local KDL::JntArray kdl_joints_cache;    // NOLINT
+  static thread_local KDL::Jacobian kdl_jacobian_cache;  // NOLINT
+
+  void calculateTransforms(tesseract::common::LinkIdTransformMap& link_transforms,
+                           const KDL::JntArray& q_in,
+                           const KDL::SegmentMap::const_iterator& it,
+                           const Eigen::Isometry3d& parent_frame) const;
+
+  void calculateTransforms(tesseract::common::LinkIdTransformMap& link_transforms,
+                           tesseract::common::JointIdTransformMap& joint_transforms,
+                           const KDL::JntArray& q_in,
+                           const KDL::SegmentMap::const_iterator& it,
+                           const Eigen::Isometry3d& parent_frame) const;
+
+  bool setJointValuesHelper(KDL::JntArray& q,
+                            const tesseract::common::JointId& joint_id,
+                            const double& joint_value) const;
+
+  bool calcJacobianHelper(KDL::Jacobian& jacobian,
+                          const KDL::JntArray& kdl_joints,
+                          const tesseract::common::LinkId& link_id) const;
+
+  /** @brief Get this thread's jacobian solver, constructing it on first use */
+  KDL::TreeJntToJacSolver& getJacobianSolver() const;
+
+  /** @brief The transform from a segment's parent to its tip, using the joint value @p q_in holds
+   * at this segment's q_nr */
+  static Eigen::Isometry3d segmentTransform(const SegmentIdCache& segment, const KDL::JntArray& q_in);
+
+  /** @brief Rebuild the per-segment cache and the root pointer from this object's own tree, and
+   * clear the per-thread jacobian solvers, which hold a copy of the tree being replaced */
+  void rebuildSegmentCache();
+
+  /** @brief Get an updated kdl joint array */
+  void getKDLJntArray(KDL::JntArray& kdl_joints,
+                      const std::vector<tesseract::common::JointId>& joint_ids,
+                      const Eigen::Ref<const Eigen::VectorXd>& joint_values) const;
+
+  bool processKDLData(const tesseract::scene_graph::SceneGraph& scene_graph);
+};
+
+}  // namespace tesseract::scene_graph
+#endif  // TESSERACT_STATE_SOLVER_KDL_STATE_SOLVER_H

@@ -1,0 +1,180 @@
+/**
+ * @file opw_kinematics_unit.cpp
+ * @brief Tesseract opw kinematics test
+ *
+ * @author Levi Armstrong
+ * @date Feb 4, 2021
+ *
+ * @copyright Copyright (c) 2021, Southwest Research Institute
+ *
+ * @par License
+ * Software License Agreement (Apache License)
+ * @par
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * @par
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+#include <tesseract/common/macros.h>
+TESSERACT_COMMON_IGNORE_WARNINGS_PUSH
+#include <gtest/gtest.h>
+TESSERACT_COMMON_IGNORE_WARNINGS_POP
+
+#include "kinematics_test_utils.h"
+#include <tesseract/kinematics/ur/ur_inv_kin.h>
+#include <tesseract/kinematics/kdl/kdl_fwd_kin_chain.h>
+
+using namespace tesseract::kinematics::test_suite;
+using namespace tesseract::kinematics;
+
+void runURKinematicsTests(const URParameters& params,
+                          double shoulder_offset,
+                          double elbow_offset,
+                          const Eigen::Isometry3d& pose)
+{
+  Eigen::VectorXd seed = Eigen::VectorXd::Zero(6);
+
+  // Setup test
+  auto scene_graph = getSceneGraphUR(params, shoulder_offset, elbow_offset);
+
+  tesseract::common::LinkId base_link_id = "base_link";
+  tesseract::common::LinkId tip_link_id = "tool0";
+  std::vector<tesseract::common::JointId> joint_ids{ "shoulder_pan_joint", "shoulder_lift_joint", "elbow_joint",
+                                                     "wrist_1_joint",      "wrist_2_joint",       "wrist_3_joint" };
+
+  KDLFwdKinChain fwd_kin(*scene_graph, base_link_id, tip_link_id);
+  auto inv_kin = std::make_unique<URInvKin>(params, base_link_id, tip_link_id, joint_ids);
+
+  EXPECT_EQ(inv_kin->getSolverName(), UR_INV_KIN_CHAIN_SOLVER_NAME);
+  EXPECT_EQ(inv_kin->numJoints(), 6);
+  EXPECT_EQ(inv_kin->getBaseLinkId(), base_link_id);
+  EXPECT_EQ(inv_kin->getWorkingFrame(), base_link_id);
+  EXPECT_EQ(inv_kin->getTipLinkIds().size(), 1);
+  EXPECT_EQ(inv_kin->getTipLinkIds()[0], tip_link_id);
+  EXPECT_EQ(inv_kin->getJointIds(), joint_ids);
+
+  runInvKinTest(*inv_kin, fwd_kin, pose, tip_link_id, seed);
+
+  // Check cloned
+  InverseKinematics::Ptr inv_kin2 = inv_kin->clone();
+  EXPECT_TRUE(inv_kin2 != nullptr);
+  EXPECT_EQ(inv_kin2->getSolverName(), UR_INV_KIN_CHAIN_SOLVER_NAME);
+  EXPECT_EQ(inv_kin2->numJoints(), 6);
+  EXPECT_EQ(inv_kin2->getBaseLinkId(), base_link_id);
+  EXPECT_EQ(inv_kin2->getWorkingFrame(), base_link_id);
+  EXPECT_EQ(inv_kin2->getTipLinkIds().size(), 1);
+  EXPECT_EQ(inv_kin2->getTipLinkIds()[0], tip_link_id);
+  EXPECT_EQ(inv_kin2->getJointIds(), joint_ids);
+
+  runInvKinTest(*inv_kin2, fwd_kin, pose, tip_link_id, seed);
+}
+
+TEST(TesseractKinematicsUnit, UR10InvKinUnit)  // NOLINT
+{
+  // Inverse target pose and seed
+  Eigen::Isometry3d pose;
+  pose.setIdentity();
+  pose.translation()[0] = 0.75;
+  pose.translation()[1] = 0;
+  pose.translation()[2] = 0.75;
+
+  double shoulder_offset{ 0.220941 };
+  double elbow_offset{ -0.1719 };
+
+  runURKinematicsTests(UR10Parameters, shoulder_offset, elbow_offset, pose);
+}
+
+TEST(TesseractKinematicsUnit, UR5InvKinUnit)  // NOLINT
+{
+  // Inverse target pose and seed
+  Eigen::Isometry3d pose;
+  pose.setIdentity();
+  pose.translation()[0] = 0.5;
+  pose.translation()[1] = 0;
+  pose.translation()[2] = 0.5;
+
+  double shoulder_offset{ 0.13585 };
+  double elbow_offset{ -0.1197 };
+
+  runURKinematicsTests(UR5Parameters, shoulder_offset, elbow_offset, pose);
+}
+
+TEST(TesseractKinematicsUnit, UR3InvKinUnit)  // NOLINT
+{
+  // Inverse target pose and seed
+  Eigen::Isometry3d pose;
+  pose.setIdentity();
+  pose.translation()[0] = 0.25;
+  pose.translation()[1] = 0;
+  pose.translation()[2] = 0.25;
+
+  double shoulder_offset{ 0.1198 };
+  double elbow_offset{ -0.0925 };
+
+  runURKinematicsTests(UR3Parameters, shoulder_offset, elbow_offset, pose);
+}
+
+TEST(TesseractKinematicsUnit, UR10eInvKinUnit)  // NOLINT
+{
+  // Inverse target pose and seed
+  Eigen::Isometry3d pose;
+  pose.setIdentity();
+  pose.translation()[0] = 0.75;
+  pose.translation()[1] = 0;
+  pose.translation()[2] = 0.75;
+
+  double shoulder_offset{ 0.176 };
+  double elbow_offset{ -0.137 };
+
+  runURKinematicsTests(UR10eParameters, shoulder_offset, elbow_offset, pose);
+}
+
+TEST(TesseractKinematicsUnit, UR5eInvKinUnit)  // NOLINT
+{
+  // Inverse target pose and seed
+  Eigen::Isometry3d pose;
+  pose.setIdentity();
+  pose.translation()[0] = 0.5;
+  pose.translation()[1] = 0;
+  pose.translation()[2] = 0.5;
+
+  double shoulder_offset{ 0.138 };
+  double elbow_offset{ -0.131 };
+
+  runURKinematicsTests(UR5eParameters, shoulder_offset, elbow_offset, pose);
+}
+
+TEST(TesseractKinematicsUnit, UR3eInvKinUnit)  // NOLINT
+{
+  // Inverse target pose and seed
+  Eigen::Isometry3d pose;
+  pose.setIdentity();
+  pose.translation()[0] = 0.25;
+  pose.translation()[1] = 0;
+  pose.translation()[2] = 0.25;
+
+  double shoulder_offset{ 0.120 };
+  double elbow_offset{ -0.093 };
+
+  runURKinematicsTests(UR3eParameters, shoulder_offset, elbow_offset, pose);
+}
+
+TEST(TesseractKinematicsUnit, URInvKinWrongJointCountThrowsUnit)  // NOLINT
+{
+  // URInvKin throws when joint_ids.size() != 6.
+  const std::vector<tesseract::common::JointId> five_joints{ "j1", "j2", "j3", "j4", "j5" };
+  EXPECT_THROW(URInvKin(UR5Parameters, "base_link", "tool0", five_joints, "ur_solver"), std::runtime_error);
+}
+
+int main(int argc, char** argv)
+{
+  testing::InitGoogleTest(&argc, argv);
+
+  return RUN_ALL_TESTS();
+}

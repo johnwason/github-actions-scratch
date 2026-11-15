@@ -1,0 +1,137 @@
+/**
+ * @file schema_registry.h
+ * @brief This is a schema registry class
+ *
+ * @author Levi Armstrong
+ * @date March 1, 2026
+ *
+ * @copyright Copyright (c) 2026, Levi Armstrong
+ *
+ * @par License
+ * Software License Agreement (Apache License)
+ * @par
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * @par
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+#ifndef TESSERACT_COMMON_SCHEMA_REGISTRY_H
+#define TESSERACT_COMMON_SCHEMA_REGISTRY_H
+
+#include <string>
+#include <map>
+#include <mutex>
+#include <memory>
+#include <vector>
+
+#include <boost_plugin_loader/fwd.h>
+
+namespace tesseract::common
+{
+class PropertyTree;
+
+/**
+ * @brief A global registry of named schemas for PropertyTree.
+ *
+ * Use SchemaRegistry::instance() to access the singleton.
+ */
+class SchemaRegistry
+{
+public:
+  ~SchemaRegistry();
+  SchemaRegistry(const SchemaRegistry&) = delete;
+  SchemaRegistry& operator=(const SchemaRegistry&) = delete;
+  SchemaRegistry(const SchemaRegistry&&) = delete;
+  SchemaRegistry& operator=(const SchemaRegistry&&) = delete;
+
+  /** @brief Access the singleton instance. */
+  static std::shared_ptr<SchemaRegistry> instance();
+
+  /**
+   * @brief Register an already-parsed schema under a logical key.
+   * @param key    Unique identifier for this schema.
+   * @param schema Parsed PropertyTree schema.
+   */
+  void registerSchema(const std::string& key, const PropertyTree& schema);
+
+  /**
+   * @brief Register a schema from a YAML file path.
+   * @param key   Unique identifier for this schema.
+   * @param path  Path to a .yaml schema file.
+   */
+  void registerSchemaFromFile(const std::string& key, const std::string& path);
+
+  /**
+   * @brief Check whether a schema is registered under this key.
+   * @param key  Logical identifier.
+   * @return True if present.
+   */
+  bool contains(const std::string& key) const;
+
+  /**
+   * @brief Retrieve a registered schema by key.
+   * @param key Logical identifier.
+   * @return Copy of the schema PropertyTree.
+   * @throws std::out_of_range if the key is not found.
+   */
+  PropertyTree get(const std::string& key) const;
+
+  /**
+   * @brief Load and parse an arbitrary YAML file into a PropertyTree.
+   * @param path  Path to a .yaml file.
+   * @return Parsed PropertyTree.
+   * @throws YAML::Exception on parse errors.
+   */
+  static PropertyTree loadFile(const std::string& path);
+
+  /**
+   * @brief Load plugin libraries and retain ownership for the lifetime of their registered schemas.
+   * @details Libraries are loaded before the registry mutex is acquired so their static schema registration may
+   * safely call back into this registry. Loaded libraries are deduplicated by their resolved path.
+   * @param loader Configured plugin loader defining the libraries and search paths to use.
+   * @throws boost_plugin_loader::PluginLoaderException if no plugin libraries were provided.
+   */
+  void loadAndRetainPluginLibraries(const boost_plugin_loader::PluginLoader& loader);
+
+  /**
+   * @brief Register that a derived type can be used where a base type is expected.
+   * @param base_type_name    The base type name (e.g., "MyBaseClass")
+   * @param derived_type_name The derived type name (e.g., "MyDerivedClass")
+   */
+  void registerDerivedType(const std::string& base_type_name, const std::string& derived_type_name);
+
+  /**
+   * @brief Check if a given type is derived from (or equal to) a base type.
+   * @param base_type_name    The base type to check against
+   * @param candidate_type    The type to check
+   * @return True if candidate is the base or derives from it
+   */
+  bool isDerivedFrom(const std::string& base_type_name, const std::string& candidate_type) const;
+
+  /**
+   * @brief Get all registered derived types for a base type.
+   * @param base_type_name The base type
+   * @return Vector of all type names that derive from (or equal) the base
+   */
+  std::vector<std::string> getDerivedTypes(const std::string& base_type_name) const;
+
+private:
+  SchemaRegistry() = default;
+
+  mutable std::mutex mutex_;
+  std::map<std::string, std::shared_ptr<const void>> retained_library_lifetimes_;
+  mutable std::map<std::string, PropertyTree> schemas_;
+  mutable std::map<std::string, std::string> paths_;
+  mutable std::map<std::string, std::vector<std::string>> derived_types_;  // base_type -> [derived_type1,
+                                                                           // derived_type2, ...]
+};
+
+}  // namespace tesseract::common
+
+#endif  // TESSERACT_COMMON_SCHEMA_REGISTRY_H

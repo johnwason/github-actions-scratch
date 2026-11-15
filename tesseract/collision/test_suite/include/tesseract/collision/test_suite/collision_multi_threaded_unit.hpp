@@ -1,0 +1,151 @@
+#ifndef TESSERACT_COLLISION_COLLISION_MULTI_THREADED_UNIT_HPP
+#define TESSERACT_COLLISION_COLLISION_MULTI_THREADED_UNIT_HPP
+
+#include <tesseract/common/macros.h>
+TESSERACT_COMMON_IGNORE_WARNINGS_PUSH
+#include <chrono>
+#include <gtest/gtest.h>
+TESSERACT_COMMON_IGNORE_WARNINGS_POP
+
+#include <tesseract/common/logging.h>
+#include <tesseract/collision/bullet/convex_hull_utils.h>
+#include <tesseract/collision/discrete_contact_manager.h>
+#include <tesseract/collision/common.h>
+#include <tesseract/geometry/geometries.h>
+#include <tesseract/common/resource_locator.h>
+#include <tesseract/common/ply_io.h>
+
+#include <unordered_set>
+
+namespace tesseract::collision::test_suite
+{
+inline void runTest(DiscreteContactManager& checker, bool use_convex_mesh = false)
+{
+  // Add Meshed Sphere to checker
+  CollisionShapePtr sphere;
+  if (use_convex_mesh)
+  {
+    auto mesh_vertices = std::make_shared<tesseract::common::VectorVector3d>();
+    auto mesh_faces = std::make_shared<Eigen::VectorXi>();
+    tesseract::common::GeneralResourceLocator locator;
+    EXPECT_GT(tesseract::common::loadSimplePlyFile(
+                  locator.locateResource("package://tesseract/support/meshes/sphere_p25m.ply")->getFilePath(),
+                  *mesh_vertices,
+                  *mesh_faces,
+                  true),
+              0);
+
+    auto mesh = std::make_shared<tesseract::geometry::Mesh>(mesh_vertices, mesh_faces);
+    sphere = makeConvexMesh(*mesh);
+  }
+  else
+  {
+    sphere = std::make_shared<tesseract::geometry::Sphere>(0.25);
+  }
+
+  double delta = 0.55;
+
+  std::size_t t = 10;
+  std::vector<tesseract::common::LinkId> link_ids;
+  tesseract::common::LinkIdTransformMap location;
+  for (std::size_t x = 0; x < t; ++x)
+  {
+    for (std::size_t y = 0; y < t; ++y)
+    {
+      for (std::size_t z = 0; z < t; ++z)
+      {
+        CollisionShapesConst obj3_shapes;
+        tesseract::common::VectorIsometry3d obj3_poses;
+        Eigen::Isometry3d sphere_pose;
+        sphere_pose.setIdentity();
+
+        obj3_shapes.push_back(CollisionShapePtr(sphere->clone()));
+        obj3_poses.push_back(sphere_pose);
+
+        link_ids.emplace_back("sphere_link_" + std::to_string(x) + std::to_string(y) + std::to_string(z));
+
+        location[link_ids.back()] = sphere_pose;
+        location[link_ids.back()].translation() = Eigen::Vector3d(
+            static_cast<double>(x) * delta, static_cast<double>(y) * delta, static_cast<double>(z) * delta);
+        checker.addCollisionObject(link_ids.back(), 0, obj3_shapes, obj3_poses);
+      }
+    }
+  }
+
+  // Check if they are in collision
+  checker.setActiveCollisionObjects(link_ids);
+  EXPECT_EQ(checker.getActiveCollisionObjects(),
+            std::unordered_set<tesseract::common::LinkId>(link_ids.begin(), link_ids.end()));
+
+  EXPECT_TRUE(checker.getContactAllowedValidator() == nullptr);
+
+  checker.setCollisionMarginData(CollisionMarginData(0.1));
+  EXPECT_NEAR(checker.getCollisionMarginData().getMaxCollisionMargin(), 0.1, 1e-5);
+  checker.setCollisionObjectsTransform(location);
+
+  long num_threads = 4;
+  std::vector<ContactResultVector> result_vector(static_cast<std::size_t>(num_threads));
+  std::vector<DiscreteContactManager::Ptr> contact_manager(static_cast<std::size_t>(num_threads));
+  contact_manager[0] = checker.clone();
+  contact_manager[1] = checker.clone();
+  contact_manager[2] = checker.clone();
+  contact_manager[3] = checker.clone();
+
+  auto start_time = std::chrono::high_resolution_clock::now();
+
+  const auto& const_location = location;
+#pragma omp parallel for num_threads(num_threads) shared(const_location, link_ids)
+  for (long i = 0; i < num_threads; ++i)  // NOLINT
+  {
+    const int tn = omp_get_thread_num();
+    TESSERACT_LOG_DEBUG("Thread (ID: {}): {} of {}", tn, i, num_threads);
+    const DiscreteContactManager::Ptr& manager = contact_manager[static_cast<size_t>(tn)];
+    for (const auto& link_id : link_ids)
+    {
+      auto id = tesseract::common::LinkId(link_id);
+      if (tn == 0)
+      {
+        Eigen::Isometry3d pose = const_location.at(id);
+        pose.translation()[0] += 0.1;
+        manager->setCollisionObjectsTransform(link_id, pose);
+      }
+      else if (tn == 1)
+      {
+        Eigen::Isometry3d pose = const_location.at(id);
+        pose.translation()[1] += 0.1;
+        std::vector<tesseract::common::LinkId> link_ids = { link_id };
+        tesseract::common::VectorIsometry3d transforms = { pose };
+        manager->setCollisionObjectsTransform(link_ids, transforms);
+      }
+      else if (tn == 2)
+      {
+        Eigen::Isometry3d pose = const_location.at(id);
+        pose.translation()[2] += 0.1;
+        manager->setCollisionObjectsTransform(link_id, pose);
+      }
+      else
+      {
+        Eigen::Isometry3d pose = const_location.at(id);
+        pose.translation()[0] -= 0.1;
+        std::vector<tesseract::common::LinkId> link_ids = { link_id };
+        tesseract::common::VectorIsometry3d transforms = { pose };
+        manager->setCollisionObjectsTransform(link_ids, transforms);
+      }
+    }
+
+    ContactResultMap result;
+    manager->contactTest(result, ContactRequest(ContactTestType::ALL));
+    result.flattenMoveResults(result_vector[static_cast<size_t>(tn)]);
+  }
+  auto end_time = std::chrono::high_resolution_clock::now();
+
+  TESSERACT_LOG_INFO("DT: {} ms", std::chrono::duration<double, std::milli>(end_time - start_time).count());
+
+  for (long i = 0; i < num_threads; ++i)
+  {
+    EXPECT_TRUE(result_vector[static_cast<std::size_t>(i)].size() == 2700);
+  }
+}
+}  // namespace tesseract::collision::test_suite
+
+#endif  // TESSERACT_COLLISION_COLLISION_MULTI_THREADED_UNIT_HPP

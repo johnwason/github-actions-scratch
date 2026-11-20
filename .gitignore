@@ -1,0 +1,12 @@
+# Downloaded and built artifacts; reproducible from scripts/bootstrap.sh
+/.deps/
+/build/
+/build-*/
+
+# Editor and tool state
+.vscode/
+.idea/
+*.swp
+*~
+__pycache__/
+*.pyc

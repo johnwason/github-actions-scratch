@@ -1,0 +1,49 @@
+# Runs in johnwason/github-actions-scratch, not in this repository. scripts/remote-sanitizers.sh
+# pushes a snapshot of the tree to an orphan branch there with this file installed as
+# .github/workflows/rr-lua-sanitizers.yml. Sanitizers and TSan are never run locally
+# (CLAUDE.md, M0.5).
+name: rr-lua-sanitizers
+
+on:
+  push:
+    branches: ["rr-lua-sanitizers/**"]
+
+permissions:
+  contents: read
+
+jobs:
+  sanitizers:
+    strategy:
+      fail-fast: false
+      matrix:
+        san: [asan, tsan]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Runner
+        run: |
+          uname -a; nproc; free -g; podman --version
+          echo "vm.mmap_rnd_bits=$(cat /proc/sys/vm/mmap_rnd_bits)"
+      # GCC 13's TSan aborts ("unexpected memory mapping") with 32 bits of mmap ASLR entropy.
+      - name: Reduce mmap ASLR entropy
+        run: sudo sysctl -w vm.mmap_rnd_bits=28
+      - name: Bootstrap
+        run: scripts/bootstrap.sh
+      - name: Sanitizers (${{ matrix.san }})
+        run: scripts/verify-sanitizers.sh ${{ matrix.san }}
+
+  # The same steps as ci.yml's verify job, to check them before the human pushes.
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Bootstrap
+        run: scripts/bootstrap.sh
+      - name: Verify
+        run: scripts/verify.sh

@@ -1,0 +1,147 @@
+# Reproduce the intermittent access violation in test_tcp_ws_origins.py seen on Windows x86 / Python 3.11
+# (robotraconteur PR #497, run 45720112018, build-win x86). Builds RR_REPO@RR_REF for Win32 as main.yml build-win
+# does, but RelWithDebInfo (optimized, with PDBs), then repeats the Python suite and the single test file with
+# Windows Error Reporting full dumps enabled, and prints native stacks of every thread of any crash with cdb.
+# To rerun: change RR_REF / the counts below and push this branch again.
+name: win-repro-ws-origins
+on:
+  push:
+    paths:
+    - .github/workflows/win.yml
+env:
+  RR_REPO: robotraconteur/robotraconteur
+  RR_REF: master
+  FULL_SUITE_RUNS: "12"   # full pytest session per shard (the CI crash happened in a full session)
+  FILE_RUNS: "300"        # test_tcp_ws_origins.py alone per shard
+  VCPKG_TRIPLET: x86-windows-static-md-release-vc142
+  VCPKG_PKGS: >-
+    boost-algorithm boost-array boost-asio boost-assign boost-atomic boost-bind boost-config boost-container
+    boost-date-time boost-smart-ptr boost-filesystem boost-foreach boost-format boost-function boost-interprocess
+    boost-intrusive boost-lexical-cast boost-locale boost-random boost-range boost-regex boost-scope-exit
+    boost-signals2 boost-thread boost-tuple boost-unordered boost-utility boost-uuid boost-program-options gtest openssl
+jobs:
+  build:
+    runs-on: windows-2022
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        repository: ${{ env.RR_REPO }}
+        ref: ${{ env.RR_REF }}
+        path: robotraconteur
+    - name: vcpkg build
+      uses: johnwason/vcpkg-action@v8
+      id: vcpkg
+      with:
+        pkgs: ${{ env.VCPKG_PKGS }}
+        triplet: ${{ env.VCPKG_TRIPLET }}
+        extra-args: --clean-after-build --overlay-triplets=${{ github.workspace }}/robotraconteur/tools/build_files/triplets
+        cache-key: win-x86-repro-ws-origins
+        token: ${{ github.token }}
+        revision: 5ad42ec00d7723dde08c0df0910d9044e54ef032
+    - uses: actions/setup-python@v5
+      id: python3
+      with:
+        python-version: '3.11'
+        architecture: x86
+    - name: pip
+      run: python -m pip install numpy setuptools wheel pytest
+    - name: choco
+      run: choco install swig -r
+    - uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: x86
+        toolset: '14.2'
+    - name: configure
+      run: >
+        cmake -G "Ninja" -DBUILD_GEN=ON -DBUILD_TESTING=ON -DBUILD_NET=OFF -DBUILD_JAVA=OFF
+        -DBoost_USE_STATIC_LIBS=ON -DBUILD_PYTHON3=ON -DBUILD_PYTHON3_WHEEL=OFF
+        -DPYTHON3_EXECUTABLE="${{ steps.python3.outputs.python-path }}"
+        ${{ steps.vcpkg.outputs.vcpkg-cmake-config }}
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo -S robotraconteur -B build
+    - name: build
+      run: cmake --build build -j 4
+    - name: locate module
+      shell: bash
+      run: |
+        find build -name '_RobotRaconteurPython*.pyd' -o -name '_RobotRaconteurPython*.pdb' | head
+        git -C robotraconteur log -1 --format='%H %s'
+    - uses: actions/upload-artifact@v4
+      with:
+        name: build-win-x86-reldebug
+        path: |
+          build/out*/Python3/**
+          build/**/*.pdb
+          robotraconteur/test/python/**
+        retention-days: 3
+
+  repro:
+    needs: build
+    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+    - uses: actions/download-artifact@v4
+      with:
+        name: build-win-x86-reldebug
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        architecture: x86
+    - name: pip
+      run: python -m pip install numpy pytest
+    - name: enable full crash dumps
+      run: |
+        New-Item -ItemType Directory -Force -Path D:\dumps | Out-Null
+        $k = 'HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps\python.exe'
+        New-Item -Force -Path $k | Out-Null
+        New-ItemProperty -Force -Path $k -Name DumpFolder -PropertyType ExpandString -Value 'D:\dumps' | Out-Null
+        New-ItemProperty -Force -Path $k -Name DumpType -PropertyType DWord -Value 2 | Out-Null
+        New-ItemProperty -Force -Path $k -Name DumpCount -PropertyType DWord -Value 5 | Out-Null
+        New-ItemProperty -Force -Path 'HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting' -Name DontShowUI -PropertyType DWord -Value 1 | Out-Null
+    - name: repeat
+      run: |
+        $py = (Get-ChildItem -Recurse -Filter '_RobotRaconteurPython*.pyd' build | Select-Object -First 1).Directory.Parent.FullName
+        $env:PYTHONPATH = "$py;$PWD\robotraconteur\test\python"
+        Write-Host "PYTHONPATH=$env:PYTHONPATH"
+        python -c "import RobotRaconteur; print(RobotRaconteur.__file__)"
+        $crash = 0; $fail = 0
+        for ($i = 1; $i -le [int]$env:FULL_SUITE_RUNS; $i++) {
+          python -m pytest -p no:faulthandler -p no:cacheprovider -q robotraconteur\test\python > full_$i.log 2>&1
+          $rc = $LASTEXITCODE
+          if ($rc -lt 0 -or $rc -gt 5) { $crash++; Write-Host "full run $i CRASH rc=$rc"; Get-Content full_$i.log -Tail 15 }
+          elseif ($rc -ne 0) { $fail++; Write-Host "full run $i failed rc=$rc"; Get-Content full_$i.log -Tail 15 }
+        }
+        Write-Host "full suite: $crash crashes, $fail failures in $env:FULL_SUITE_RUNS runs"
+        $fcrash = 0
+        for ($i = 1; $i -le [int]$env:FILE_RUNS; $i++) {
+          python -m pytest -p no:faulthandler -p no:cacheprovider -q robotraconteur\test\python\RobotRaconteurTest\test_tcp_ws_origins.py > file.log 2>&1
+          $rc = $LASTEXITCODE
+          if ($rc -lt 0 -or $rc -gt 5) { $fcrash++; Write-Host "file run $i CRASH rc=$rc"; Copy-Item file.log file_crash_$i.log }
+        }
+        Write-Host "test_tcp_ws_origins.py: $fcrash crashes in $env:FILE_RUNS runs"
+        Get-ChildItem D:\dumps -ErrorAction SilentlyContinue | Format-Table Name, Length
+    - name: native stacks
+      if: always()
+      run: |
+        $dumps = Get-ChildItem D:\dumps -Filter *.dmp -ErrorAction SilentlyContinue | Select-Object -First 3
+        if (-not $dumps) { Write-Host "no dumps"; exit 0 }
+        $cdb = Get-ChildItem -Recurse -Filter cdb.exe 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x86' -ErrorAction SilentlyContinue | Select-Object -First 1
+        if (-not $cdb) { Write-Host "cdb.exe not found; dumps are in the artifact"; exit 0 }
+        $pdbdirs = (Get-ChildItem -Recurse -Filter *.pdb build | ForEach-Object { $_.Directory.FullName } | Sort-Object -Unique) -join ';'
+        Write-Host "PDB dirs: $pdbdirs"
+        $sym = "srv*C:\symcache*https://msdl.microsoft.com/download/symbols;$pdbdirs"
+        foreach ($d in $dumps) {
+          Write-Host "===== $($d.Name)"
+          & $cdb.FullName -z $d.FullName -y $sym -lines -c ".symfix+ C:\symcache;.reload /f;.ecxr;kP 40;~*kb 40;q" 2>&1 | Select-String -NotMatch -Pattern '^\*\*\* WARNING|^Symbol search path|^Executable search path' | Out-String -Width 400 | Write-Host
+        }
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: dumps-shard-${{ matrix.shard }}
+        path: |
+          D:\dumps\*.dmp
+          *.log
+        if-no-files-found: ignore
+        retention-days: 5

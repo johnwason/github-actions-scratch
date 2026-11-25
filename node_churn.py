@@ -12,13 +12,58 @@ service experimental.node_churn
 
 object testobj
     function int32 add(int32 a, int32 b)
+    pipe int32 broadcastpipe [readonly]
+    wire int32 broadcastwire [readonly]
 end
 """
 
 
 class _testobj_impl(object):
+    # Same pattern as test/python/RobotRaconteurTest/ServiceTest.py: two 25 ms timers with Python callbacks that
+    # broadcast on a pipe and a wire, started in RRServiceObjectInit and never stopped
+    def __init__(self):
+        self._pipe_b = None
+        self._wire_b = None
+
     def add(self, a, b):
         return a + b
+
+    @property
+    def broadcastpipe(self):
+        return self._pipe_b
+
+    @broadcastpipe.setter
+    def broadcastpipe(self, value):
+        self._pipe_b = RR.PipeBroadcaster(value, 3)
+
+    @property
+    def broadcastwire(self):
+        return self._wire_b
+
+    @broadcastwire.setter
+    def broadcastwire(self, value):
+        self._wire_b = RR.WireBroadcaster(value)
+
+    def RRServiceObjectInit(self, ctx, service_path):
+        node = ctx.GetNode()
+
+        def timer_func(ev):
+            try:
+                for i in range(100):
+                    self._pipe_b.AsyncSendPacket(i, lambda: None)
+            except:
+                pass
+        t = node.CreateTimer(.025, timer_func, oneshot=False)
+        t.Start()
+
+        def timer_func2(ev):
+            try:
+                for i in range(100):
+                    self._wire_b.OutValue = i
+            except:
+                pass
+        t2 = node.CreateTimer(.025, timer_func2, oneshot=False)
+        t2.Start()
 
 
 def ws_handshake(port, origin):
@@ -65,12 +110,16 @@ def batch(n, rnd):
     for (snode, port), cnode in zip(servers, clients):
         o = cnode.ConnectService("rr+tcp://127.0.0.1:%d?service=svc" % port)
         assert o.add(2, 3) == 5
-        objs.append((cnode, o))
+        p = o.broadcastpipe.Connect(-1)
+        w = o.broadcastwire.Connect()
+        objs.append((cnode, o, p, w))
     for (snode, port) in servers:
         for origin in ("https://robotraconteur.com", "chrome-extension://x"):
             ws_handshake(port, origin)
     # Disconnect some clients cleanly, leave the rest connected when the nodes shut down
-    for cnode, o in objs:
+    # Let the broadcast timers run against the connected endpoints
+    time.sleep(0.2)
+    for cnode, o, p, w in objs:
         if rnd.random() < 0.5:
             cnode.DisconnectService(o)
     allnodes = [s for s, _ in servers] + clients

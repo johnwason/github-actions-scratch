@@ -10,8 +10,8 @@ on:
 env:
   RR_REPO: johnwason/robotraconteur
   RR_REF: review-fixes
-  FULL_SUITE_RUNS: "15"   # full pytest session per shard (the CI crash happened in a full session)
-  FILE_RUNS: "100"        # test_tcp_ws_origins.py alone per shard
+  FULL_SUITE_RUNS: "10"   # full pytest session per shard (the CI crash happened in a full session)
+  FILE_RUNS: "200"        # test_tcp_ws_origins.py alone per shard (5 crashes in 400 runs on 616b3eed)
   DEBIAN_FRONTEND: noninteractive
 jobs:
   repro:

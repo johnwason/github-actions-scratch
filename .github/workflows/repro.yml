@@ -5,6 +5,8 @@
 name: repro-ws-origins-segv
 on:
   push:
+    paths:
+    - .github/workflows/repro.yml
 env:
   RR_REPO: johnwason/robotraconteur
   RR_REF: review-fixes

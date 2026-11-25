@@ -1,0 +1,77 @@
+# Bisect the arm64 exit-time segfaults in ServiceTest.* on review-fixes 9da6ca11.
+# Variants revert one commit inside the job: 0f321e29 (close listeners) or 6c8e8cc6 (ThreadPool node lifetime).
+name: arm-servicetest-segv
+on:
+  push:
+    paths:
+    - .github/workflows/arm.yml
+env:
+  RR_REPO: johnwason/robotraconteur
+  RR_REF: review-fixes
+  REPEATS: "5"
+  DEBIAN_FRONTEND: noninteractive
+jobs:
+  arm:
+    runs-on: ubuntu-22.04-arm
+    strategy:
+      fail-fast: false
+      matrix:
+        variant:
+        - {name: head, revert: ""}
+        - {name: no-closers, revert: "0f321e29"}
+        - {name: no-tpfix, revert: "6c8e8cc6"}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        repository: ${{ env.RR_REPO }}
+        ref: ${{ env.RR_REF }}
+        path: robotraconteur
+        fetch-depth: 40
+    - name: revert
+      if: ${{ matrix.variant.revert != '' }}
+      working-directory: robotraconteur
+      run: |
+        git -c user.name=ci -c user.email=ci@example.com revert --no-edit ${{ matrix.variant.revert }}
+        git log --oneline -3
+    - name: apt
+      run: >
+        sudo apt update && sudo apt-get install zlib1g-dev libssl-dev libusb-1.0-0-dev libdbus-1-dev
+        libbluetooth-dev git cmake g++ make libboost-all-dev libgtest-dev gdb -qq
+    - uses: hendrikmuhs/ccache-action@v1.2.23
+      with:
+        key: arm-servicetest-${{ matrix.variant.name }}
+    - name: configure
+      run: >
+        mkdir -p build2 && cd build2 &&
+        cmake -G "Unix Makefiles" -DBUILD_GEN=ON -DBUILD_TESTING=ON -DBoost_USE_STATIC_LIBS=OFF
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+        -DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON ../robotraconteur
+    - name: build
+      working-directory: build2
+      run: cmake --build . -- -j 4
+    - name: repeat
+      working-directory: build2
+      run: |
+        mkdir -p /tmp/cores && chmod 777 /tmp/cores
+        sudo sysctl -w kernel.core_pattern=/tmp/cores/core.%e.%p.%t
+        ulimit -c unlimited
+        fails=0
+        for i in $(seq 1 $REPEATS); do
+          ctest -R "^ServiceTest\." --timeout 300 -j 4 > /tmp/ctest_$i.log 2>&1 || fails=$((fails+1))
+          echo "${{ matrix.variant.name }} run $i: $(grep -E 'tests passed' /tmp/ctest_$i.log) $(grep -c '(SEGFAULT)' /tmp/ctest_$i.log) segfaults"
+        done
+        echo "FAILS=$fails" >> $GITHUB_ENV
+    - name: backtraces
+      if: always()
+      run: |
+        n=0
+        for c in /tmp/cores/core.*; do
+          [ -f "$c" ] || continue
+          n=$((n+1)); [ $n -gt 3 ] && break
+          exe=$(file "$c" | grep -oE "execfn: '[^']+'" | sed "s/execfn: '//; s/'$//")
+          echo "===== $c ($exe)"
+          gdb -batch -ex "info threads" -ex "thread apply all bt 25" "$exe" "$c" 2>&1 | grep -vE '^\[New LWP|^warning:' | head -250
+        done
+        echo "cores: $(ls /tmp/cores | wc -l)"
+    - name: result
+      run: test "$FAILS" = "0"

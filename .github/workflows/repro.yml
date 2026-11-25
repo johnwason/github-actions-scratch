@@ -1,0 +1,99 @@
+# Reproduce the intermittent Python segfault in test_tcp_ws_origins (Robot Raconteur build-ubuntu, ubuntu-22.04).
+# Builds johnwason/robotraconteur@RR_REF exactly like main.yml build-ubuntu (ubuntu-22.04), then repeats the Python
+# suite and the single test file with core dumps enabled; prints gdb backtraces of any crash.
+# To rerun: change RR_REF / the counts below and push this branch again.
+name: repro-ws-origins-segv
+on:
+  push:
+env:
+  RR_REPO: johnwason/robotraconteur
+  RR_REF: review-fixes
+  FULL_SUITE_RUNS: "15"   # full pytest session per shard (the CI crash happened in a full session)
+  FILE_RUNS: "100"        # test_tcp_ws_origins.py alone per shard
+  DEBIAN_FRONTEND: noninteractive
+jobs:
+  repro:
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        repository: ${{ env.RR_REPO }}
+        ref: ${{ env.RR_REF }}
+        path: robotraconteur
+    - name: semver
+      run: python3 robotraconteur/packaging/scripts/actions_semver.py --github-env
+    - name: apt
+      run: >
+        sudo apt update && sudo apt-get install default-jdk default-jdk-headless default-jre default-jre-headless
+        zlib1g zlib1g-dev libssl-dev libusb-1.0-0
+        libusb-1.0-0-dev libdbus-1-3 libdbus-1-dev libbluetooth3 libbluetooth-dev
+        git cmake g++ make libboost-all-dev python3-dev python3-numpy python3-setuptools python3-wheel
+        python3-pytest mono-devel curl libgtest-dev gdb -qq
+    - name: build-swig
+      uses: johnwason/swig-build-action@v1.3
+      with:
+        cache-key: ubuntu-22.04-x64
+        version: "4.4.1"
+    - uses: hendrikmuhs/ccache-action@v1.2.23
+      with:
+        key: repro-ubuntu-22.04-${{ matrix.shard }}
+    - name: configure
+      run: >
+        mkdir -p build2 && cd build2 &&
+        cmake -G "Unix Makefiles" -DBUILD_GEN=ON  -DBUILD_TESTING=ON -DBUILD_PYTHON3=ON -DBUILD_PYTHON3_WHEEL=ON
+        -DBoost_USE_STATIC_LIBS=OFF -DCMAKE_BUILD_TYPE=Release -DPYTHON3_EXECUTABLE=/usr/bin/python3
+        -DBUILD_JAVA=ON -DBUILD_NET=ON -DPACKAGE_SWIG_SOURCE_ALL=ON -DJAVA_HOME=/usr/lib/jvm/default-java
+        -DBUILD_PYTHON_WHEEL=OFF -DROBOTRACONTEUR_VERSION_SEMVER="${{ env.ROBOTRACONTEUR_SEMVER }}"
+        -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON
+        ../robotraconteur
+    - name: build
+      working-directory: build2
+      run: cmake --build . --config Release -- -j 4
+    - name: enable core dumps
+      run: |
+        mkdir -p /tmp/cores && chmod 777 /tmp/cores
+        sudo sysctl -w kernel.core_pattern=/tmp/cores/core.%e.%p.%t
+        sudo sysctl -w kernel.core_uses_pid=1
+    - name: repeat tests
+      working-directory: build2
+      run: |
+        ulimit -c unlimited
+        export PYTHONPATH=$PWD/out/Python3:$GITHUB_WORKSPACE/robotraconteur/test/python
+        export ROBOTRACONTEUR_ROBDEF_PATH=$GITHUB_WORKSPACE/robotraconteur/test/python/test/robdef
+        export PYTHONFAULTHANDLER=1
+        fails=0
+        for i in $(seq 1 $FULL_SUITE_RUNS); do
+          if ! timeout 900 python3 -m pytest -q -p no:cacheprovider $GITHUB_WORKSPACE/robotraconteur/test/python > /tmp/full_$i.log 2>&1; then
+            fails=$((fails+1)); echo "::error::full suite run $i failed"; tail -60 /tmp/full_$i.log; fi
+        done
+        echo "full suite: $fails / $FULL_SUITE_RUNS failed"
+        ffails=0
+        for i in $(seq 1 $FILE_RUNS); do
+          if ! timeout 120 python3 -m pytest -q -p no:cacheprovider $GITHUB_WORKSPACE/robotraconteur/test/python/RobotRaconteurTest/test_tcp_ws_origins.py > /tmp/file_$i.log 2>&1; then
+            ffails=$((ffails+1)); echo "::error::single file run $i failed"; tail -40 /tmp/file_$i.log; fi
+        done
+        echo "single file: $ffails / $FILE_RUNS failed"
+        echo "FAILS=$((fails+ffails))" >> $GITHUB_ENV
+    - name: backtraces
+      if: always()
+      run: |
+        ls -la /tmp/cores || true
+        for c in /tmp/cores/core.*; do
+          [ -f "$c" ] || continue
+          echo "===== $c"
+          gdb -batch -ex "info threads" -ex "thread apply all bt 30" /usr/bin/python3 "$c" 2>&1 | grep -vE '^\[New LWP|^warning:' | head -400
+        done
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: repro-logs-${{ matrix.shard }}
+        path: |
+          /tmp/full_*.log
+          /tmp/file_*.log
+        retention-days: 5
+    - name: result
+      run: test "$FAILS" = "0"

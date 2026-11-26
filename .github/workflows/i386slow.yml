@@ -1,0 +1,48 @@
+# Trial of the proposed build-sid-i386-slow CI job (robotraconteur branch bughunt/ci-sid-i386-slow): checks out
+# RR_REPO@RR_REF, overlays sid_i386_build/ from this branch, then builds at full speed and runs the tests on one
+# throttled core with the Java JIT disabled. To rerun: change RR_REF or the quota and push.
+name: i386-slow-trial
+on:
+  push:
+    paths:
+    - .github/workflows/i386slow.yml
+    - sid_i386_build/**
+env:
+  RR_REPO: robotraconteur/robotraconteur
+  RR_REF: master
+  CPU_QUOTA: "0.25"
+jobs:
+  build-sid-i386-slow:
+    runs-on: ubuntu-latest
+    env:
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        path: scratch
+    - uses: actions/checkout@v4
+      with:
+        repository: ${{ env.RR_REPO }}
+        ref: ${{ env.RR_REF }}
+        path: src/robotraconteur
+    - name: overlay scripts
+      run: |
+        mkdir -p src/robotraconteur/tools/build_files/sid_i386_build
+        cp scratch/sid_i386_build/*.sh src/robotraconteur/tools/build_files/sid_i386_build/
+        chmod +x src/robotraconteur/tools/build_files/sid_i386_build/*.sh
+    - name: apt update
+      run: sudo apt update
+    - name: apt
+      run: |
+        sudo apt-get install podman -qq
+    - name: build
+      run: |
+        podman run --platform linux/386 --name rr-sid-i386-build -v ${{github.workspace}}:/work -w /work \
+          docker.io/i386/debian:sid /work/src/robotraconteur/tools/build_files/sid_i386_build/sid_i386_build.sh build
+        podman commit rr-sid-i386-build rr-sid-i386-build-image
+        podman rm rr-sid-i386-build
+    - name: test (slow single core)
+      run: |
+        podman run --platform linux/386 --rm --cpuset-cpus=0 --cpus=${{ env.CPU_QUOTA }} --cpu-period=10000 \
+          -e JAVA_TOOL_OPTIONS=-Xint -v ${{github.workspace}}:/work -w /work rr-sid-i386-build-image \
+          /work/src/robotraconteur/tools/build_files/sid_i386_build/sid_i386_build.sh test

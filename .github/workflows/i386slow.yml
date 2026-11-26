@@ -10,7 +10,7 @@ on:
 env:
   RR_REPO: robotraconteur/robotraconteur
   RR_REF: master
-  CPU_QUOTA: "0.25"
+  CPU_QUOTA_US: "2500"   # CPU time per 10 ms period; 2500 = a quarter of one core
 jobs:
   build-sid-i386-slow:
     runs-on: ubuntu-latest
@@ -43,6 +43,6 @@ jobs:
         podman rm rr-sid-i386-build
     - name: test (slow single core)
       run: |
-        podman run --platform linux/386 --rm --cpuset-cpus=0 --cpus=${{ env.CPU_QUOTA }} --cpu-period=10000 \
+        podman run --platform linux/386 --rm --cpuset-cpus=0 --cpu-period=10000 --cpu-quota=${{ env.CPU_QUOTA_US }} \
           -e JAVA_TOOL_OPTIONS=-Xint -v ${{github.workspace}}:/work -w /work rr-sid-i386-build-image \
           /work/src/robotraconteur/tools/build_files/sid_i386_build/sid_i386_build.sh test

@@ -1,0 +1,62 @@
+# The project's CI. It runs in johnwason/github-actions-scratch, not in this repository, at the
+# project owner's direction: scripts/remote-ci.sh pushes a snapshot of the tree (no history) to
+# an orphan branch there with this file installed as .github/workflows/rr-lua-ci.yml.
+#   rr-lua-ci/<sha>        secret scan, verify.sh, and the ASan and TSan sanitizer jobs
+#   rr-lua-ci-quick/<sha>  secret scan and verify.sh only
+name: rr-lua-ci
+
+on:
+  push:
+    branches: ["rr-lua-ci/**", "rr-lua-ci-quick/**"]
+
+permissions:
+  contents: read
+
+jobs:
+  secret-scan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The snapshot has no history; the pre-commit hook scans each commit locally.
+      - name: gitleaks (snapshot tree)
+        run: >
+          docker run --rm -v "$PWD:/repo"
+          ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+          dir /repo --redact --verbose
+
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Runner
+        run: uname -a; nproc; free -g; podman --version
+      - name: Bootstrap
+        run: scripts/bootstrap.sh
+      - name: Verify
+        run: scripts/verify.sh
+
+  sanitizers:
+    if: startsWith(github.ref_name, 'rr-lua-ci/')
+    strategy:
+      fail-fast: false
+      matrix:
+        san: [asan, tsan]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # GCC 13's TSan aborts ("unexpected memory mapping") with 32 bits of mmap ASLR entropy.
+      - name: Reduce mmap ASLR entropy
+        run: sudo sysctl -w vm.mmap_rnd_bits=28
+      - name: Bootstrap
+        run: scripts/bootstrap.sh
+      - name: Sanitizers (${{ matrix.san }})
+        run: scripts/verify-sanitizers.sh ${{ matrix.san }}

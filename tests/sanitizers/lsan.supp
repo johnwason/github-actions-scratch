@@ -1,0 +1,7 @@
+# LeakSanitizer suppressions, used by scripts/container/sanitizer-steps.sh.
+# Keep each entry narrow and explained; never suppress the binding's own allocations.
+
+# RR core's C++ test server library (a test fixture with its own static RR copy, loaded by
+# host_sim) does not free its node and service objects after it is stopped. These allocations
+# are made inside that library, not by the binding. See PROGRESS.md, 2026-11-20.
+leak:librobotraconteur_test_server_lib.so

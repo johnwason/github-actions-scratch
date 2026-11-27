@@ -1,0 +1,35 @@
+service experimental.lua_server_test
+
+stdver 0.10
+
+struct Point
+    field double x
+    field double y
+end
+
+object Root
+    property double speed
+    property string name [readonly]
+    property Point pos
+    function double add(double a, double b)
+    function void fail(string msg)
+    function Point midpoint(Point a, Point b)
+    function void ping()
+    function int32{generator} count(int32 n)
+    function double{generator} running_sum(double{generator} x)
+    event moved(Point p, double t)
+    objref Child child
+    objref Child{int32} kids
+    wire double[] state [readonly]
+    wire double[] command [writeonly]
+    wire int32 both
+    pipe double[] frames
+    memory double[] buf
+    memory int32[*] grid
+end
+
+object Child
+    property int32 id
+    function string hello(string who)
+    wire int32 counter [readonly]
+end

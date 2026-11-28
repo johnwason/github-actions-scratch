@@ -1,0 +1,11 @@
+# ThreadSanitizer suppressions, used by scripts/container/sanitizer-steps.sh.
+# Keep each entry narrow and explained; never suppress a report in the binding's own code.
+
+# RR core discovery: lock-order inversion between Discovery_findservicebytype::work_lock (M0)
+# and the work_lock (M1) of the Discovery_updatediscoverednodes object that
+# Discovery::AsyncUpdateDetectedNodes creates fresh for each call. The calling thread takes M1
+# exactly once, at the top of UpdateDiscoveredNodes, while holding M0. The callbacks that take
+# M1 then M0 (getdetectednodes_callback / timeout_timer_callback -> InvokeHandler -> find2) are
+# bound inside that critical section, so none can hold M1 before it, and the caller never asks
+# for M1 again: the cycle cannot close. Reviewed against RR core; see PROGRESS.md, 2026-11-26.
+deadlock:Discovery_updatediscoverednodes::UpdateDiscoveredNodes
